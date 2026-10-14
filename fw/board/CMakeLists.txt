@@ -3,6 +3,8 @@
 
 if(CONFIG_BOARD_ASTERIX)
   set(sources boards/board_asterix.c)
+elseif(CONFIG_BOARD_SILK)
+  set(sources boards/board_silk.c)
 elseif(CONFIG_BOARD_OBELIX)
   set(sources boards/board_obelix.c)
 elseif(CONFIG_BOARD_GETAFIX)

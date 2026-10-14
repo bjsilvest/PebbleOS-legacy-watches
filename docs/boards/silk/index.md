@@ -79,6 +79,66 @@ backup registers:
   back to PRF immediately. The image header format must match what the stock
   bootloader expects (`firmware.h`).
 
+Checked against the stock bootloader source: the boot bit values in
+`fw/system/bootbits.h` are identical, and so is their register (`RTC_BKP_DR0`).
+The bootloader only touches `DR0` (boot bits), `DR1` (stuck-button counter,
+which it manages itself) and `DR2` (bootloader version). Core's STM32 register
+map differs from stock only in OS-internal registers (`DR6`–`DR10`).
+
+Before jumping to the firmware the bootloader calls `RCC_DeInit()`, so
+`SystemInit()` (`soc/stm32/stm32f4/system_stm32f4xx.c`) sets up the clocks
+itself. It runs the PLL from the HSI at 96 MHz, with an exact 48 MHz for the
+RNG. Core's old version left the PLL at its reset values but reported 100 MHz,
+and used 4 flash wait states, which is too few at silk's 1.8–2.0 V supply. It
+now uses 6 wait states; tune this against RM0402.
+
+## Factory data (read-only)
+
+- `MFG_INFO` (external flash) uses the stock v3 struct (`fw/mfg/silk/mfg_info.c`)
+  with the layout verified against stock. All setters are no-ops.
+- Serial number, PCBA serial and hardware version come from the STM32 OTP
+  area, in several slots per value; the most recent locked slot wins. Writing
+  OTP is irreversible, so the OTP driver must not write on silk.
+
+## Flashing
+
+The silk board has **no `pbl flash`/`erase` runner**, on purpose. The OpenOCD
+runner's `erase` erases internal flash sector 0, which on silk is the stock
+bootloader. Install only through the stock update path.
+
+## Hardware port status
+
+Core's drivers have been redesigned since silk support was dropped, so the
+STM32 drivers are rewritten against the current APIs, using the old drivers
+(`git show 85a10e0b5^:src/fw/drivers/...`) for the hardware details.
+
+| Area | Status |
+|---|---|
+| STM32 SPL (`third_party/hal_stm32`) | done |
+| SoC: clocks, IRQs, memory, idle (`soc/stm32/stm32f4`) | done (idle: WFI only, STOP mode TODO) |
+| GPIO | done |
+| UART (console), RTC, watchdog, EXTI, buttons | todo |
+| QSPI + MX25U flash | todo |
+| Sharp display (SPI2 + DMA) | todo |
+| I2C3, AS3701B PMIC, battery ADC | todo |
+| BMA255 accel (SPI), MAG3110, ALS, vibe/backlight PWM | todo |
+| Board (`fw/board/boards/board_silk.*`) | old file restored, to be rewritten |
+
+Pin map (from the stock board file):
+
+| Function | Pins / peripheral |
+|---|---|
+| Debug UART | USART1, TX PA9, RX PB7 (QEMU: USART2) |
+| Buttons (active high) | Back PC13 (no pull), Up PD2, Select PH0, Down PH1 (pull-down) |
+| QSPI flash | CS PB6, CLK PB2, D0 PC9, D1 PC10, D2 PC8, D3 PA1, 50 MHz |
+| Sharp display | SPI2, CLK PB10, MOSI PB15, CS PB9, ON PA0 |
+| I2C3 (PMIC, HRM) | SCL PA8, SDA PB8, 400 kHz; AS3701B at 0x80, INT PC7 |
+| Vibe | ctl PB13, PWM TIM3 CH1 on PC6 |
+| Backlight | PWM TIM14 CH1 on PA7 |
+| Accel ints | PA6, PA3 |
+| ADC1 | ALS ch13 (PC3, enable PC0), battery ch5 (PA5), temperature |
+| Mic | DFSDM1 ch2, CK PC2, SD PB14 |
+
 ## Resources
 
 Each stock resource bank is 512K. The full Core resource pack (about 705K)

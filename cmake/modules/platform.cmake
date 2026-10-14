@@ -17,7 +17,9 @@ else()
   message(FATAL_ERROR "No platform specified for ${PBL_BOARD}")
 endif()
 
-if(NOT PBL_BOARD_RUNNERS AND NOT CONFIG_QEMU AND NOT CONFIG_SOC_POSIX)
+# Guarded boards (stock bootloader and PRF that must not be touched) get no
+# runner on purpose: they are only installed through the stock update path.
+if(NOT PBL_BOARD_RUNNERS AND NOT CONFIG_QEMU AND NOT CONFIG_SOC_POSIX AND NOT CONFIG_FLASH_GUARD)
   message(FATAL_ERROR "Board ${PBL_BOARD} does not define any supported runners")
 endif()
 
