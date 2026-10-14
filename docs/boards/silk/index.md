@@ -116,13 +116,32 @@ STM32 drivers are rewritten against the current APIs, using the old drivers
 |---|---|
 | STM32 SPL (`third_party/hal_stm32`) | done |
 | SoC: clocks, IRQs, memory, idle (`soc/stm32/stm32f4`) | done (idle: WFI only, STOP mode TODO) |
-| GPIO | done |
-| UART (console), RTC, watchdog, EXTI, buttons | todo |
-| QSPI + MX25U flash | todo |
-| Sharp display (SPI2 + DMA) | todo |
-| I2C3, AS3701B PMIC, battery ADC | todo |
-| BMA255 accel (SPI), MAG3110, ALS, vibe/backlight PWM | todo |
-| Board (`fw/board/boards/board_silk.*`) | old file restored, to be rewritten |
+| GPIO, EXTI, delay, RNG, OTP (read-only), MCU ID | done |
+| RTC (stock time format, timezone registers) | done |
+| Watchdog (IWDG, started by the stock bootloader) | done |
+| Debug UART (USART1) | done (RX DMA TODO) |
+| Buttons (TIM4 debounce, reset combo, stuck-button counter) | done |
+| QSPI + MX25U flash (hardware PRF/MFG block locks) | done (polled; DMA/mmap TODO) |
+| Sharp display (SPI2) | done (polled; DMA TODO) |
+| Board (`fw/board/boards/board_silk.*`) | done for the above |
+| I2C3, AS3701B PMIC, battery ADC | todo (fixed-value stand-in) |
+| BMA255 accel, ALS, vibe/backlight PWM, DFSDM mic | todo (fixed-value stand-ins) |
+| STOP mode, DMA | todo |
+| Bluetooth (DA14681) | todo |
+
+The `silk` board boots in QEMU (`pebble-silk-bb`) through the **stock
+bootloader** to the watchface, with PRF, stock shared PRF storage and MFG
+info untouched:
+
+```shell
+pbl configure -b build-hw --board silk
+pbl build -b build-hw
+python3 tools/qemu_silk_canary.py --build-dir build-hw --machine pebble-silk-bb \
+    --qemu $PEBBLEOS_SDK_ROOT/qemu/bin/qemu-pebble
+```
+
+QEMU does not emulate the IWDG, so watchdog resets (and the bootloader's
+three-strike fallback to PRF) are untested in emulation.
 
 Pin map (from the stock board file):
 
