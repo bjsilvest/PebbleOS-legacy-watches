@@ -105,6 +105,15 @@ extern UARTDevice *const BT_HCI_TX_UART;
 
 // DA14681 reset, active high.
 static const struct pbl_gpio BOARD_BT_RESET = PBL_GPIO(STM32_GPIOC, 5, 0);
+
+// H4 flow control over spare lines of stock's SPI link, routed there by the
+// controller image: its UART RTS (radio P0_0, low when it can take bytes) and
+// CTS (radio P0_1, held low so it may always send). The bootrom probes these
+// for SPI, so CTS is driven only once the controller image runs.
+#define BOARD_BT_HAS_FLOW_CONTROL 1
+static const struct pbl_gpio BOARD_BT_RTS =
+    PBL_GPIO(STM32_GPIOB, 0, PBL_GPIO_ACTIVE_LOW | PBL_GPIO_PULL_UP);
+static const struct pbl_gpio BOARD_BT_CTS = PBL_GPIO(STM32_GPIOB, 1, PBL_GPIO_ACTIVE_LOW);
 #endif
 extern QSPIPort *const QSPI;
 extern QSPIFlash *const QSPI_FLASH;

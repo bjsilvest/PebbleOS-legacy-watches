@@ -321,6 +321,11 @@ static void prv_hold_in_reset(void) {
 static bool prv_boot_once(void) {
   prv_hold_in_reset();
   delay_us(100);
+#ifdef BOARD_BT_HAS_FLOW_CONTROL
+  // Released while the bootrom probes these pins for SPI.
+  pbl_gpio_configure(&BOARD_BT_CTS, PBL_GPIO_INPUT);
+  pbl_gpio_configure(&BOARD_BT_RTS, PBL_GPIO_INPUT);
+#endif
 
   uart_init_rx_only(BT_HCI_UART);
   uart_init_tx_only(BT_HCI_UART_TX);
@@ -339,6 +344,10 @@ static bool prv_boot_once(void) {
     return false;
   }
 
+#ifdef BOARD_BT_HAS_FLOW_CONTROL
+  // The controller image runs now: let it send.
+  pbl_gpio_configure(&BOARD_BT_CTS, PBL_GPIO_OUTPUT_ACTIVE);
+#endif
   prv_set_baud(CONFIG_BT_DA1468X_HCI_BAUD);
   prv_collect_markers();
   if (!prv_hci_probe()) {
@@ -378,6 +387,23 @@ bool da1468x_boot(void) {
 
 const char *da1468x_status(void) {
   return s_status;
+}
+
+bool da1468x_rts_ready(void) {
+#ifdef BOARD_BT_HAS_FLOW_CONTROL
+  return pbl_gpio_get(&BOARD_BT_RTS) > 0;
+#else
+  return true;
+#endif
+}
+
+bool da1468x_has_flow_control(void) {
+#ifdef BOARD_BT_HAS_FLOW_CONTROL
+  // An image without flow control leaves the line to the pull-up.
+  return da1468x_rts_ready();
+#else
+  return false;
+#endif
 }
 
 const char *da1468x_chip_id(void) {

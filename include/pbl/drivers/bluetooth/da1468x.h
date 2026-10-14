@@ -44,3 +44,17 @@ const char *da1468x_rx_after_markers(void);
  * @return A static hex string, empty if nothing came.
  */
 const char *da1468x_rx_after_reset(void);
+
+/**
+ * @brief Whether the running controller drives RTS for H4 flow control.
+ *
+ * Call once the controller answers HCI: its RTS then reads ready.
+ */
+bool da1468x_has_flow_control(void);
+
+/**
+ * @brief Whether the controller can take more bytes (its RTS is asserted).
+ *
+ * Always true on boards without flow control lines. ISR-safe.
+ */
+bool da1468x_rts_ready(void);

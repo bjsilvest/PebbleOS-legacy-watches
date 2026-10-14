@@ -367,6 +367,9 @@ static void prv_rx_irq_handler(UARTDevice *dev, uint8_t data, const UARTRXErrorF
 }
 
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
+// With flow control the controller's RTS gates each byte instead of pacing.
+static bool s_flow_control;
+static volatile uint32_t s_tx_flow_waits;
 static void prv_tx_irq_handler(UARTDevice *dev);
 // 89 ms of data at 115200 baud.
 static uint8_t s_rx_dma_buf[1024];
@@ -389,6 +392,7 @@ static void prv_uart_start(void) {
   // which interrupts locked for longer (e.g. flash writes after pairing) broke:
   // receive by DMA where the board has it.
   uart_start_rx_dma(BT_HCI_UART, s_rx_dma_buf, sizeof(s_rx_dma_buf));
+  s_flow_control = da1468x_has_flow_control();
 #endif
   s_controller_state = ControllerStateReady;
 }
@@ -579,14 +583,14 @@ static void prv_hci_task_main(void *unused) {
 
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
 // The DA1468x's DGTL reads each packet in steps (type, header, parameters),
-// re-arming the read in between, and its UART has only a 16-byte FIFO and no
-// flow control here. Long bursts lost bytes: pairing failed on the 69-byte
-// SMP public key, which the phone rejected as invalid. Send in short bursts
-// with a pause after each, and after each packet type byte.
+// re-arming the read in between, and its UART has only a 16-byte FIFO. Bytes
+// lost there make the DGTL drop everything until the next HCI Reset. When the
+// controller image drives RTS (BOARD_BT_HAS_FLOW_CONTROL), each byte waits for
+// it. Otherwise send in short bursts with a pause after each, and after each
+// packet type byte, which still loses bytes when the controller is busy.
 //
-// The host task runs at nearly the highest priority, so the bursts go out from
-// the TX interrupt and the pauses sleep: busy-waiting starved the UI while the
-// phone app synced.
+// The host task runs at nearly the highest priority, so bytes go out from the
+// TX interrupt and waits sleep: busy-waiting starved the UI.
 #define TX_BURST_BYTES      8U
 #define TX_PAUSE_MS         1U
 #define TX_BURST_TIMEOUT_MS 50U
@@ -594,10 +598,18 @@ static void prv_hci_task_main(void *unused) {
 static const uint8_t *s_tx_ptr;
 static volatile size_t s_tx_left;
 static PBL_SEM_DEFINE(s_tx_done, 0, 1);
+// RTS stuck deasserted this long means the line is not what we think: send.
+#define TX_FLOW_TIMEOUT_MS 500U
 
 static void prv_tx_irq_handler(UARTDevice *dev) {
   if (s_tx_left == 0U) {
     uart_set_tx_interrupt_enabled(dev, false);
+    return;
+  }
+  if (s_flow_control && !da1468x_rts_ready()) {
+    // No EXTI line is free for RTS on silk: stop and let the writer poll.
+    uart_set_tx_interrupt_enabled(dev, false);
+    pbl_sem_give(&s_tx_done);
     return;
   }
   uart_write_byte(dev, *s_tx_ptr++);
@@ -607,24 +619,43 @@ static void prv_tx_irq_handler(UARTDevice *dev) {
   }
 }
 
-static void prv_write_burst(const uint8_t *data, size_t len) {
+static void prv_tx_poll_rest(void) {
+  pbl_irq_lock();
+  uart_set_tx_interrupt_enabled(BT_HCI_UART_TX, false);
+  const uint8_t *ptr = s_tx_ptr;
+  size_t left = s_tx_left;
+  s_tx_left = 0U;
+  pbl_irq_unlock();
+  while (left-- > 0U) {
+    uart_write_byte(BT_HCI_UART_TX, *ptr++);
+  }
+  (void)pbl_sem_take(&s_tx_done, PBL_NO_WAIT);
+}
+
+// Send from the TX interrupt; the caller sleeps meanwhile.
+static void prv_write_irq(const uint8_t *data, size_t len) {
+  uint32_t waited_ms = 0U;
+
   s_tx_ptr = data;
   s_tx_left = len;
-  uart_set_tx_interrupt_enabled(BT_HCI_UART_TX, true);
-  if (pbl_sem_take(&s_tx_done, PBL_MSEC(TX_BURST_TIMEOUT_MS)) != 0) {
-    // Should not happen; finish the burst by polling rather than lose it.
-    pbl_irq_lock();
-    uart_set_tx_interrupt_enabled(BT_HCI_UART_TX, false);
-    const uint8_t *ptr = s_tx_ptr;
-    size_t left = s_tx_left;
-    s_tx_left = 0U;
-    pbl_irq_unlock();
-    while (left-- > 0U) {
-      uart_write_byte(BT_HCI_UART_TX, *ptr++);
+  while (s_tx_left > 0U) {
+    uart_set_tx_interrupt_enabled(BT_HCI_UART_TX, true);
+    if (pbl_sem_take(&s_tx_done, PBL_MSEC(TX_BURST_TIMEOUT_MS)) != 0) {
+      // Should not happen; finish by polling rather than lose the bytes.
+      prv_tx_poll_rest();
+      return;
     }
-    (void)pbl_sem_take(&s_tx_done, PBL_NO_WAIT);
+    if (s_tx_left > 0U) {
+      // The controller deasserted RTS.
+      s_tx_flow_waits++;
+      if (waited_ms >= TX_FLOW_TIMEOUT_MS) {
+        prv_tx_poll_rest();
+        return;
+      }
+      pbl_thread_sleep(PBL_MSEC(1));
+      waited_ms++;
+    }
   }
-  pbl_thread_sleep(PBL_MSEC(TX_PAUSE_MS));
 }
 #endif
 
@@ -634,8 +665,13 @@ static void prv_write(const uint8_t *data, size_t len) {
   }
 
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
+  if (s_flow_control) {
+    prv_write_irq(data, len);
+    return;
+  }
   for (size_t i = 0U; i < len; i += TX_BURST_BYTES) {
-    prv_write_burst(&data[i], MIN(len - i, (size_t)TX_BURST_BYTES));
+    prv_write_irq(&data[i], MIN(len - i, (size_t)TX_BURST_BYTES));
+    pbl_thread_sleep(PBL_MSEC(TX_PAUSE_MS));
   }
 #else
   for (size_t i = 0U; i < len; i++) {
@@ -719,9 +755,10 @@ uint32_t pbl_bt_hci_uart_acl_clamped(void) {
 
 void pbl_bt_hci_uart_copy_rx_stats(char *buf, size_t len) {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
-  sniprintf(buf, len, "u%04x@%04x g%lu/%04x d%lu o%lu", (unsigned)s_unknown_msg_id,
+  sniprintf(buf, len, "u%04x@%04x g%lu/%04x d%lu o%lu %c%lu", (unsigned)s_unknown_msg_id,
             (unsigned)s_unknown_task_id, (unsigned long)s_dgtl_skipped, (unsigned)s_last_gtl_msg_id,
-            (unsigned long)s_rx_dropped_bytes, (unsigned long)s_rx_overruns);
+            (unsigned long)s_rx_dropped_bytes, (unsigned long)s_rx_overruns,
+            s_flow_control ? 'F' : 'p', (unsigned long)s_tx_flow_waits);
 #else
   buf[0] = '\0';
 #endif
