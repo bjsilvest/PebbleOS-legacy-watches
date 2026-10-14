@@ -23,8 +23,8 @@ bool pbl_bt_hci_uart_wait_ready(uint32_t timeout_ms);
 /**
  * @brief Describe the last HCI exchange, for diagnostics.
  *
- * Formats "<last command>><last answered command>:<its status> #<events received>",
- * opcodes in hex.
+ * Formats "<last answered command>:<its status> !<last failed command>:<its status>",
+ * opcodes and status codes in hex.
  *
  * @param[out] buf Buffer for the string.
  * @param len Size of @p buf.

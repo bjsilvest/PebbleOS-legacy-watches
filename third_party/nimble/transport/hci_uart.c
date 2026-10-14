@@ -69,6 +69,8 @@ static volatile uint16_t s_last_cmd;
 static volatile uint16_t s_last_reply_cmd;
 static volatile uint8_t s_last_reply_status;
 static volatile uint32_t s_num_evts;
+static volatile uint16_t s_last_fail_cmd;
+static volatile uint8_t s_last_fail_status;
 
 static struct os_mbuf *prv_alloc_acl_from_ll(void) {
   struct os_mbuf *om;
@@ -113,6 +115,12 @@ static void prv_note_evt(const struct ble_hci_ev *ev) {
   } else if (ev->opcode == BLE_HCI_EVCODE_COMMAND_STATUS && ev->length >= 4U) {
     s_last_reply_cmd = ev->data[2] | (ev->data[3] << 8);
     s_last_reply_status = ev->data[0];
+  } else {
+    return;
+  }
+  if (s_last_reply_status != 0U) {
+    s_last_fail_cmd = s_last_reply_cmd;
+    s_last_fail_status = s_last_reply_status;
   }
 }
 
@@ -253,8 +261,8 @@ bool pbl_bt_hci_uart_wait_ready(uint32_t timeout_ms) {
 }
 
 void pbl_bt_hci_uart_copy_status(char *buf, size_t len) {
-  sniprintf(buf, len, "%04x>%04x:%02x #%lu", (unsigned)s_last_cmd, (unsigned)s_last_reply_cmd,
-            (unsigned)s_last_reply_status, (unsigned long)s_num_evts);
+  sniprintf(buf, len, "%04x:%02x !%04x:%02x", (unsigned)s_last_reply_cmd,
+            (unsigned)s_last_reply_status, (unsigned)s_last_fail_cmd, (unsigned)s_last_fail_status);
 }
 
 int ble_transport_to_ll_cmd_impl(void *buf) {
