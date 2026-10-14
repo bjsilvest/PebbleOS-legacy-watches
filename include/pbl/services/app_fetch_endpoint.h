@@ -98,6 +98,12 @@ bool app_fetch_in_progress(void);
  */
 void app_fetch_put_bytes_event_handler(PebblePutBytesEvent *pb_event);
 
+//! Add a step to the app fetch trace, for diagnostics.
+void app_fetch_trace_note(char c);
+
+//! The app fetch trace, oldest step first.
+const char *app_fetch_trace(void);
+
 /**
  * @brief Get the result of the last fetch.
  *

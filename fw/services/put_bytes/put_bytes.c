@@ -9,6 +9,7 @@
 #include <pbl/kernel/sem.h>
 #include <pbl/kernel/types.h>
 #include <pbl/logging/logging.h>
+#include <pbl/services/app_fetch_endpoint.h>
 #include <pbl/services/comm_session/session.h>
 #include <pbl/services/comm_session/session_receive_router.h>
 #include <pbl/services/firmware_update.h>
@@ -384,6 +385,7 @@ static void prv_fail(uint32_t token) {
 }
 
 static void prv_timer_callback(void *data) {
+  app_fetch_trace_note('t');
   PBL_LOG_WRN("Put bytes Tok: %" PRIu32 " timed out after %" PRIu32 "ms, cleaning up.",
               s_pb_state.token, PUT_TIMEOUT_MS);
   prv_cleanup_async();
@@ -811,6 +813,7 @@ static void prv_do_commit(void) {
                                              s_pb_state.total_size, elapsed_time_ms,
                                              &s_pb_state.conn_event_stats);
 
+  app_fetch_trace_note(commit_succeeded ? 'c' : 'x');
   if (commit_succeeded) {
     s_pb_state.is_success = true;
     PBL_LOG_DBG("PutBytes commit CB. CRC matches! Calculated CRC is 0x%" PRIx32

@@ -18,6 +18,7 @@
 #include <pbl/bluetooth/hci_uart.h>
 #include <pbl/drivers/bluetooth/da1468x.h>
 #endif
+#include <pbl/services/app_fetch_endpoint.h>
 #include <pbl/services/blob_db/api.h>
 #include <pbl/services/bluetooth/local_id.h>
 #include <pbl/services/i18n/i18n.h>
@@ -65,6 +66,7 @@ enum {
   SystemInformationItemBtSmp2,
   SystemInformationItemLastReboot,
   SystemInformationItemBtRx,
+  SystemInformationItemAppFetch,
   SystemInformationItemBtChip,
   SystemInformationItemBtRxBoot,
   SystemInformationItemBtRxReset,
@@ -242,6 +244,7 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemBtSmp2] = i18n_noop("BT SMP 2"),
   [SystemInformationItemLastReboot] = i18n_noop("Last reboot"),
   [SystemInformationItemBtRx] = i18n_noop("BT Rx"),
+  [SystemInformationItemAppFetch] = i18n_noop("App fetch"),
   [SystemInformationItemBtChip] = i18n_noop("BT Chip"),
   [SystemInformationItemBtRxBoot] = i18n_noop("BT Rx boot"),
   [SystemInformationItemBtRxReset] = i18n_noop("BT Rx reset"),
@@ -381,6 +384,7 @@ static void prv_information_window_push(SettingsSystemData *data) {
   info->subtitle_text[SystemInformationItemLastReboot] = info->last_reboot_string;
   pbl_bt_hci_uart_copy_rx_stats(info->bt_rx_string, sizeof(info->bt_rx_string));
   info->subtitle_text[SystemInformationItemBtRx] = info->bt_rx_string;
+  info->subtitle_text[SystemInformationItemAppFetch] = app_fetch_trace();
   info->subtitle_text[SystemInformationItemBtChip] = da1468x_chip_id();
   info->subtitle_text[SystemInformationItemBtRxBoot] = da1468x_rx_after_markers();
   info->subtitle_text[SystemInformationItemBtRxReset] = da1468x_rx_after_reset();

@@ -132,7 +132,30 @@ static uint8_t prv_compute_progress_percent(PutBytesObjectType type, unsigned in
 }
 
 //! Cleans up the state of the app fetch endpoint. Always called from the system task
+// Trace of the last fetches for diagnostics, one character per step, oldest
+// dropped: R request sent, S phone starting, a/w/r app/worker/resources done,
+// F put_bytes failed, T timeout, C added to the app cache, then '=' and the
+// result. put_bytes adds c (CRC ok), x (CRC mismatch) and t (timeout).
+#define TRACE_LEN 24U
+static char s_trace[TRACE_LEN + 1];
+
+void app_fetch_trace_note(char c) {
+  size_t len = strlen(s_trace);
+  if (len == TRACE_LEN) {
+    memmove(s_trace, &s_trace[1], TRACE_LEN - 1U);
+    len--;
+  }
+  s_trace[len] = c;
+  s_trace[len + 1U] = '\0';
+}
+
+const char *app_fetch_trace(void) {
+  return s_trace;
+}
+
 static void prv_cleanup(AppFetchResult result) {
+  app_fetch_trace_note('=');
+  app_fetch_trace_note("0123456789abcdef"[result & 0xfU]);
   if (result != AppFetchResultSuccess) {
     put_bytes_cancel();
     app_cache_remove_entry(s_fetch_state.app_id);
@@ -155,6 +178,7 @@ void prv_put_bytes_event_system_task_cb(void *data) {
 
   // If put_bytes has failed, let's just say fail and stop everything.
   if (pb_event->failed == true) {
+    app_fetch_trace_note('F');
     AppFetchResult error;
     if (s_fetch_state.cancelling) {
       PBL_LOG_WRN("Put bytes cancelled by user");
@@ -169,6 +193,7 @@ void prv_put_bytes_event_system_task_cb(void *data) {
   }
 
   if (pb_event->type == PebblePutBytesEventTypeInitTimeout) {
+    app_fetch_trace_note('T');
     PBL_LOG_WRN("Timed out waiting for putbytes request from phone");
     prv_cleanup(AppFetchResultTimeoutError);
   }
@@ -190,12 +215,15 @@ void prv_put_bytes_event_system_task_cb(void *data) {
 
     switch (pb_event->object_type) {
       case ObjectWatchApp:
+        app_fetch_trace_note('a');
         s_fetch_state.app = true;
         break;
       case ObjectWatchWorker:
+        app_fetch_trace_note('w');
         s_fetch_state.worker = true;
         break;
       case ObjectAppResources:
+        app_fetch_trace_note('r');
         s_fetch_state.resources = true;
         break;
       default:
@@ -216,6 +244,7 @@ void prv_put_bytes_event_system_task_cb(void *data) {
     // signify in the app cache that the app binaries are now loaded
     status_t added = app_cache_add_entry(s_fetch_state.app_id, s_fetch_state.total_size);
     if (added == S_SUCCESS) {
+      app_fetch_trace_note('C');
       // Set prev_error as a Success.
       s_fetch_state.prev_error = AppFetchResultSuccess;
       prv_put_event_simple(AppFetchEventTypeFinish);
@@ -270,6 +299,7 @@ static void prv_app_fetch_binaries_system_task_cb(void *data) {
   // free before error checking
   kernel_free(request);
 
+  app_fetch_trace_note(successful ? 'R' : 'N');
   // If Bluetooth wasn't active, then post the error and cleanup.
   if (!successful) {
     prv_cleanup(AppFetchResultNoBluetooth);
@@ -287,6 +317,7 @@ static void prv_app_fetch_binaries_system_task_cb(void *data) {
 void prv_handle_app_fetch_install_response(uint8_t result_code) {
   switch (result_code) {
     case APP_FETCH_RESPONSE_STARTING:
+      app_fetch_trace_note('S');
       PBL_LOG_INFO("Phone confirmed it will start sending data");
       prv_put_event_simple(AppFetchEventTypeStart);
       put_bytes_expect_init(FETCH_TIMEOUT_MS);
