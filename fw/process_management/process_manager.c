@@ -21,6 +21,7 @@
 #include <pbl/services/hrm/hrm_manager.h>
 #include <pbl/services/persist.h>
 #include <pbl/services/voice/voice.h>
+#include <pbl/task_wdt/task_wdt.h>
 #include <pbl/util/heap.h>
 
 #include <applib/accel_service_private.h>
@@ -41,6 +42,13 @@
 #include <system/passert.h>
 
 static TimerID s_deinit_timer_id = TIMER_INVALID_ID;
+
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+// Diagnostic: silk with the DA1468x froze after pairing with no monitored
+// thread stuck, so also watch the app task while it handles an event.
+#define APP_WDT_TIMEOUT_MS 20000U
+static int s_app_wdt_channel = -1;
+#endif
 
 // -------------------------------------------------------------------------------------------
 static ProcessContext *prv_get_context_for_task(PebbleTask task) {
@@ -566,6 +574,13 @@ void process_manager_process_cleanup(PebbleTask task) {
 
   new_timer_stop(s_deinit_timer_id);
 
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  if (task == PebbleTask_App && s_app_wdt_channel >= 0) {
+    (void)pbl_task_wdt_delete(s_app_wdt_channel);
+    s_app_wdt_channel = -1;
+  }
+#endif
+
   if (context->task_handle) {
     pbl_thread_abort(context->task_handle);
     context->task_handle = nullptr;
@@ -687,10 +702,26 @@ DEFINE_SYSCALL(void, sys_get_pebble_event, PebbleEvent *event) {
     syscall_assert_userspace_buffer(event, sizeof(*event));
   }
 
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  const bool watched = (pebble_task_get_current() == PebbleTask_App);
+  if (watched && s_app_wdt_channel < 0) {
+    s_app_wdt_channel = pbl_task_wdt_add(nullptr, APP_WDT_TIMEOUT_MS, nullptr, nullptr);
+  }
+  if (watched) {
+    pbl_task_wdt_set_waiting(true);
+  }
+#endif
+
   // A forced close suspends the task to read its registers. Resuming it ends this wait with
   // -EINTR and no event, so wait again rather than hand the process an empty event.
   while (pbl_msgq_get(prv_get_context()->to_process_event_queue, event, PBL_FOREVER) != 0) {
   }
+
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  if (watched) {
+    pbl_task_wdt_set_waiting(false);
+  }
+#endif
 }
 
 // -------------------------------------------------------------------------------------------
