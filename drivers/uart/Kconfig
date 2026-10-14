@@ -23,6 +23,13 @@ config UART_SF32LB
     help
       Support for the SiFli SF32LB UART controller.
 
+config UART_STM32
+    bool "ST STM32 USART"
+    default y if SOC_STM32F4
+    select HAL_STM32
+    help
+      Support for the STM32F4 USART.
+
 config UART_QEMU
     bool "QEMU Simple UART"
     default y if SOC_QEMU
