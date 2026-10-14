@@ -30,8 +30,9 @@ PBL_LOG_MODULE_DEFINE(bt, CONFIG_BT_LOG_LEVEL);
 static const uint32_t s_bt_stack_start_stop_timeout_ms = 10000;
 
 #ifdef CONFIG_BT_HCI_UART
-// Below the caller's task watchdog timeout.
-#define BT_HCI_UART_READY_TIMEOUT_MS 3500U
+// Long enough for the transport to retry booting its controller; the wait
+// feeds the caller's task watchdog.
+#define BT_HCI_UART_READY_TIMEOUT_MS 8000U
 #endif
 
 extern void pebble_pairing_service_init(void);
@@ -205,11 +206,29 @@ bool pbl_bt_start(struct pbl_bt_config *config) {
 #endif
 
   ble_hs_sched_start();
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  // The controller is built out of tree and still unproven: a host that cannot
+  // sync with it leaves Bluetooth off instead of crashing, since a crash loop
+  // would end in the bootloader starting PRF. Feed the caller's task watchdog
+  // meanwhile.
+  f_rc = false;
+  for (uint32_t waited_ms = 0U; !f_rc && waited_ms < s_bt_stack_start_stop_timeout_ms;
+       waited_ms += 1000U) {
+    pbl_task_wdt_feed_self();
+    f_rc = (pbl_sem_take(&s_host_started, PBL_MSEC(1000U)) == 0);
+  }
+  pbl_task_wdt_feed_self();
+  if (!f_rc) {
+    PBL_LOG_ERR("NimBLE host start timed out");
+    goto err;
+  }
+#else
   f_rc = (pbl_sem_take(&s_host_started, PBL_MSEC(s_bt_stack_start_stop_timeout_ms)) == 0);
   if (!f_rc) {
     // core_dump wakes the LCPU itself, so its RAM is captured here too.
     PBL_CROAK("NimBLE host start timed out");
   }
+#endif
 
   rc = prv_ensure_addr();
   if (rc != 0) {
