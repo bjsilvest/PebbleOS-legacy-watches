@@ -41,6 +41,14 @@ void pbl_dma_stm32_start_circular(const struct pbl_dma_stm32_stream *dma,
                                   uint32_t priority, PblDmaStm32Callback cb, void *context);
 
 /** @brief Stop the transfer. */
+/** Like pbl_dma_stm32_start_circular(), but moving bytes (e.g. from a UART). */
+void pbl_dma_stm32_start_circular_u8(const struct pbl_dma_stm32_stream *dma,
+                                     volatile void *periph_addr, void *buffer, uint32_t size_bytes,
+                                     uint32_t priority, PblDmaStm32Callback cb, void *context);
+
+/** Transfers left before the circular buffer wraps (the NDTR register). */
+uint32_t pbl_dma_stm32_remaining(const struct pbl_dma_stm32_stream *dma);
+
 void pbl_dma_stm32_stop(const struct pbl_dma_stm32_stream *dma);
 
 /** @brief Stream interrupt handler, connected with PBL_IRQ_CONNECT() in the board file. */
