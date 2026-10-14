@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 set(sources)
-if(CONFIG_VIBE_AW86225)
+if(CONFIG_VIBE_PWM)
+  list(APPEND sources vibe_pwm.c)
+elseif(CONFIG_VIBE_AW86225)
   list(APPEND sources vibe_aw86225.c)
 elseif(CONFIG_VIBE_AW8623X)
   list(APPEND sources vibe_aw8623x.c)

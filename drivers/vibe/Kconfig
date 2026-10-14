@@ -8,6 +8,13 @@ menuconfig VIBE
 
 if VIBE
 
+config VIBE_PWM
+    bool "PWM-driven motor"
+    depends on PWM
+    help
+      Single-direction vibe motor driven by a PWM output, its strength
+      scaled by the supply voltage (e.g. the TI DRV2603 on silk).
+
 config VIBE_AW86225
     bool "Awinic AW86225"
     help
