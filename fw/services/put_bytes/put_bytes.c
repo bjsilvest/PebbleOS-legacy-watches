@@ -590,6 +590,13 @@ static bool prv_is_init_object_type_invalid(PutBytesObjectType type) {
   if (!prv_is_object_allowed(type)) {
     return true;
   }
+#ifdef CONFIG_FLASH_GUARD
+  // The PRF belongs to the stock bootloader here and is never replaced.
+  if (type == ObjectRecovery) {
+    PBL_LOG_WRN("Refusing recovery firmware object");
+    return true;
+  }
+#endif
   if (!prv_has_valid_fw_update_state_for_object_type(type)) {
     PBL_LOG_ERR("Not in FW update state");
     return true;
