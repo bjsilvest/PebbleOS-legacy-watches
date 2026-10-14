@@ -70,7 +70,22 @@ typedef struct {
   const uint16_t battery_capacity_hours;
 } BoardConfigPower;
 
+typedef enum {
+  AccelThresholdLow,  ///< A sensitive state used for stationary mode
+  AccelThresholdHigh, ///< The accelerometer's default sensitivity
+  AccelThreshold_Num,
+} AccelThreshold;
+
 typedef struct {
+  int axes_offsets[3];
+  bool axes_inverts[3];
+  uint32_t shake_thresholds[AccelThreshold_Num];
+  uint32_t double_tap_threshold;
+} AccelConfig;
+
+typedef struct {
+  const AccelConfig accel_config;
+  const struct pbl_gpio accel_int_gpios[2];
   uint8_t default_motion_sensitivity;
 } BoardConfigAccel;
 
@@ -82,6 +97,21 @@ typedef struct {
 typedef struct {
   const MagConfig mag_config;
 } BoardConfigMag;
+
+//! A timer channel driving a PWM output pin.
+typedef struct {
+  struct pbl_gpio output;
+  TIM_TypeDef *timer;
+  uint32_t rcc;    ///< RCC_APB1Periph_TIMx (APB1 timers only)
+  uint8_t af;      ///< GPIO_AF_TIMx
+  uint8_t channel; ///< 1-4
+} PwmConfig;
+
+typedef struct {
+  const PwmConfig pwm;
+  //! Supply voltage (mV) at which the duty cycle is not scaled; 0 to not scale.
+  uint16_t vsys_scale;
+} BoardConfigActuator;
 
 typedef struct {
   SPI_TypeDef *spi;

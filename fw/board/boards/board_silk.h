@@ -3,6 +3,9 @@
 
 #pragma once
 
+#include <pbl/drivers/backlight/pwm.h>
+#include <pbl/services/imu/units.h>
+
 #define BT_VENDOR_ID   0x0154
 #define BT_VENDOR_NAME "Pebble Technology"
 
@@ -32,7 +35,52 @@ static const BoardConfigPower BOARD_CONFIG_POWER = {
 };
 
 static const BoardConfigAccel BOARD_CONFIG_ACCEL = {
+  .accel_config =
+      {
+        .axes_offsets[AXIS_X] = 0,
+        .axes_offsets[AXIS_Y] = 1,
+        .axes_offsets[AXIS_Z] = 2,
+        .axes_inverts[AXIS_X] = true,
+        .axes_inverts[AXIS_Y] = true,
+        .axes_inverts[AXIS_Z] = true,
+        // Tuned for the BMA255 locked at 125 Hz.
+        .shake_thresholds[AccelThresholdHigh] = 64,
+        .shake_thresholds[AccelThresholdLow] = 0xf,
+        .double_tap_threshold = 12500,
+      },
+  .accel_int_gpios =
+      {
+        PBL_GPIO(STM32_GPIOA, 6, 0),
+        PBL_GPIO(STM32_GPIOA, 3, 0),
+      },
   .default_motion_sensitivity = 55U, // Medium
+};
+
+// Vibe: DRV2603 driven by TIM14 CH1
+static const BoardConfigActuator BOARD_CONFIG_VIBE = {
+  .pwm =
+      {
+        .output = PBL_GPIO(STM32_GPIOA, 7, 0),
+        .timer = TIM14,
+        .rcc = RCC_APB1Periph_TIM14,
+        .af = GPIO_AF_TIM14,
+        .channel = 1,
+      },
+  .vsys_scale = 3300,
+};
+
+// Backlight: TIM3 CH1, enabled by PB13
+static const BacklightPwmConfig BACKLIGHT_PWM = {
+  .ctl = PBL_GPIO(STM32_GPIOB, 13, 0),
+  .pwm =
+      {
+        .output = PBL_GPIO(STM32_GPIOC, 6, 0),
+        .timer = TIM3,
+        .rcc = RCC_APB1Periph_TIM3,
+        .af = GPIO_AF_TIM3,
+        .channel = 1,
+      },
+  .max_duty_cycle_percent = 67,
 };
 
 static const BoardConfigSharpDisplay BOARD_CONFIG_DISPLAY = {

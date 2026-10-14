@@ -125,7 +125,8 @@ STM32 drivers are rewritten against the current APIs, using the old drivers
 | Sharp display (SPI2) | done (polled; DMA TODO) |
 | Board (`fw/board/boards/board_silk.*`) | done for the above |
 | I2C3, AS3701B PMIC, battery ADC | done (stock charger settings) |
-| BMA255 accel, ALS, vibe/backlight PWM, DFSDM mic | todo (fixed-value stand-ins) |
+| Vibe (DRV2603 PWM), backlight PWM, BMA255 accel | done (stock values; QEMU does not emulate the BMA255) |
+| ALS, DFSDM mic | todo (fixed-value stand-ins) |
 | Hardware platform ID (`PebbleSilk`), bundle `hwrev: silk` | done |
 | STOP mode, DMA | todo |
 | Bluetooth (DA14681) | todo |
@@ -162,8 +163,8 @@ Pin map (from the stock board file):
 | QSPI flash | CS PB6, CLK PB2, D0 PC9, D1 PC10, D2 PC8, D3 PA1, 50 MHz |
 | Sharp display | SPI2, CLK PB10, MOSI PB15, CS PB9, ON PA0 |
 | I2C3 (PMIC, HRM) | SCL PA8, SDA PB8, 400 kHz; AS3701B at 0x80, INT PC7 |
-| Vibe | ctl PB13, PWM TIM3 CH1 on PC6 |
-| Backlight | PWM TIM14 CH1 on PA7 |
+| Vibe (DRV2603) | PWM TIM14 CH1 on PA7, 22 kHz, scaled by Vsys (3300 mV) |
+| Backlight | enable PB13, PWM TIM3 CH1 on PC6, 67% max duty |
 | Accel ints | PA6, PA3 |
 | ADC1 | ALS ch13 (PC3, enable PC0), battery ch5 (PA5), temperature |
 | Mic | DFSDM1 ch2, CK PC2, SD PB14 |
