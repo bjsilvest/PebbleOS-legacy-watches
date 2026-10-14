@@ -307,4 +307,7 @@ manager) before its HCI transport starts, then the vendor event
 - Radio P2_3 is wired to both PA2 (HCI TX) and PC4 (stock's interrupt
   input), so PC4 must stay an input.
 - The controller keeps running while Bluetooth is off (airplane mode).
+- The H4 UART has no flow control, and the controller's DGTL reads each
+  packet in steps behind a 16-byte FIFO, so the transport sends in 8-byte
+  bursts with 300 us pauses. This limits throughput.
 - QEMU has no DA14681, so only the failure path is tested there.
