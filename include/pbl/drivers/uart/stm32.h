@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 
+#include <pbl/drivers/dma/stm32.h>
 #include <pbl/drivers/gpio.h>
 #include <pbl/drivers/uart.h>
 
@@ -22,6 +23,12 @@ typedef struct UARTDeviceState {
   bool rx_int_enabled;
   /** Transmit interrupt enabled. */
   bool tx_int_enabled;
+  /** Circular RX DMA buffer, or NULL when RX is interrupt driven. */
+  uint8_t *rx_dma_buffer;
+  /** Size of rx_dma_buffer. */
+  uint32_t rx_dma_length;
+  /** Next byte of rx_dma_buffer to hand to the RX handler. */
+  uint32_t rx_dma_index;
 } UARTDeviceState;
 
 struct UARTDevice {
@@ -41,6 +48,8 @@ struct UARTDevice {
   uint8_t af;
   /** Interrupt number. */
   int irqn;
+  /** RX DMA stream, or NULL to keep RX interrupt driven. */
+  const struct pbl_dma_stm32_stream *rx_dma;
 };
 
 /* UART interrupt handler, connected with PBL_IRQ_CONNECT() in the board file. */

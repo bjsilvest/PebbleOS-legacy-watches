@@ -1,8 +1,9 @@
 /* SPDX-FileCopyrightText: 2024 Google LLC */
 /* SPDX-License-Identifier: Apache-2.0 */
 
-//! STM32F4 USART. RX is interrupt driven; uart_start_rx_dma() falls back to
-//! that until a DMA driver exists.
+//! STM32F4 USART. RX is interrupt driven, or with uart_start_rx_dma() on a
+//! device with an RX DMA stream, received into a circular buffer and handed
+//! to the RX handler on line idle and at each half of the buffer.
 
 #include <pbl/drivers/gpio/stm32.h>
 #include <pbl/drivers/uart.h>
@@ -69,7 +70,10 @@ void uart_init_rx_only(UARTDevice *dev) {
   prv_init(dev, false, UARTCR1Flags_RE);
 }
 
+void uart_stop_rx_dma(UARTDevice *dev);
+
 void uart_deinit(UARTDevice *dev) {
+  uart_stop_rx_dma(dev);
   dev->periph->CR1 &= ~USART_CR1_UE;
   prv_clock(dev, false);
 
@@ -178,8 +182,20 @@ void uart_set_tx_interrupt_handler(UARTDevice *dev, UARTTXInterruptHandler irq_h
   dev->state->tx_irq_handler = irq_handler;
 }
 
+static void prv_rx_dma_drain(UARTDevice *dev);
+
 void uart_set_rx_interrupt_enabled(UARTDevice *dev, bool enabled) {
   PBL_ASSERTN(dev->state->initialized);
+  if (dev->state->rx_dma_buffer) {
+    // DMA keeps receiving; this only gates delivery to the handler.
+    dev->state->rx_int_enabled = enabled;
+    if (enabled) {
+      pbl_irq_lock();
+      prv_rx_dma_drain(dev);
+      pbl_irq_unlock();
+    }
+    return;
+  }
   if (enabled) {
     dev->state->rx_int_enabled = true;
     dev->periph->CR1 |= USART_CR1_RXNEIE;
@@ -198,7 +214,7 @@ void uart_set_tx_interrupt_enabled(UARTDevice *dev, bool enabled) {
     dev->periph->CR1 |= USART_CR1_TXEIE;
     prv_set_interrupt_enabled(dev, true);
   } else {
-    prv_set_interrupt_enabled(dev, dev->state->rx_int_enabled);
+    prv_set_interrupt_enabled(dev, dev->state->rx_int_enabled || dev->state->rx_dma_buffer);
     dev->periph->CR1 &= ~USART_CR1_TXEIE;
     dev->state->tx_int_enabled = false;
   }
@@ -207,7 +223,13 @@ void uart_set_tx_interrupt_enabled(UARTDevice *dev, bool enabled) {
 void uart_irq_handler(UARTDevice *dev) {
   PBL_ASSERTN(dev->state->initialized);
 
-  if (dev->state->rx_irq_handler && dev->state->rx_int_enabled) {
+  if (dev->state->rx_dma_buffer) {
+    if (dev->periph->SR & USART_SR_IDLE) {
+      // Reading SR then DR clears IDLE (and any overrun).
+      (void)dev->periph->DR;
+      prv_rx_dma_drain(dev);
+    }
+  } else if (dev->state->rx_irq_handler && dev->state->rx_int_enabled) {
     const UARTRXErrorFlags err_flags = {
       .overrun_error = uart_has_rx_overrun(dev),
       .framing_error = uart_has_rx_framing_error(dev),
@@ -232,13 +254,73 @@ void uart_clear_all_interrupt_flags(UARTDevice *dev) {
 // DMA
 ////////////////////////////////////////////////////////////////////////////////
 
-// TODO: circular RX DMA. Until then received bytes are delivered from the RX
-// interrupt as they arrive, which callers handle the same way.
+// Hand the bytes the DMA wrote since the last call to the RX handler. Called
+// from the UART and DMA interrupts, or with interrupts locked.
+static void prv_rx_dma_drain(UARTDevice *dev) {
+  UARTDeviceState *state = dev->state;
+  const UARTRXErrorFlags no_errors = {};
+
+  if (!state->rx_dma_buffer || !state->rx_irq_handler) {
+    return;
+  }
+
+  const uint32_t pos =
+      (state->rx_dma_length - pbl_dma_stm32_remaining(dev->rx_dma)) % state->rx_dma_length;
+  // The handler may pause delivery (rx_int_enabled) partway through.
+  while (state->rx_int_enabled && state->rx_dma_index != pos) {
+    const uint8_t data = state->rx_dma_buffer[state->rx_dma_index];
+    state->rx_dma_index = (state->rx_dma_index + 1U) % state->rx_dma_length;
+    state->rx_irq_handler(dev, data, &no_errors);
+  }
+}
+
+static void prv_rx_dma_cb(void *context, bool is_complete) {
+  prv_rx_dma_drain(context);
+}
+
 void uart_start_rx_dma(UARTDevice *dev, void *buffer, uint32_t length) {
+  // Without a stream, RX stays interrupt driven, which callers handle the same way.
+  if (!dev->rx_dma) {
+    return;
+  }
+
+  PBL_ASSERTN(dev->state->initialized && dev->state->rx_irq_handler);
+
+  pbl_irq_disable(dev->irqn);
+  dev->periph->CR1 &= ~USART_CR1_RXNEIE;
+  (void)dev->periph->SR;
+  (void)dev->periph->DR;
+
+  dev->state->rx_dma_buffer = buffer;
+  dev->state->rx_dma_length = length;
+  dev->state->rx_dma_index = 0U;
+
+  pbl_dma_stm32_start_circular_u8(dev->rx_dma, &dev->periph->DR, buffer, length, DMA_Priority_High,
+                                  prv_rx_dma_cb, (void *)dev);
+  dev->periph->CR3 |= USART_CR3_DMAR;
+  dev->periph->CR1 |= USART_CR1_IDLEIE;
+  pbl_irq_enable(dev->irqn);
 }
 
 void uart_stop_rx_dma(UARTDevice *dev) {
+  if (!dev->state->rx_dma_buffer) {
+    return;
+  }
+
+  dev->periph->CR1 &= ~USART_CR1_IDLEIE;
+  dev->periph->CR3 &= ~USART_CR3_DMAR;
+  pbl_dma_stm32_stop(dev->rx_dma);
+  dev->state->rx_dma_buffer = nullptr;
+  prv_set_interrupt_enabled(dev, dev->state->tx_int_enabled);
 }
 
 void uart_clear_rx_dma_buffer(UARTDevice *dev) {
+  if (!dev->state->rx_dma_buffer) {
+    return;
+  }
+
+  pbl_irq_lock();
+  dev->state->rx_dma_index = (dev->state->rx_dma_length - pbl_dma_stm32_remaining(dev->rx_dma)) %
+                             dev->state->rx_dma_length;
+  pbl_irq_unlock();
 }
