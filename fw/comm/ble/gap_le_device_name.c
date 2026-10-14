@@ -20,6 +20,11 @@ pbl_bt_bonding_id_t prv_get_bonding_id_and_name_from_address_safe(void *ctx, cha
     goto unlock;
   }
 
+  if (device_name && !connection->device_name) {
+    // Nothing read yet to store.
+    goto unlock;
+  }
+
   bonding_id = connection->bonding_id;
 
   if (device_name) {

@@ -2,10 +2,12 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 #include <pbl/bluetooth/bonding_sync.h>
+#include <pbl/bluetooth/gap_le_device_name.h>
 #include <pbl/bluetooth/types.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/bluetooth/bluetooth_persistent_storage.h>
 #include <pbl/services/bluetooth/local_addr.h>
+#include <pbl/services/system_task.h>
 
 #include <comm/ble/gap_le_connection.h>
 #include <comm/ble/gap_le_device_name.h>
@@ -31,6 +33,15 @@ static void prv_finalize_create_bonding(pbl_bt_bonding_id_t bonding_id,
 
     if (!connection->is_gateway) {
       PBL_LOG_DBG("New bonding is not gateway?");
+    }
+
+    // The name may already have been read before the bonding existed, when
+    // it could not be stored; a re-read of the same name is not stored again,
+    // so store it now.
+    if (connection->device_name) {
+      struct pbl_bt_addr *name_addr = kernel_zalloc_check(sizeof(*name_addr));
+      *name_addr = connection->device.address;
+      system_task_add_callback(pbl_bt_store_device_name_kernelbg_cb, name_addr);
     }
 
     gap_le_device_name_request(&connection->device);
