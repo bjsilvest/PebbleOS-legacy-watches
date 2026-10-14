@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #include <pbl/bluetooth/hci_uart.h>
 #include <pbl/drivers/uart.h>
@@ -10,6 +11,7 @@
 #include <pbl/kernel/sem.h>
 #include <pbl/kernel/thread.h>
 #include <pbl/logging/logging.h>
+#include <pbl/task_wdt/task_wdt.h>
 
 #include <board/board.h>
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
@@ -25,6 +27,7 @@
 #include <nimble/transport.h>
 #include <nimble/transport/hci_h4.h>
 #include <nimble/transport_impl.h>
+#include <os/endian.h>
 
 PBL_LOG_MODULE_DECLARE(nimble, CONFIG_NIMBLE_LOG_LEVEL);
 
@@ -37,7 +40,12 @@ PBL_LOG_MODULE_DECLARE(nimble, CONFIG_NIMBLE_LOG_LEVEL);
 #define EVT_POOL_POLL_MS 5U
 
 static struct pbl_thread *s_hci_task_handle;
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+// Booting the controller also runs on this stack.
+PBL_THREAD_STACK_DEFINE(s_hci_task_stack, 2048);
+#else
 PBL_THREAD_STACK_DEFINE(s_hci_task_stack, 1024);
+#endif
 static PBL_SEM_DEFINE(s_rx_ready, 0, 1);
 static PBL_SEM_DEFINE(s_acl_pool_avail, 0, 1);
 static PBL_MUTEX_DEFINE(s_tx_mutex);
@@ -55,6 +63,12 @@ static volatile enum {
   ControllerStateReady,
   ControllerStateFailed,
 } s_controller_state;
+
+// The last command sent and the last command answered, for diagnostics.
+static volatile uint16_t s_last_cmd;
+static volatile uint16_t s_last_reply_cmd;
+static volatile uint8_t s_last_reply_status;
+static volatile uint32_t s_num_evts;
 
 static struct os_mbuf *prv_alloc_acl_from_ll(void) {
   struct os_mbuf *om;
@@ -91,9 +105,21 @@ static const struct hci_h4_allocators s_hci_h4_allocs_from_ll = {
   .evt = prv_alloc_evt,
 };
 
+static void prv_note_evt(const struct ble_hci_ev *ev) {
+  s_num_evts++;
+  if (ev->opcode == BLE_HCI_EVCODE_COMMAND_COMPLETE && ev->length >= 4U) {
+    s_last_reply_cmd = ev->data[1] | (ev->data[2] << 8);
+    s_last_reply_status = ev->data[3];
+  } else if (ev->opcode == BLE_HCI_EVCODE_COMMAND_STATUS && ev->length >= 4U) {
+    s_last_reply_cmd = ev->data[2] | (ev->data[3] << 8);
+    s_last_reply_status = ev->data[0];
+  }
+}
+
 static int prv_hci_frame_cb(uint8_t pkt_type, void *data) {
   switch (pkt_type) {
     case HCI_H4_EVT:
+      prv_note_evt(data);
       return ble_transport_to_hs_evt(data);
     case HCI_H4_ACL:
       return ble_transport_to_hs_acl(data);
@@ -219,15 +245,23 @@ bool pbl_bt_hci_uart_wait_ready(uint32_t timeout_ms) {
     if (waited >= timeout_ms) {
       return false;
     }
+    pbl_task_wdt_feed_self();
     pbl_thread_sleep(PBL_MSEC(step_ms));
   }
 
   return s_controller_state == ControllerStateReady;
 }
 
+void pbl_bt_hci_uart_copy_status(char *buf, size_t len) {
+  sniprintf(buf, len, "%04x>%04x:%02x #%lu", (unsigned)s_last_cmd, (unsigned)s_last_reply_cmd,
+            (unsigned)s_last_reply_status, (unsigned long)s_num_evts);
+}
+
 int ble_transport_to_ll_cmd_impl(void *buf) {
   struct ble_hci_cmd *cmd = buf;
   uint8_t type = HCI_H4_CMD;
+
+  s_last_cmd = le16toh(cmd->opcode);
 
   pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
   prv_write(&type, 1U);

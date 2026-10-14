@@ -4,6 +4,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 /**
@@ -12,7 +13,20 @@
  * Controllers that the transport has to boot first (@c BT_CONTROLLER_DA1468X)
  * come up asynchronously and may fail; others are ready at once.
  *
+ * Feeds the calling thread's task watchdog while it waits.
+ *
  * @param timeout_ms How long to wait while the controller is still booting.
  * @return true if the controller can take HCI traffic.
  */
 bool pbl_bt_hci_uart_wait_ready(uint32_t timeout_ms);
+
+/**
+ * @brief Describe the last HCI exchange, for diagnostics.
+ *
+ * Formats "<last command>><last answered command>:<its status> #<events received>",
+ * opcodes in hex.
+ *
+ * @param[out] buf Buffer for the string.
+ * @param len Size of @p buf.
+ */
+void pbl_bt_hci_uart_copy_status(char *buf, size_t len);
