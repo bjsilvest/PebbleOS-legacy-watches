@@ -57,11 +57,14 @@
 #define dg_configRAM_CODE_SIZE_AE               (62 * 1024)
 
 #define OS_FREERTOS
-#define configTOTAL_HEAP_SIZE                   (18300)
+/* RetRAM0 has room below the BLE retention area for a larger heap. */
+#define configTOTAL_HEAP_SIZE                   (30000)
 
 #define BLE_EXTERNAL_HOST
-#define BLE_MGR_COMMAND_QUEUE_LENGTH            (8)
-#define BLE_MGR_EVENT_QUEUE_LENGTH              (8)
+#define BLE_MGR_COMMAND_QUEUE_LENGTH            (16)
+#define BLE_MGR_EVENT_QUEUE_LENGTH              (16)
+#define AD_BLE_COMMAND_QUEUE_LENGTH             (16)
+#define AD_BLE_EVENT_QUEUE_LENGTH               (16)
 
 #define DGTL_QUEUE_ENABLE_APP                   (0)
 #define DGTL_QUEUE_ENABLE_LOG                   (0)

@@ -9,8 +9,13 @@
 
 /* HCI H4 to the STM32 on the bootrom UART pins (TX P1_3, RX P2_3).
  * Silk has no RTS/CTS lines, so no flow control. */
-/* Hardware flow control: RTS and CTS are routed in main.c. */
-UART_BUS(UART2, DGTL_UART, HW_UART_BAUDRATE_115200, HW_UART_DATABITS_8, HW_UART_PARITY_NONE,
+/*
+ * Hardware flow control: RTS and CTS are routed in main.c. 1 Mbaud, so the
+ * DGTL's queue to the host does not back up behind the air link: when both of
+ * its queues fill, its task and the BLE manager wait on each other for good.
+ * The host's BT_DA1468X_HCI_BAUD must match.
+ */
+UART_BUS(UART2, DGTL_UART, HW_UART_BAUDRATE_1000000, HW_UART_DATABITS_8, HW_UART_PARITY_NONE,
          HW_UART_STOPBITS_1, 1, 1, HW_DMA_CHANNEL_1, HW_DMA_CHANNEL_0, 0, 0)
 
 /* Die temperature, used by the RF driver for calibration. */

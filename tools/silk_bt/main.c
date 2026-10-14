@@ -33,7 +33,7 @@ static void prv_mark(char c)
 
         if (!s_uart_up) {
                 const uart_config cfg = {
-                        .baud_rate = HW_UART_BAUDRATE_115200,
+                        .baud_rate = HW_UART_BAUDRATE_1000000,
                         .data = HW_UART_DATABITS_8,
                         .parity = HW_UART_PARITY_NONE,
                         .stop = HW_UART_STOPBITS_1,
