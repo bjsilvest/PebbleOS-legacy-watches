@@ -76,6 +76,10 @@ static volatile uint8_t s_last_fail_status;
 // ACL packets sent and completed as the controller reports them, and the
 // length of the last command reply, to tell which check a host reset tripped.
 static volatile uint32_t s_acl_tx;
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+// The UART has no flow control: count bytes lost to receive overruns.
+static volatile uint32_t s_rx_overruns;
+#endif
 static volatile uint32_t s_acl_completed;
 static volatile uint8_t s_last_reply_len;
 static char s_reset_snapshot[32];
@@ -340,6 +344,11 @@ static int prv_hci_frame_cb(uint8_t pkt_type, void *data) {
 }
 
 static void prv_rx_irq_handler(UARTDevice *dev, uint8_t data, const UARTRXErrorFlags *err_flags) {
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  if (err_flags->overrun_error) {
+    s_rx_overruns++;
+  }
+#endif
   uint32_t head = s_rx_head;
   uint32_t next = (head + 1U) % RX_RING_SIZE;
 
@@ -370,6 +379,106 @@ static void prv_uart_start(void) {
   s_controller_state = ControllerStateReady;
 }
 
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+// The DA1468x's DGTL transport also sends its own GTL messages (type 5, e.g.
+// stack indications) and possibly other DGTL packet types on the HCI UART.
+// NimBLE's H4 parser asserts on any packet type but HCI, so frame the stream
+// here, pass HCI events and ACL data on whole, and skip the rest. A byte that
+// starts no known packet is dropped to resynchronize.
+#define DGTL_PKT_LOG     0x08U
+#define DGTL_PKT_APP_RSP 0x07U
+#define DGTL_PKT_GTL     0x05U
+#define FRAME_MAX        (5U + 300U)
+
+static struct {
+  uint8_t buf[FRAME_MAX];
+  uint16_t len;
+  uint16_t hdr_len;
+  uint32_t want; // total frame length once the header is in, else 0
+  bool skip;     // a DGTL packet that is not HCI: count bytes but keep none
+} s_frame;
+static volatile uint32_t s_dgtl_skipped;
+static volatile uint32_t s_rx_dropped_bytes;
+static volatile uint16_t s_last_gtl_msg_id;
+
+static uint16_t prv_frame_hdr_len(uint8_t type) {
+  switch (type) {
+    case HCI_H4_ACL:
+      return 5U;
+    case HCI_H4_EVT:
+      return 3U;
+    case DGTL_PKT_GTL:
+      return 9U;
+    case DGTL_PKT_APP_RSP:
+      return 4U;
+    case DGTL_PKT_LOG:
+      return 2U;
+    default:
+      return 0U;
+  }
+}
+
+static uint32_t prv_frame_total_len(const uint8_t *hdr) {
+  switch (hdr[0]) {
+    case HCI_H4_ACL:
+      return 5U + (hdr[3] | (hdr[4] << 8));
+    case HCI_H4_EVT:
+      return 3U + hdr[2];
+    case DGTL_PKT_GTL:
+      return 9U + (hdr[7] | (hdr[8] << 8));
+    case DGTL_PKT_APP_RSP:
+      return 4U + (hdr[2] | (hdr[3] << 8));
+    case DGTL_PKT_LOG:
+      return 2U + hdr[1];
+    default:
+      return 0U;
+  }
+}
+
+static void prv_frame_byte(uint8_t c) {
+  if (s_frame.len == 0U) {
+    s_frame.hdr_len = prv_frame_hdr_len(c);
+    if (s_frame.hdr_len == 0U) {
+      s_rx_dropped_bytes++;
+      return;
+    }
+    s_frame.want = 0U;
+    s_frame.skip = false;
+  }
+
+  if (s_frame.len < sizeof(s_frame.buf)) {
+    s_frame.buf[s_frame.len] = c;
+  }
+  s_frame.len++;
+
+  if (s_frame.want == 0U) {
+    if (s_frame.len < s_frame.hdr_len) {
+      return;
+    }
+    s_frame.want = prv_frame_total_len(s_frame.buf);
+    const uint8_t type = s_frame.buf[0];
+    s_frame.skip = (type != HCI_H4_ACL && type != HCI_H4_EVT) || s_frame.want > FRAME_MAX;
+    if (type == DGTL_PKT_GTL) {
+      s_last_gtl_msg_id = s_frame.buf[1] | (s_frame.buf[2] << 8);
+    }
+  }
+
+  if (s_frame.len < s_frame.want) {
+    return;
+  }
+
+  if (s_frame.skip) {
+    s_dgtl_skipped++;
+  } else {
+    int consumed = hci_h4_sm_rx(&s_hci_h4sm, s_frame.buf, s_frame.len);
+    if (consumed != (int)s_frame.len) {
+      PBL_LOG_ERR("hci_h4_sm_rx returned %d of %u", consumed, (unsigned)s_frame.len);
+    }
+  }
+  s_frame.len = 0U;
+}
+#endif
+
 static void prv_hci_task_main(void *unused) {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   // Loading the controller takes about a second, so it happens here rather
@@ -390,11 +499,18 @@ static void prv_hci_task_main(void *unused) {
       uint32_t head = s_rx_head;
       uint32_t len = (head > tail) ? (head - tail) : (RX_RING_SIZE - tail);
 
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+      for (uint32_t i = 0; i < len; i++) {
+        prv_frame_byte(s_rx_ring[tail + i]);
+      }
+      int consumed = len;
+#else
       int consumed = hci_h4_sm_rx(&s_hci_h4sm, &s_rx_ring[tail], len);
       if (consumed <= 0) {
         PBL_LOG_ERR("hci_h4_sm_rx returned %d", consumed);
         consumed = len;
       }
+#endif
       s_rx_tail = (tail + consumed) % RX_RING_SIZE;
 
       if (s_rx_paused) {
@@ -481,6 +597,16 @@ uint32_t pbl_bt_hci_uart_acl_clamped(void) {
   return s_acl_clamped;
 #else
   return 0U;
+#endif
+}
+
+void pbl_bt_hci_uart_copy_rx_stats(char *buf, size_t len) {
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  sniprintf(buf, len, "g%lu/%04x d%lu o%lu", (unsigned long)s_dgtl_skipped,
+            (unsigned)s_last_gtl_msg_id, (unsigned long)s_rx_dropped_bytes,
+            (unsigned long)s_rx_overruns);
+#else
+  buf[0] = '\0';
 #endif
 }
 

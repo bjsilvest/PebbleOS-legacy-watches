@@ -64,6 +64,7 @@ enum {
   SystemInformationItemBtSmp,
   SystemInformationItemBtSmp2,
   SystemInformationItemLastReboot,
+  SystemInformationItemBtRx,
   SystemInformationItemBtChip,
   SystemInformationItemBtRxBoot,
   SystemInformationItemBtRxReset,
@@ -151,6 +152,7 @@ typedef struct SystemInformationData {
   char bt_reset_string[40];
   char last_reboot_string[24];
   char bt_smp_string[21];
+  char bt_rx_string[32];
 #endif
   char const *subtitle_text[SystemInformationItem_Count];
   char language_string[16];
@@ -239,6 +241,7 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemBtSmp] = i18n_noop("BT SMP"),
   [SystemInformationItemBtSmp2] = i18n_noop("BT SMP 2"),
   [SystemInformationItemLastReboot] = i18n_noop("Last reboot"),
+  [SystemInformationItemBtRx] = i18n_noop("BT Rx"),
   [SystemInformationItemBtChip] = i18n_noop("BT Chip"),
   [SystemInformationItemBtRxBoot] = i18n_noop("BT Rx boot"),
   [SystemInformationItemBtRxReset] = i18n_noop("BT Rx reset"),
@@ -376,6 +379,8 @@ static void prv_information_window_push(SettingsSystemData *data) {
   sniprintf(info->last_reboot_string, sizeof(info->last_reboot_string), "%u %08lx %08lx",
             (unsigned)reason.code, (unsigned long)words[1], (unsigned long)words[2]);
   info->subtitle_text[SystemInformationItemLastReboot] = info->last_reboot_string;
+  pbl_bt_hci_uart_copy_rx_stats(info->bt_rx_string, sizeof(info->bt_rx_string));
+  info->subtitle_text[SystemInformationItemBtRx] = info->bt_rx_string;
   info->subtitle_text[SystemInformationItemBtChip] = da1468x_chip_id();
   info->subtitle_text[SystemInformationItemBtRxBoot] = da1468x_rx_after_markers();
   info->subtitle_text[SystemInformationItemBtRxReset] = da1468x_rx_after_reset();

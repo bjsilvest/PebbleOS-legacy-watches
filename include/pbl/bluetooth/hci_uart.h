@@ -71,3 +71,14 @@ const char *pbl_bt_hci_uart_smp_trace(void);
  *        transport capped it to the LL PDU size (DA1468x only; 0 if unknown).
  */
 uint16_t pbl_bt_hci_uart_le_acl_len_reported(void);
+
+/**
+ * @brief Describe what the transport skipped on receive, for diagnostics.
+ *
+ * Formats "g<non-HCI DGTL packets skipped>/<last GTL message ID> d<bytes dropped
+ * to resynchronize> o<UART overruns>" (DA1468x only; empty otherwise).
+ *
+ * @param[out] buf Buffer for the string.
+ * @param len Size of @p buf.
+ */
+void pbl_bt_hci_uart_copy_rx_stats(char *buf, size_t len);
