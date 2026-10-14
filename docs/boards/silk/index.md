@@ -245,8 +245,9 @@ The controller image is the Dialog SDK's BLE stack in pass-through
 DA14681 charger, USB and 1V8 rails stay off, the LP clock is the internal
 RCX, and the radio never sleeps, because H4 without flow control cannot wake
 it. The controller only has a placeholder public address, so the identity
-address is a random static address kept in shared PRF storage
-(`BT_ID_ADDR_STORAGE`).
+address is a random static address derived from the serial number on every
+boot, like the legacy firmware (`BT_ID_ADDR_SERIAL`). It needs no storage, so
+it never changes, and it matches the address the legacy firmware used.
 
 ### Building
 
