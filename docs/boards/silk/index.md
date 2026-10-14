@@ -298,6 +298,17 @@ manager) before its HCI transport starts, then the vendor event
 
 ### Known limitations
 
+- **TODO — revisit: two Android entries.** Android lists the watch twice
+  under the same name: stock and PRF advertise resolvable private addresses
+  (e.g. `7B:CA:D6:4E:13:9B`), so their bonding is keyed on one of those,
+  while this firmware advertises its serial-derived static identity address
+  (e.g. `FB:F2:D1:20:55:24`) and shares no identity key (IRK) when pairing
+  (`BLE_SM_OUR_KEY_DIST` is 1). Both firmwares derive the same identity
+  address, but each has its own bonding. Keep both for now: PRF updates use
+  the stock entry. Merging would mean reusing the stock bonding from shared
+  PRF storage. Distributing the IRK and advertising private addresses would
+  help privacy but would not merge the entries.
+
 - **Power:** STOP mode is blocked while the controller runs, because the
   USART clocks stop in STOP and the controller can send at any time. With
   the radio never sleeping either, battery life is much shorter than stock.
