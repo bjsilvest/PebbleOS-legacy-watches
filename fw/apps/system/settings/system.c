@@ -14,6 +14,7 @@
 
 #include <pbl/drivers/ambient_light.h>
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
+#include <pbl/bluetooth/advert.h>
 #include <pbl/bluetooth/hci_uart.h>
 #include <pbl/drivers/bluetooth/da1468x.h>
 #endif
@@ -57,6 +58,7 @@ enum {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   SystemInformationItemBtRadio,
   SystemInformationItemBtHci,
+  SystemInformationItemBtPair,
   SystemInformationItemBtChip,
   SystemInformationItemBtRxBoot,
   SystemInformationItemBtRxReset,
@@ -140,6 +142,7 @@ typedef struct SystemInformationData {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   char bt_radio_string[32];
   char bt_hci_string[32];
+  char bt_pair_string[24];
 #endif
   char const *subtitle_text[SystemInformationItem_Count];
   char language_string[16];
@@ -223,6 +226,7 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   [SystemInformationItemBtRadio] = i18n_noop("BT Radio"),
   [SystemInformationItemBtHci] = i18n_noop("BT HCI"),
+  [SystemInformationItemBtPair] = i18n_noop("BT Pair"),
   [SystemInformationItemBtChip] = i18n_noop("BT Chip"),
   [SystemInformationItemBtRxBoot] = i18n_noop("BT Rx boot"),
   [SystemInformationItemBtRxReset] = i18n_noop("BT Rx reset"),
@@ -338,6 +342,8 @@ static void prv_information_window_push(SettingsSystemData *data) {
   pbl_bt_hci_uart_copy_status(info->bt_hci_string, sizeof(info->bt_hci_string));
   info->subtitle_text[SystemInformationItemBtRadio] = info->bt_radio_string;
   info->subtitle_text[SystemInformationItemBtHci] = info->bt_hci_string;
+  strncpy(info->bt_pair_string, pbl_bt_advert_pairing_trace(), sizeof(info->bt_pair_string) - 1);
+  info->subtitle_text[SystemInformationItemBtPair] = info->bt_pair_string;
   info->subtitle_text[SystemInformationItemBtChip] = da1468x_chip_id();
   info->subtitle_text[SystemInformationItemBtRxBoot] = da1468x_rx_after_markers();
   info->subtitle_text[SystemInformationItemBtRxReset] = da1468x_rx_after_reset();

@@ -70,4 +70,14 @@ bool pbl_bt_advert_client_get_tx_power(int8_t *tx_power);
  */
 bool pbl_bt_advert_set_advertising_data(const struct pbl_bt_ad_data *ad_data);
 
+/**
+ * @brief Describe how far the last pairing got, for diagnostics.
+ *
+ * Formats "r<requests>k<passkey prompts> p<pairing status> e<encryption status>
+ * d<disconnect reason>", the counts capped at 9 and the NimBLE status codes in hex.
+ *
+ * @return A static string, valid until the next call.
+ */
+const char *pbl_bt_advert_pairing_trace(void);
+
 /** @} */

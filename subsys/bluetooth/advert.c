@@ -86,6 +86,25 @@ bool pbl_bt_advert_set_advertising_data(const struct pbl_bt_ad_data *ad_data) {
   return true;
 }
 
+// Pairing trace for diagnostics: how far the last pairing got and the
+// status codes it ended with.
+static struct {
+  uint8_t requests;
+  uint8_t passkeys;
+  uint16_t pairing_status;
+  uint16_t enc_status;
+  uint16_t disconnect_reason;
+} s_pair_trace;
+static char s_pair_trace_str[24];
+
+const char *pbl_bt_advert_pairing_trace(void) {
+  sniprintf(s_pair_trace_str, sizeof(s_pair_trace_str), "r%uk%u p%03x e%03x d%03x",
+            (unsigned)MIN(s_pair_trace.requests, 9U), (unsigned)MIN(s_pair_trace.passkeys, 9U),
+            (unsigned)s_pair_trace.pairing_status, (unsigned)s_pair_trace.enc_status,
+            (unsigned)s_pair_trace.disconnect_reason);
+  return s_pair_trace_str;
+}
+
 static void prv_handle_connection_event(struct ble_gap_event *event) {
   // we only want to notify on a successful connection
   if (event->connect.status != 0)
@@ -165,6 +184,8 @@ static void prv_end_pairing(uint16_t conn_handle, bool success) {
 }
 
 static void prv_handle_disconnection_event(struct ble_gap_event *event) {
+  s_pair_trace.disconnect_reason = event->disconnect.reason;
+
   // A link dropped mid-pairing raises no pairing complete event.
   prv_end_pairing(event->disconnect.conn.conn_handle, false);
 
@@ -189,6 +210,7 @@ static void prv_handle_enc_change_event(struct ble_gap_event *event) {
     return;
   }
 
+  s_pair_trace.enc_status = event->enc_change.status;
   PBL_LOG_INFO("Encryption change: status=0x%04x encrypted=%u bonded=%u",
                (uint16_t)event->enc_change.status, desc.sec_state.encrypted, desc.sec_state.bonded);
 
@@ -254,6 +276,7 @@ static void prv_handle_passkey_event(struct ble_gap_event *event) {
     device_name = s_device_name;
   }
 
+  s_pair_trace.passkeys++;
   snprintf(passkey_str, sizeof(passkey_str), "%06" PRIu32, passkey);
   pbl_bt_cb_pairing_confirm_handle_request(ctx, device_name, passkey_str);
   s_pairing_in_progress = true;
@@ -261,6 +284,7 @@ static void prv_handle_passkey_event(struct ble_gap_event *event) {
 }
 
 static void prv_handle_pairing_complete_event(struct ble_gap_event *event) {
+  s_pair_trace.pairing_status = event->pairing_complete.status;
   PBL_LOG_INFO("Pairing complete: status=0x%04x", (uint16_t)event->pairing_complete.status);
 
   prv_end_pairing(event->pairing_complete.conn_handle, event->pairing_complete.status == 0);
@@ -330,6 +354,8 @@ static int prv_handle_pairing_request_event(struct ble_gap_event *event) {
   struct ble_gap_conn_desc desc;
   struct ble_store_value_sec value_sec;
   int rc;
+
+  s_pair_trace.requests++;
 
   if (pairability_is_enabled()) {
     return 0;
