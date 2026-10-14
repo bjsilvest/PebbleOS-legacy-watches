@@ -268,6 +268,14 @@ pbl build -b build-bt
 The SDK's BLE library targets DA14681-01 (AE) silicon. The driver logs the
 chip ID the bootrom prints; pre-production AD silicon prints none.
 
+A radio that fails to boot or that the host cannot sync with leaves
+Bluetooth off instead of crashing: a crash loop before the firmware is
+marked stable ends in the bootloader starting PRF. Settings > System >
+Information shows how far it got without a serial console: "BT Radio" is
+the boot step (for example `Bootrom: none (0 ch)` or `Running (try 1)`),
+and "BT HCI" is `<last command>><last answered command>:<status> #<events>`
+with HCI opcodes in hex.
+
 ### Known limitations
 
 - **Power:** STOP mode is blocked while the controller runs, because the
