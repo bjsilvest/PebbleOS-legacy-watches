@@ -313,8 +313,9 @@ manager) before its HCI transport starts, then the vendor event
   20 ms without HCI traffic it deasserts CTS so the controller holds its
   data, and the controller image raises a wake line (radio P0_4 to PA10)
   while it has data for the host, which wakes it to reassert CTS. "BT Rx"
-  counts these sleeps (`z`). The controller itself never sleeps yet
-  (`pm_mode_active`).
+  counts these sleeps (`z`). The controller uses extended sleep between BLE
+  events: the SDK's UART adapter sleeps only while the host holds CTS
+  deasserted, deasserts RTS first, and wakes when the host asserts CTS.
 - Radio P2_3 is wired to both PA2 (HCI TX) and PC4 (stock's interrupt
   input), so PC4 must stay an input.
 - The controller keeps running while Bluetooth is off (airplane mode).
