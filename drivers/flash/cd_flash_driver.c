@@ -2,6 +2,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 #include <pbl/drivers/flash.h>
+#include <pbl/drivers/flash/flash_guard.h>
 #include <pbl/drivers/flash/flash_impl.h>
 #include <pbl/drivers/watchdog.h>
 
@@ -41,10 +42,12 @@ void cd_flash_erase_region(uint32_t start_addr, uint32_t total_bytes) {
     uint32_t erase_size = 0;
     if (((start_addr & SECTOR_ADDR_MASK) == start_addr) && (total_bytes >= SECTOR_SIZE_BYTES)) {
       erase_size = SECTOR_SIZE_BYTES;
+      CD_ASSERTN(!flash_guard_is_protected(start_addr, erase_size));
       flash_impl_erase_sector_begin(start_addr);
     } else if ((start_addr & SUBSECTOR_ADDR_MASK) == start_addr &&
                (total_bytes >= SUBSECTOR_SIZE_BYTES)) {
       erase_size = SUBSECTOR_SIZE_BYTES;
+      CD_ASSERTN(!flash_guard_is_protected(start_addr, erase_size));
       flash_impl_erase_subsector_begin(start_addr);
     } else {
       // Unaligned start address or unaligned erase size
@@ -67,6 +70,7 @@ uint32_t cd_flash_write_bytes(const void *buffer_ptr, uint32_t start_addr,
                               const uint32_t buffer_size) {
   CD_ASSERTN(((start_addr + buffer_size) <= CORE_DUMP_FLASH_END) &&
              (int)start_addr >= CORE_DUMP_FLASH_START);
+  CD_ASSERTN(!flash_guard_is_protected(start_addr, buffer_size));
 
   const uint8_t *buffer = buffer_ptr;
   uint32_t remaining = buffer_size;

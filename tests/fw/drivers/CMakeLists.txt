@@ -20,3 +20,10 @@ pbl_clar_test(test_accel_qemu
     tests/fakes/fake_rtc.c
   OVERRIDES dummy_board
 )
+
+pbl_clar_test(test_flash_guard
+  SOURCES
+    drivers/flash/flash_guard.c
+  DEFINES CONFIG_FLASH_LAYOUT_SILK=1 CONFIG_FLASH_GUARD=1
+  OVERRIDES dummy_board
+)

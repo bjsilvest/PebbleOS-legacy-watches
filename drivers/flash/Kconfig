@@ -30,6 +30,19 @@ config FLASH_POSIX
     help
       External flash backed by a file on the host.
 
+config FLASH_LAYOUT_SILK
+    bool "Pebble 2 (silk) stock flash layout"
+    select FLASH_GUARD
+    help
+      Use the stock Pebble 2 external flash layout, keeping the stock
+      bootloader's PRF, shared PRF storage and MFG info where they are.
+
+config FLASH_GUARD
+    bool "Guard regions the firmware does not own"
+    help
+      Assert instead of issuing any erase or write that overlaps PRF,
+      shared PRF storage or MFG info, and refuse security register writes.
+
 module = DRIVER_FLASH
 module-str = Flash
 source "subsys/logging/Kconfig.template.log_level"

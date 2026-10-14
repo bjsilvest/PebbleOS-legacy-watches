@@ -5,7 +5,9 @@
 
 #include <stdint.h>
 
-#if defined(CONFIG_FLASH_QEMU) || defined(CONFIG_FLASH_POSIX)
+#ifdef CONFIG_FLASH_LAYOUT_SILK
+#include "flash_region_mx25u.h"
+#elif defined(CONFIG_FLASH_QEMU) || defined(CONFIG_FLASH_POSIX)
 #include "flash_region_qemu.h"
 #elifdef CONFIG_FLASH_GD25LQ255E
 #include "flash_region_gd25lq255e.h"

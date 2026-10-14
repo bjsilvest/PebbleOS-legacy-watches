@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include <pbl/drivers/flash.h>
+#include <pbl/drivers/flash/flash_guard.h>
 #include <pbl/drivers/flash/flash_impl.h>
 #include <pbl/drivers/flash/flash_internal.h>
 #include <pbl/kernel/mutex.h>
@@ -121,6 +122,8 @@ void flash_expect_program_failure(bool expect_failure) {
 #endif
 
 void flash_write_bytes(const uint8_t *buffer, uint32_t start_addr, uint32_t buffer_size) {
+  PBL_ASSERT(!flash_guard_is_protected(start_addr, buffer_size),
+             "Write to protected flash 0x%" PRIx32 "+%" PRIu32, start_addr, buffer_size);
   pbl_mutex_lock(&s_flash_lock, PBL_FOREVER);
   prv_erase_pause();
   if (s_erase.suspended) {
@@ -170,6 +173,11 @@ void flash_write_bytes(const uint8_t *buffer, uint32_t start_addr, uint32_t buff
 // the erase completes.
 static uint32_t prv_flash_erase_start(uint32_t addr, FlashOperationCompleteCb on_complete_cb,
                                       void *context, bool is_subsector, uint8_t retries) {
+  const uint32_t erase_base = is_subsector ? flash_impl_get_subsector_base_address(addr)
+                                           : flash_impl_get_sector_base_address(addr);
+  const uint32_t erase_size = is_subsector ? SUBSECTOR_SIZE_BYTES : SECTOR_SIZE_BYTES;
+  PBL_ASSERT(!flash_guard_is_protected(erase_base, erase_size),
+             "Erase of protected flash 0x%" PRIx32, erase_base);
   pbl_sem_take(&s_erase_semphr, PBL_FOREVER);
   pbl_mutex_lock(&s_flash_lock, PBL_FOREVER);
   PBL_ASSERTN(s_erase.in_progress == false);
@@ -478,6 +486,10 @@ status_t flash_security_register_is_locked(uint32_t address, bool *locked) {
 }
 
 status_t flash_erase_security_register(uint32_t addr) {
+#ifdef CONFIG_FLASH_GUARD
+  (void)addr;
+  return E_INVALID_OPERATION;
+#else
   status_t status;
 
   pbl_mutex_lock(&s_flash_lock, PBL_FOREVER);
@@ -485,9 +497,15 @@ status_t flash_erase_security_register(uint32_t addr) {
   pbl_mutex_unlock(&s_flash_lock);
 
   return status;
+#endif
 }
 
 status_t flash_write_security_register(uint32_t addr, uint8_t val) {
+#ifdef CONFIG_FLASH_GUARD
+  (void)addr;
+  (void)val;
+  return E_INVALID_OPERATION;
+#else
   status_t status;
 
   pbl_mutex_lock(&s_flash_lock, PBL_FOREVER);
@@ -495,6 +513,7 @@ status_t flash_write_security_register(uint32_t addr, uint8_t val) {
   pbl_mutex_unlock(&s_flash_lock);
 
   return status;
+#endif
 }
 
 const FlashSecurityRegisters *flash_security_registers_info(void) {
