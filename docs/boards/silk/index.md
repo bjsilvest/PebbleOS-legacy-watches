@@ -278,7 +278,8 @@ with HCI opcodes in hex, and "BT Chip" is the chip ID the bootrom printed.
 If the controller does not answer HCI Reset, "BT Radio" reads
 `HCI <bytes>B <first byte> [<markers>] f<framing errors>`: the controller
 image sends `m` (main), `c` (clocks), `p` (power manager) and `b` (BLE
-manager) before its HCI transport starts.
+manager) before its HCI transport starts, then the vendor event
+`04 ff 01 'H'` through it (shown as `???H`).
 
 ### Known limitations
 
