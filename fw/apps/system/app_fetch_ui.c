@@ -86,6 +86,7 @@ static void prv_app_fetch_launch_app(AppFetchUIData *data) {
     .launch_app = {.id = data->next_app_args.app_id, .data = ext}
   };
 
+  app_fetch_trace_note('L');
   event_put(&launch_event);
 }
 
@@ -150,6 +151,7 @@ static void prv_set_progress_failure(AppFetchUIData *data) {
 
 static void prv_progress_window_finished(ProgressWindow *window, bool success, void *context) {
   AppFetchUIData *data = context;
+  app_fetch_trace_note(success ? 'P' : 'p');
   if (!success) {
     return;
   }

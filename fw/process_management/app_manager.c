@@ -9,6 +9,7 @@
 #include <pbl/kernel/mutex.h>
 #include <pbl/mcu/privilege.h>
 #include <pbl/services/analytics/analytics.h>
+#include <pbl/services/app_fetch_endpoint.h>
 #include <pbl/services/app_inbox_service.h>
 #include <pbl/services/app_outbox_service.h>
 #include <pbl/services/compositor/compositor_transitions.h>
@@ -304,6 +305,9 @@ static bool prv_app_start(const PebbleProcessMd *app_md, const void *args,
   g_app_load_address = app_segment.start;
   void *entry_point = process_loader_load(app_md, PebbleTask_App, &app_segment);
   s_app_task_context.load_end = app_segment.start;
+  if (app_md->process_storage == ProcessStorageFlash) {
+    app_fetch_trace_note(entry_point ? 'A' : 'v');
+  }
   if (!entry_point) {
     PBL_LOG_WRN("Tried to launch an invalid app in bank %u!",
                 process_metadata_get_code_bank_num(app_md));
@@ -315,6 +319,7 @@ static bool prv_app_start(const PebbleProcessMd *app_md, const void *args,
     const ResourceVersion res_version = process_metadata_get_res_version(app_md);
     if (!resource_init_app(res_bank_num, &res_version)) {
       // The resources are busted! Abort starting this app.
+      app_fetch_trace_note('k');
       APP_LOG(APP_LOG_LEVEL_ERROR, "Checksum for resources differs.");
       return false;
     }
@@ -327,6 +332,7 @@ static bool prv_app_start(const PebbleProcessMd *app_md, const void *args,
 
   // The rest of app_ram is available for app_state to use as it sees fit.
   if (!app_state_configure(&app_ram, sdk_type, timeline_peek_get_obstruction_origin_y())) {
+    app_fetch_trace_note('s');
     PBL_LOG_ERR("App state configuration failed");
     return false;
   }
@@ -361,6 +367,9 @@ static bool prv_app_start(const PebbleProcessMd *app_md, const void *args,
   }
 
   app_manager_set_minimum_run_level(process_metadata_get_run_level(app_md));
+  if (app_md->process_storage == ProcessStorageFlash) {
+    app_fetch_trace_note('O');
+  }
 
   // Use the static app event queue:
   s_app_task_context.to_process_event_queue = &s_to_app_event_queue;
@@ -477,6 +486,7 @@ static void prv_app_show_crash_ui(AppInstallId install_id) {
   PBL_ASSERTN(install_id != INSTALL_ID_INVALID);
   if (crash_info.install_id != install_id ||
       (crash_info.crash_ticks + RETURN_CRASH_TIMEOUT_TICKS) < rtc_get_ticks()) {
+    app_fetch_trace_note('X');
     PBL_LOG_ERR("Watchface crashed (id=%" PRId32 "); relaunching", install_id);
     PBL_ANALYTICS_ADD(watchface_crash_count, 1);
     crash_info = (AppCrashInfo){.install_id = install_id, .crash_ticks = rtc_get_ticks()};

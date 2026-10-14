@@ -14,6 +14,7 @@
 #include <pbl/services/analytics/analytics.h>
 #include <pbl/services/animation_service.h>
 #include <pbl/services/app_cache.h>
+#include <pbl/services/app_fetch_endpoint.h>
 #include <pbl/services/blob_db/app_db.h>
 #include <pbl/services/data_logging/data_logging_service.h>
 #include <pbl/services/event_service.h>
@@ -216,6 +217,7 @@ static bool prv_needs_fetch(AppInstallId id, const PebbleProcessMd **md, bool is
   PBL_ASSERTN(md);
 
   if (!app_cache_entry_exists(id)) {
+    app_fetch_trace_note('n');
     PBL_LOG_DBG("Cache entry did not exist on launch attempt");
     return true;
   }
@@ -237,6 +239,7 @@ static bool prv_needs_fetch(AppInstallId id, const PebbleProcessMd **md, bool is
     app_install_release_md(*md);
     *md = nullptr;
     app_cache_remove_entry(id);
+    app_fetch_trace_note('u');
     return true;
   }
 

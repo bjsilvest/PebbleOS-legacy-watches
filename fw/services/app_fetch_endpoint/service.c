@@ -135,8 +135,11 @@ static uint8_t prv_compute_progress_percent(PutBytesObjectType type, unsigned in
 // Trace of the last fetches for diagnostics, one character per step, oldest
 // dropped: R request sent, S phone starting, a/w/r app/worker/resources done,
 // F put_bytes failed, T timeout, C added to the app cache, then '=' and the
-// result. put_bytes adds c (CRC ok), x (CRC mismatch) and t (timeout).
-#define TRACE_LEN 24U
+// result. put_bytes adds c (CRC ok), x (CRC mismatch) and t (timeout). The
+// launch after it adds P/p (progress window done, ok/failed), L (launch
+// event), n (not cached), u (stale cache entry), A/v (app loaded/invalid),
+// k (resources CRC), s (app state), O (started) and X (watchface crashed).
+#define TRACE_LEN 40U
 static char s_trace[TRACE_LEN + 1];
 
 void app_fetch_trace_note(char c) {
