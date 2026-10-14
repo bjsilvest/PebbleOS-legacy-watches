@@ -99,6 +99,7 @@ def main():
     parser.add_argument("--machine", default="pebble-flint")
     parser.add_argument("--seconds", type=int, default=40)
     parser.add_argument("--screenshot", help="write a PNG of the screen here")
+    parser.add_argument("--console", help="copy the console log here")
     args = parser.parse_args()
 
     silk_hw = args.machine == "pebble-silk-bb"
@@ -164,6 +165,8 @@ def main():
             print(f"{name:26s} {'unchanged' if same else 'MODIFIED'}")
 
         log = Path(console).read_bytes()
+        if args.console:
+            shutil.copyfile(console, args.console)
         guard_hits = log.count(GUARD_MESSAGE)
         print(f"flash guard assertions     {guard_hits}")
         ok &= guard_hits == 0
