@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 Brian Silvestri
+# SPDX-License-Identifier: Apache-2.0
+
+menuconfig HAL_STM32
+    bool "STM32 Standard Peripheral Library"
+    help
+      Build the STM32F4xx Standard Peripheral Library.
+
+if HAL_STM32
+
+config HAL_STM32_STM32F412
+    bool "STM32F412xG SoC variant"
+    help
+      Configure the library for the STM32F412xG used by the Pebble 2
+      (silk).
+
+endif # HAL_STM32
