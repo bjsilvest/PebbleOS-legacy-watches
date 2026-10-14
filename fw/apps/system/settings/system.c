@@ -57,6 +57,7 @@ enum {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   SystemInformationItemBtRadio,
   SystemInformationItemBtHci,
+  SystemInformationItemBtChip,
 #endif
   SystemInformationItemFirmware,
   SystemInformationItemLanguage,
@@ -220,6 +221,7 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   [SystemInformationItemBtRadio] = i18n_noop("BT Radio"),
   [SystemInformationItemBtHci] = i18n_noop("BT HCI"),
+  [SystemInformationItemBtChip] = i18n_noop("BT Chip"),
 #endif
   [SystemInformationItemFirmware] = i18n_noop("Firmware"),
   [SystemInformationItemLanguage] = i18n_noop("Language"),
@@ -332,6 +334,7 @@ static void prv_information_window_push(SettingsSystemData *data) {
   pbl_bt_hci_uart_copy_status(info->bt_hci_string, sizeof(info->bt_hci_string));
   info->subtitle_text[SystemInformationItemBtRadio] = info->bt_radio_string;
   info->subtitle_text[SystemInformationItemBtHci] = info->bt_hci_string;
+  info->subtitle_text[SystemInformationItemBtChip] = da1468x_chip_id();
 #endif
   info->subtitle_text[SystemInformationItemFirmware] =
       (char *)(strlen(TINTIN_METADATA.version_tag) >= 2 ? TINTIN_METADATA.version_tag

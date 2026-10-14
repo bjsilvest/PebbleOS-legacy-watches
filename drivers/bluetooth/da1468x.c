@@ -50,6 +50,11 @@ extern const uint8_t da1468x_controller_start[], da1468x_controller_end[];
 // The controller image needs a moment to start its UART after stage 2 jumps.
 #define HCI_PROBE_ATTEMPTS 10
 #define HCI_PROBE_REPLY_MS 200U
+// The controller image sends one marker byte per init step before HCI is up
+// ("m", "c", "p", "b"), the last one just before its HCI transport starts.
+#define MARKERS_MS  1000U
+#define MARKER_LAST 'b'
+#define MAX_MARKERS 8U
 
 #define SOH 0x01U
 #define STX 0x02U
@@ -65,11 +70,15 @@ static volatile uint32_t s_rx_tail;
 static PBL_SEM_DEFINE(s_rx_ready, 0, 1);
 
 static char s_status[32] = "Not started";
+static char s_chip_id[24];
+static char s_markers[MAX_MARKERS + 1];
+static volatile uint32_t s_rx_framing_errors;
 
 static void prv_rx_irq_handler(UARTDevice *dev, uint8_t data, const UARTRXErrorFlags *err_flags) {
   // The bootrom drives the lines while probing other interfaces, which can
   // show up as framing errors: drop those bytes.
   if (err_flags->framing_error) {
+    s_rx_framing_errors++;
     return;
   }
 
@@ -136,6 +145,7 @@ static bool prv_wait_bootrom_start(void) {
     }
     if (c == STX) {
       PBL_LOG_INFO("DA1468x bootrom up, ID \"%s\"", id);
+      strncpy(s_chip_id, id, sizeof(s_chip_id) - 1);
       return true;
     }
     // The lines glitch while the bootrom probes its interfaces, so only the
@@ -215,6 +225,21 @@ static bool prv_stage2_load_controller(void) {
   return true;
 }
 
+// Collect the controller's init markers, to show how far it got.
+static void prv_collect_markers(void) {
+  size_t n = 0;
+  uint8_t c;
+
+  memset(s_markers, 0, sizeof(s_markers));
+  s_rx_framing_errors = 0;
+  while (n < MAX_MARKERS && prv_getc(&c, MARKERS_MS)) {
+    s_markers[n++] = (c >= 0x20U && c < 0x7fU) ? (char)c : '?';
+    if (c == MARKER_LAST) {
+      break;
+    }
+  }
+}
+
 // HCI Reset must complete before the host is let at the controller: a
 // controller that runs but does not speak HCI would otherwise time the host
 // start out, which crashes.
@@ -240,8 +265,8 @@ static bool prv_hci_probe(void) {
 
   PBL_LOG_ERR("Controller does not answer HCI Reset");
   // The last reply, to tell silence from a wrong baud rate.
-  sniprintf(s_status, sizeof(s_status), "HCI: %uB %02x %02x %02x", (unsigned)n, n > 0 ? evt[0] : 0U,
-            n > 1 ? evt[1] : 0U, n > 2 ? evt[2] : 0U);
+  sniprintf(s_status, sizeof(s_status), "HCI %uB %02x [%s] f%lu", (unsigned)n, n > 0 ? evt[0] : 0U,
+            s_markers, (unsigned long)s_rx_framing_errors);
   return false;
 }
 
@@ -271,6 +296,7 @@ static bool prv_boot_once(void) {
   }
 
   prv_set_baud(CONFIG_BT_DA1468X_HCI_BAUD);
+  prv_collect_markers();
   if (!prv_hci_probe()) {
     uart_set_rx_interrupt_enabled(BT_HCI_UART, false);
     uart_deinit(BT_HCI_UART);
@@ -308,4 +334,8 @@ bool da1468x_boot(void) {
 
 const char *da1468x_status(void) {
   return s_status;
+}
+
+const char *da1468x_chip_id(void) {
+  return s_chip_id;
 }

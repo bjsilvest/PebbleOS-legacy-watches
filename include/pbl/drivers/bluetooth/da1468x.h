@@ -23,3 +23,10 @@ bool da1468x_boot(void);
  * @return A short static string, e.g. "Running (try 1)" or the failing step.
  */
 const char *da1468x_status(void);
+
+/**
+ * @brief The chip ID the bootrom printed in the last boot, for diagnostics.
+ *
+ * @return A static string, empty if none was printed (AD silicon) or no boot got that far.
+ */
+const char *da1468x_chip_id(void);
