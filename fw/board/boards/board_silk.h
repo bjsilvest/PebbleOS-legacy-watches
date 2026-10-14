@@ -114,6 +114,12 @@ static const struct pbl_gpio BOARD_BT_RESET = PBL_GPIO(STM32_GPIOC, 5, 0);
 static const struct pbl_gpio BOARD_BT_RTS =
     PBL_GPIO(STM32_GPIOB, 0, PBL_GPIO_ACTIVE_LOW | PBL_GPIO_PULL_UP);
 static const struct pbl_gpio BOARD_BT_CTS = PBL_GPIO(STM32_GPIOB, 1, PBL_GPIO_ACTIVE_LOW);
+
+// Radio P0_4 (stock's SPI data in): the controller image drives it high while
+// it has data for the host, whose CTS may be deasserted for STOP mode, so it
+// wakes the host.
+#define BOARD_BT_HAS_WAKE 1
+static const struct pbl_gpio BOARD_BT_WAKE = PBL_GPIO(STM32_GPIOA, 10, PBL_GPIO_PULL_DOWN);
 #endif
 extern QSPIPort *const QSPI;
 extern QSPIFlash *const QSPI_FLASH;

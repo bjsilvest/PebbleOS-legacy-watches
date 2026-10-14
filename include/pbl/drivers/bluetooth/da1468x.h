@@ -5,6 +5,8 @@
 
 #include <stdbool.h>
 
+#include <pbl/drivers/exti.h>
+
 /**
  * @brief Boot the DA1468x Bluetooth controller from RAM.
  *
@@ -65,3 +67,21 @@ bool da1468x_rts_ready(void);
  * No-op on boards without flow control lines. ISR-safe.
  */
 void da1468x_set_cts(bool allow);
+
+/**
+ * @brief Whether the board has the controller's wake line, so the host may
+ *        enter STOP mode with the controller running.
+ */
+bool da1468x_has_wake(void);
+
+/**
+ * @brief Whether the controller has data for the host (its wake line is high).
+ *
+ * ISR-safe.
+ */
+bool da1468x_wake_pending(void);
+
+/**
+ * @brief Call @p cb from an interrupt when the controller raises its wake line.
+ */
+void da1468x_wake_irq_init(ExtiHandlerCallback cb);

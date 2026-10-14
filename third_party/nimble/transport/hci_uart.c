@@ -19,6 +19,8 @@
 #include <board/board.h>
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
 #include <pbl/drivers/bluetooth/da1468x.h>
+#include <pbl/drivers/rtc.h>
+#include <pbl/soc/stm32/sleep.h>
 #endif
 #include <kernel/pebble_tasks.h>
 #include <kernel/util/delay.h>
@@ -523,6 +525,76 @@ static void prv_frame_byte(uint8_t c) {
 }
 #endif
 
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+// STOP mode stops the UART clocks. To allow it while the controller runs, the
+// host deasserts CTS after a short idle time, so the controller holds what it
+// has, and the controller raises its wake line while it has data, which
+// wakes the host to reassert CTS. Awake holds one STOP block (taken by
+// da1468x_boot()).
+#define BT_IDLE_MS 20U
+
+static bool s_power_save;
+static volatile bool s_awake = true;
+static volatile RtcTicks s_last_activity;
+static volatile uint32_t s_tx_busy;
+static volatile uint32_t s_sleeps;
+
+// With interrupts locked.
+static void prv_wake_locked(void) {
+  s_last_activity = rtc_get_ticks();
+  if (!s_awake) {
+    s_awake = true;
+    soc_stm32_stop_block();
+    da1468x_set_cts(true);
+  }
+}
+
+static void prv_wake(void) {
+  pbl_irq_lock();
+  prv_wake_locked();
+  pbl_irq_unlock();
+}
+
+static void prv_wake_irq_handler(void) {
+  prv_wake();
+  // The HCI thread waits for an idle timeout again while awake.
+  pbl_sem_give(&s_rx_ready);
+}
+
+static bool prv_idle_locked(void) {
+  return s_awake && s_tx_busy == 0U && !s_rx_paused && s_rx_tail == s_rx_head &&
+         s_frame.len == 0U && !da1468x_wake_pending() &&
+         (rtc_get_ticks() - s_last_activity) >= (BT_IDLE_MS * RTC_TICKS_HZ) / 1000U;
+}
+
+static void prv_try_sleep(void) {
+  if (!s_power_save) {
+    return;
+  }
+
+  pbl_irq_lock();
+  if (!prv_idle_locked()) {
+    pbl_irq_unlock();
+    return;
+  }
+  da1468x_set_cts(false);
+  pbl_irq_unlock();
+
+  // Let a byte already on the wire land and the UART idle interrupt hand it on.
+  delay_us(50);
+
+  pbl_irq_lock();
+  if (prv_idle_locked()) {
+    s_awake = false;
+    s_sleeps++;
+    soc_stm32_stop_release();
+  } else {
+    da1468x_set_cts(true);
+  }
+  pbl_irq_unlock();
+}
+#endif
+
 static void prv_hci_task_main(void *unused) {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   // Loading the controller takes about a second, so it happens here rather
@@ -530,6 +602,11 @@ static void prv_hci_task_main(void *unused) {
   // crashing, since a crash loop would end in the bootloader starting PRF.
   if (da1468x_boot()) {
     prv_uart_start();
+    s_last_activity = rtc_get_ticks();
+    s_power_save = s_flow_control && da1468x_has_wake();
+    if (s_power_save) {
+      da1468x_wake_irq_init(prv_wake_irq_handler);
+    }
   } else {
     s_controller_state = ControllerStateFailed;
   }
@@ -542,10 +619,16 @@ static void prv_hci_task_main(void *unused) {
   while (true) {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
     pbl_task_wdt_set_waiting(true);
-#endif
-    pbl_sem_take(&s_rx_ready, PBL_FOREVER);
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+    // While awake, wake up to check for idle.
+    const bool timed_out =
+        pbl_sem_take(&s_rx_ready, (s_power_save && s_awake) ? PBL_MSEC(BT_IDLE_MS) : PBL_FOREVER) !=
+        0;
     pbl_task_wdt_set_waiting(false);
+    if (s_rx_tail != s_rx_head) {
+      prv_wake();
+    }
+#else
+    pbl_sem_take(&s_rx_ready, PBL_FOREVER);
 #endif
 
     while (s_rx_tail != s_rx_head) {
@@ -588,6 +671,10 @@ static void prv_hci_task_main(void *unused) {
       for (size_t i = 0; i < sizeof(reply); i++) {
         prv_frame_byte(reply[i]);
       }
+    }
+
+    if (timed_out || !s_awake) {
+      prv_try_sleep();
     }
 #endif
   }
@@ -687,14 +774,23 @@ static void prv_write(const uint8_t *data, size_t len) {
   }
 
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
+  // Stay awake for the reply.
+  pbl_irq_lock();
+  s_tx_busy++;
+  prv_wake_locked();
+  pbl_irq_unlock();
   if (s_flow_control) {
     prv_write_irq(data, len);
-    return;
+  } else {
+    for (size_t i = 0U; i < len; i += TX_BURST_BYTES) {
+      prv_write_irq(&data[i], MIN(len - i, (size_t)TX_BURST_BYTES));
+      pbl_thread_sleep(PBL_MSEC(TX_PAUSE_MS));
+    }
   }
-  for (size_t i = 0U; i < len; i += TX_BURST_BYTES) {
-    prv_write_irq(&data[i], MIN(len - i, (size_t)TX_BURST_BYTES));
-    pbl_thread_sleep(PBL_MSEC(TX_PAUSE_MS));
-  }
+  pbl_irq_lock();
+  s_tx_busy--;
+  s_last_activity = rtc_get_ticks();
+  pbl_irq_unlock();
 #else
   for (size_t i = 0U; i < len; i++) {
     uart_write_byte(BT_HCI_UART_TX, data[i]);
@@ -777,11 +873,12 @@ uint32_t pbl_bt_hci_uart_acl_clamped(void) {
 
 void pbl_bt_hci_uart_copy_rx_stats(char *buf, size_t len) {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
-  sniprintf(
-      buf, len, "%c%lu!%lu r%lu o%lu d%lu u%04x@%04x g%lu/%04x", s_flow_control ? 'F' : 'p',
-      (unsigned long)s_tx_flow_waits, (unsigned long)s_tx_flow_forced, (unsigned long)s_rx_pauses,
-      (unsigned long)s_rx_overruns, (unsigned long)s_rx_dropped_bytes, (unsigned)s_unknown_msg_id,
-      (unsigned)s_unknown_task_id, (unsigned long)s_dgtl_skipped, (unsigned)s_last_gtl_msg_id);
+  sniprintf(buf, len, "%c%lu!%lu z%lu r%lu o%lu d%lu u%04x@%04x g%lu/%04x",
+            s_flow_control ? 'F' : 'p', (unsigned long)s_tx_flow_waits,
+            (unsigned long)s_tx_flow_forced, (unsigned long)s_sleeps, (unsigned long)s_rx_pauses,
+            (unsigned long)s_rx_overruns, (unsigned long)s_rx_dropped_bytes,
+            (unsigned)s_unknown_msg_id, (unsigned)s_unknown_task_id, (unsigned long)s_dgtl_skipped,
+            (unsigned)s_last_gtl_msg_id);
 #else
   buf[0] = '\0';
 #endif

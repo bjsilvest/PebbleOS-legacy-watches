@@ -18,6 +18,7 @@
 
 #include <pbl/crc/crc.h>
 #include <pbl/drivers/bluetooth/da1468x.h>
+#include <pbl/drivers/exti.h>
 #include <pbl/drivers/gpio.h>
 #include <pbl/drivers/rtc.h>
 #include <pbl/drivers/uart.h>
@@ -394,6 +395,31 @@ bool da1468x_rts_ready(void) {
   return pbl_gpio_get(&BOARD_BT_RTS) > 0;
 #else
   return true;
+#endif
+}
+
+bool da1468x_has_wake(void) {
+#ifdef BOARD_BT_HAS_WAKE
+  return true;
+#else
+  return false;
+#endif
+}
+
+bool da1468x_wake_pending(void) {
+#ifdef BOARD_BT_HAS_WAKE
+  return pbl_gpio_get(&BOARD_BT_WAKE) > 0;
+#else
+  return false;
+#endif
+}
+
+void da1468x_wake_irq_init(ExtiHandlerCallback cb) {
+#ifdef BOARD_BT_HAS_WAKE
+  pbl_gpio_configure(&BOARD_BT_WAKE, PBL_GPIO_INPUT);
+  const ExtiConfig config = pbl_exti_stm32_config(&BOARD_BT_WAKE);
+  exti_configure_pin(config, ExtiTrigger_Rising, cb);
+  exti_enable(config);
 #endif
 }
 
