@@ -7,6 +7,7 @@ from pathlib import Path
 from threading import Lock
 
 from font.fontgen import MAX_GLYPHS, MAX_GLYPHS_EXTENDED, Font
+from font.pbf_subset import load_codepoints, subset_pbf
 from pebble_sdk_platform import pebble_platforms
 from resources.resource_map.resource_generator import ResourceGenerator
 from resources.types.resource_definition import ResourceDefinition
@@ -33,6 +34,7 @@ class FontResourceGenerator(ResourceGenerator):
         """Set the font-specific attributes that build_font_data() reads."""
         definition.max_glyph_size = max_glyph_size
         definition.character_list = definition_dict.get("characterList")
+        definition.glyph_subset = definition_dict.get("glyphSubset")
         definition.character_regex = definition_dict.get("characterRegex")
         definition.compatibility = definition_dict.get("compatibility")
         definition.compress = definition_dict.get("compress")
@@ -77,6 +79,8 @@ class FontResourceGenerator(ResourceGenerator):
             font_data = cls.build_font_data(font_path, definition)
         elif font_ext.lower() == ".pbf":
             font_data = Path(font_path).read_bytes()
+            if definition.glyph_subset is not None:
+                font_data = subset_pbf(font_data, load_codepoints(definition.glyph_subset))
         else:
             raise RuntimeError(f"Unsupported font format: {font_ext}")
 

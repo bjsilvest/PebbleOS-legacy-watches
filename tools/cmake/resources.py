@@ -141,10 +141,9 @@ def get_resources_dict(bld, variant, config=frozenset()):
 
     # The font scripts want an absolute characterList path.
     for item in resources_dict["media"]:
-        if "characterList" in item:
-            item["characterList"] = os.path.abspath(
-                os.path.join("resources", item["characterList"])
-            )
+        for key in ("characterList", "glyphSubset"):
+            if key in item:
+                item[key] = os.path.abspath(os.path.join("resources", item[key]))
 
     if is_recovery:
         # PRF needs every media item built into the firmware image.
@@ -164,6 +163,9 @@ def definition_deps(definition):
     # generator only reads one for the formats that need it.
     if character_list and os.path.exists(character_list):
         deps.append(character_list)
+    glyph_subset = getattr(definition, "glyph_subset", None)
+    if glyph_subset:
+        deps.append(glyph_subset)
     return deps
 
 
