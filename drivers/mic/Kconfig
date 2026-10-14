@@ -25,6 +25,12 @@ config MIC_SF32LB
     help
       Support for the SiFli SF32LB PDM microphone interface.
 
+config MIC_STM32_DFSDM
+    bool "STM32 DFSDM"
+    depends on SOC_STM32F4
+    help
+      PDM microphone through the STM32F412 DFSDM (silk).
+
 config MIC_QEMU
     bool "QEMU stub"
     default y if SOC_QEMU || SOC_POSIX
