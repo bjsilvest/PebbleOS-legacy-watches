@@ -47,9 +47,19 @@ static int prv_device_name_read_event_cb(uint16_t conn_handle, const struct ble_
   bool changed;
   struct pbl_bt_addr addr_copy;
 
+  // Pairing can resolve the peer's identity while the read is in flight, which
+  // changes the connection's address from the one the request was made for:
+  // look the connection up by its current address so the name is kept on the
+  // first pairing, not only after reconnecting.
+  struct pbl_bt_device_internal current = *device;
+  struct ble_gap_conn_desc desc;
+  if (ble_gap_conn_find(conn_handle, &desc) == 0) {
+    nimble_addr_to_pebble_device(&desc.peer_id_addr, &current);
+  }
+
   bt_lock();
 
-  GAPLEConnection *connection = gap_le_connection_by_device(device);
+  GAPLEConnection *connection = gap_le_connection_by_device(&current);
   if (connection == nullptr) {
     bt_unlock();
     kernel_free(device_name);
