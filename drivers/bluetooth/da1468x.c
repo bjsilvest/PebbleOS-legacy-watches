@@ -13,6 +13,7 @@
 //!   host -> len bytes                  stage 2 -> 'O' (runs it) or 'C'
 
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 #include <pbl/crc/crc.h>
@@ -20,6 +21,8 @@
 #include <pbl/drivers/gpio.h>
 #include <pbl/drivers/rtc.h>
 #include <pbl/drivers/uart.h>
+#include <pbl/kernel/irq.h>
+#include <pbl/kernel/sem.h>
 #include <pbl/kernel/thread.h>
 #include <pbl/logging/logging.h>
 #include <pbl/soc/stm32/sleep.h>
@@ -52,25 +55,47 @@ extern const uint8_t da1468x_controller_start[], da1468x_controller_end[];
 #define STX 0x02U
 #define ACK 0x06U
 
+// Replies are read from the RX interrupt, so waiting for one does not starve
+// lower priority threads (and with them the task watchdog).
+#define RX_RING_SIZE 64U
+
+static uint8_t s_rx_ring[RX_RING_SIZE];
+static volatile uint32_t s_rx_head;
+static volatile uint32_t s_rx_tail;
+static PBL_SEM_DEFINE(s_rx_ready, 0, 1);
+
+static char s_status[32] = "Not started";
+
+static void prv_rx_irq_handler(UARTDevice *dev, uint8_t data, const UARTRXErrorFlags *err_flags) {
+  // The bootrom drives the lines while probing other interfaces, which can
+  // show up as framing errors: drop those bytes.
+  if (err_flags->framing_error) {
+    return;
+  }
+
+  const uint32_t next = (s_rx_head + 1U) % RX_RING_SIZE;
+  if (next != s_rx_tail) {
+    s_rx_ring[s_rx_head] = data;
+    s_rx_head = next;
+  }
+  pbl_sem_give(&s_rx_ready);
+}
+
 static bool prv_getc(uint8_t *c, uint32_t timeout_ms) {
   const RtcTicks end = rtc_get_ticks() + (timeout_ms * RTC_TICKS_HZ) / 1000U + 1U;
 
-  do {
-    if (uart_is_rx_ready(BT_HCI_UART)) {
-      // The bootrom drives the lines while probing other interfaces, which
-      // can show up as framing errors: drop those bytes.
-      const bool framing_error = uart_has_rx_framing_error(BT_HCI_UART);
-      const uint8_t byte = uart_read_byte(BT_HCI_UART);
-      if (!framing_error) {
-        *c = byte;
-        return true;
-      }
-    } else if (uart_has_rx_overrun(BT_HCI_UART)) {
-      (void)uart_read_byte(BT_HCI_UART);
+  while (s_rx_tail == s_rx_head) {
+    const RtcTicks now = rtc_get_ticks();
+    if (now >= end) {
+      return false;
     }
-  } while (rtc_get_ticks() < end);
+    const uint32_t left_ms = (uint32_t)(((end - now) * 1000U) / RTC_TICKS_HZ) + 1U;
+    (void)pbl_sem_take(&s_rx_ready, PBL_MSEC(left_ms));
+  }
 
-  return false;
+  *c = s_rx_ring[s_rx_tail];
+  s_rx_tail = (s_rx_tail + 1U) % RX_RING_SIZE;
+  return true;
 }
 
 static void prv_write(const uint8_t *data, size_t len) {
@@ -86,9 +111,10 @@ static void prv_set_baud(uint32_t baud) {
 }
 
 static void prv_flush_rx(void) {
-  while (uart_is_rx_ready(BT_HCI_UART) || uart_has_rx_overrun(BT_HCI_UART)) {
-    (void)uart_read_byte(BT_HCI_UART);
-  }
+  pbl_irq_lock();
+  s_rx_tail = s_rx_head;
+  pbl_irq_unlock();
+  (void)pbl_sem_take(&s_rx_ready, PBL_NO_WAIT);
 }
 
 static bool prv_wait_bootrom_start(void) {
@@ -100,6 +126,7 @@ static bool prv_wait_bootrom_start(void) {
     uint8_t c;
     if (!prv_getc(&c, timeout_ms)) {
       PBL_LOG_ERR("No bootrom start (got %u chars)", (unsigned)i);
+      sniprintf(s_status, sizeof(s_status), "Bootrom: none (%u ch)", (unsigned)i);
       return false;
     }
     if (c == STX) {
@@ -113,6 +140,7 @@ static bool prv_wait_bootrom_start(void) {
   }
 
   PBL_LOG_ERR("Bootrom sent no STX");
+  sniprintf(s_status, sizeof(s_status), "Bootrom: no STX");
   return false;
 }
 
@@ -125,6 +153,7 @@ static bool prv_bootrom_load_stage2(void) {
   prv_write(header, sizeof(header));
   if (!prv_getc(&c, BOOTROM_CHAR_MS) || c != ACK) {
     PBL_LOG_ERR("Bootrom refused header");
+    sniprintf(s_status, sizeof(s_status), "Bootrom: header NAK");
     return false;
   }
 
@@ -136,6 +165,7 @@ static bool prv_bootrom_load_stage2(void) {
 
   if (!prv_getc(&c, BOOTROM_CHAR_MS) || c != xor) {
     PBL_LOG_ERR("Bootrom checksum mismatch");
+    sniprintf(s_status, sizeof(s_status), "Bootrom: bad checksum");
     return false;
   }
   prv_write(&(uint8_t){ACK}, 1);
@@ -162,12 +192,14 @@ static bool prv_stage2_load_controller(void) {
   prv_put_u32(pbl_crc32(0, image, len));
   if (!prv_getc(&c, STAGE2_REPLY_MS) || c != 'K') {
     PBL_LOG_ERR("Stage 2 not responding");
+    sniprintf(s_status, sizeof(s_status), "Stage 2: no reply");
     return false;
   }
 
   prv_write(image, len);
   if (!prv_getc(&c, STAGE2_CRC_MS) || c != 'O') {
     PBL_LOG_ERR("Stage 2 rejected the controller image");
+    sniprintf(s_status, sizeof(s_status), "Stage 2: bad image");
     return false;
   }
 
@@ -179,11 +211,12 @@ static bool prv_stage2_load_controller(void) {
 // start out, which crashes.
 static bool prv_hci_probe(void) {
   static const uint8_t reset_cmd[] = {0x01, 0x03, 0x0c, 0x00};
+  // Command Complete: 04 0e 04 <num_cmds> 03 0c <status>
+  uint8_t evt[7];
+  size_t n = 0;
 
   for (int attempt = 0; attempt < HCI_PROBE_ATTEMPTS; attempt++) {
-    // Command Complete: 04 0e 04 <num_cmds> 03 0c <status>
-    uint8_t evt[7];
-    size_t n = 0;
+    n = 0;
 
     prv_flush_rx();
     prv_write(reset_cmd, sizeof(reset_cmd));
@@ -197,6 +230,9 @@ static bool prv_hci_probe(void) {
   }
 
   PBL_LOG_ERR("Controller does not answer HCI Reset");
+  // The last reply, to tell silence from a wrong baud rate.
+  sniprintf(s_status, sizeof(s_status), "HCI: %uB %02x %02x %02x", (unsigned)n, n > 0 ? evt[0] : 0U,
+            n > 1 ? evt[1] : 0U, n > 2 ? evt[2] : 0U);
   return false;
 }
 
@@ -212,10 +248,13 @@ static bool prv_boot_once(void) {
   uart_init_tx_only(BT_HCI_UART_TX);
   prv_set_baud(BOOTROM_BAUD);
   prv_flush_rx();
+  uart_set_rx_interrupt_handler(BT_HCI_UART, prv_rx_irq_handler);
+  uart_set_rx_interrupt_enabled(BT_HCI_UART, true);
 
   pbl_gpio_set(&BOARD_BT_RESET, false);
 
   if (!prv_wait_bootrom_start() || !prv_bootrom_load_stage2() || !prv_stage2_load_controller()) {
+    uart_set_rx_interrupt_enabled(BT_HCI_UART, false);
     uart_deinit(BT_HCI_UART);
     uart_deinit(BT_HCI_UART_TX);
     prv_hold_in_reset();
@@ -224,12 +263,14 @@ static bool prv_boot_once(void) {
 
   prv_set_baud(CONFIG_BT_DA1468X_HCI_BAUD);
   if (!prv_hci_probe()) {
+    uart_set_rx_interrupt_enabled(BT_HCI_UART, false);
     uart_deinit(BT_HCI_UART);
     uart_deinit(BT_HCI_UART_TX);
     prv_hold_in_reset();
     return false;
   }
 
+  uart_set_rx_interrupt_enabled(BT_HCI_UART, false);
   prv_flush_rx();
   return true;
 }
@@ -238,8 +279,10 @@ bool da1468x_boot(void) {
   // The bootrom times out between characters, so a preempted load can fail;
   // retry before giving up.
   for (int attempt = 1; attempt <= BOOT_ATTEMPTS; attempt++) {
+    sniprintf(s_status, sizeof(s_status), "Booting (try %d)", attempt);
     if (prv_boot_once()) {
       PBL_LOG_INFO("DA1468x controller running (attempt %d)", attempt);
+      sniprintf(s_status, sizeof(s_status), "Running (try %d)", attempt);
       // The controller can send at any time and its UART has no flow control,
       // but STOP mode stops the USART clocks.
       soc_stm32_stop_block();
@@ -249,4 +292,8 @@ bool da1468x_boot(void) {
 
   PBL_LOG_ERR("DA1468x boot failed, Bluetooth disabled");
   return false;
+}
+
+const char *da1468x_status(void) {
+  return s_status;
 }
