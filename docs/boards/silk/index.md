@@ -309,12 +309,12 @@ manager) before its HCI transport starts, then the vendor event
   PRF storage. Distributing the IRK and advertising private addresses would
   help privacy but would not merge the entries.
 
-- **Power:** STOP mode is blocked while the controller runs, because the
-  USART clocks stop in STOP and the controller can send at any time. With
-  the radio never sleeping either, battery life is much shorter than stock.
-  The fix is a wake handshake over the SPI lines stock used, which are free
-  now (radio P0_0/P0_1/P0_4 to PB0/PB1/PA10), and needs a change on the
-  controller side.
+- **Power:** the host enters STOP mode with the controller running: after
+  20 ms without HCI traffic it deasserts CTS so the controller holds its
+  data, and the controller image raises a wake line (radio P0_4 to PA10)
+  while it has data for the host, which wakes it to reassert CTS. "BT Rx"
+  counts these sleeps (`z`). The controller itself never sleeps yet
+  (`pm_mode_active`).
 - Radio P2_3 is wired to both PA2 (HCI TX) and PC4 (stock's interrupt
   input), so PC4 must stay an input.
 - The controller keeps running while Bluetooth is off (airplane mode).
