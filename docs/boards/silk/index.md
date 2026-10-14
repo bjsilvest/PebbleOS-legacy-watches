@@ -124,8 +124,9 @@ STM32 drivers are rewritten against the current APIs, using the old drivers
 | QSPI + MX25U flash (hardware PRF/MFG block locks) | done (polled; DMA/mmap TODO) |
 | Sharp display (SPI2) | done (polled; DMA TODO) |
 | Board (`fw/board/boards/board_silk.*`) | done for the above |
-| I2C3, AS3701B PMIC, battery ADC | todo (fixed-value stand-in) |
+| I2C3, AS3701B PMIC, battery ADC | done (stock charger settings) |
 | BMA255 accel, ALS, vibe/backlight PWM, DFSDM mic | todo (fixed-value stand-ins) |
+| Hardware platform ID (`PebbleSilk`), bundle `hwrev: silk` | done |
 | STOP mode, DMA | todo |
 | Bluetooth (DA14681) | todo |
 
@@ -140,7 +141,16 @@ python3 tools/qemu_silk_canary.py --build-dir build-hw --machine pebble-silk-bb 
     --qemu $PEBBLEOS_SDK_ROOT/qemu/bin/qemu-pebble
 ```
 
-QEMU does not emulate the IWDG, so watchdog resets (and the bootloader's
+Firmware updates are verified against the real stock bootloader binary in
+QEMU: an image staged in `FIRMWARE_SLOT_1` with the 12-byte
+`FirmwareDescription` and a zlib CRC-32 (what put_bytes writes) is
+checksummed, installed at `0x08004000`, re-verified and booted. The
+bootloader checks the staged image before erasing anything, and only erases
+from `0x08004000`, so a bad image cannot touch the bootloader. If internal
+flash holds no firmware at all, it boots PRF before looking for an update.
+
+QEMU does not emulate the AS3701B (the driver then reports a nominal battery
+voltage) or the IWDG, so watchdog resets (and the bootloader's
 three-strike fallback to PRF) are untested in emulation.
 
 Pin map (from the stock board file):
