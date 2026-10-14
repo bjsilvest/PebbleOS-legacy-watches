@@ -9,8 +9,9 @@
 
 /* HCI H4 to the STM32 on the bootrom UART pins (TX P1_3, RX P2_3).
  * Silk has no RTS/CTS lines, so no flow control. */
+/* Hardware flow control: RTS and CTS are routed in main.c. */
 UART_BUS(UART2, DGTL_UART, HW_UART_BAUDRATE_115200, HW_UART_DATABITS_8, HW_UART_PARITY_NONE,
-         HW_UART_STOPBITS_1, 0, 1, HW_DMA_CHANNEL_1, HW_DMA_CHANNEL_0, 0, 0)
+         HW_UART_STOPBITS_1, 1, 1, HW_DMA_CHANNEL_1, HW_DMA_CHANNEL_0, 0, 0)
 
 /* Die temperature, used by the RF driver for calibration. */
 GPADC_SOURCE(TEMP_SENSOR, HW_GPADC_CLOCK_INTERNAL, HW_GPADC_INPUT_MODE_SINGLE_ENDED,

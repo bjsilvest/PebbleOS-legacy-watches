@@ -60,6 +60,15 @@ static void prv_periph_init(void)
                                  HW_GPIO_FUNC_UART2_TX);
         hw_gpio_set_pin_function(HW_GPIO_PORT_2, HW_GPIO_PIN_3, HW_GPIO_MODE_INPUT,
                                  HW_GPIO_FUNC_UART2_RX);
+        /*
+         * H4 flow control over spare lines of stock's SPI link: RTS on P0_0
+         * (host PB0) and CTS on P0_1 (host PB1). The host only drives CTS once
+         * this image runs, since the bootrom probes these pins for SPI.
+         */
+        hw_gpio_set_pin_function(HW_GPIO_PORT_0, HW_GPIO_PIN_0, HW_GPIO_MODE_OUTPUT,
+                                 HW_GPIO_FUNC_UART2_RTSN);
+        hw_gpio_set_pin_function(HW_GPIO_PORT_0, HW_GPIO_PIN_1, HW_GPIO_MODE_INPUT,
+                                 HW_GPIO_FUNC_UART2_CTSN);
 }
 
 static void prv_system_init(void *arg)
