@@ -10,7 +10,7 @@ if WATCHDOG
 
 config WATCHDOG_TIMEOUT_MS
     int "Timeout in milliseconds"
-    default 8000 if WATCHDOG_NRF5
+    default 8000 if WATCHDOG_NRF5 || WATCHDOG_STM32
     default 30000
     help
       Time without a feed after which the hardware watchdog resets the
@@ -32,6 +32,14 @@ config WATCHDOG_SF32LB
     select HAL_SIFLI
     help
       Support for the SiFli SF32LB watchdog.
+
+config WATCHDOG_STM32
+    bool "ST STM32 IWDG"
+    default y if SOC_STM32F4
+    select HAL_STM32
+    help
+      Support for the STM32F4 independent watchdog. The stock silk
+      bootloader starts it with an ~8 s timeout; it cannot be stopped.
 
 config WATCHDOG_QEMU
     bool "QEMU Watchdog"
