@@ -139,6 +139,14 @@ status_t qspi_flash_blank_check(QSPIFlash *dev, uint32_t addr, bool is_subsector
 status_t qspi_flash_write_protection_enable(QSPIFlash *dev);
 
 /**
+ * @brief Check whether the flash's block-lock write protection mode is enabled.
+ *
+ * @param dev Flash device.
+ * @return True if individual block locking is active.
+ */
+bool qspi_flash_protection_is_enabled(QSPIFlash *dev);
+
+/**
  * @brief Lock a sector against writes and erases.
  *
  * Uses the @c block_lock instruction, with @c block_lock.lock_data if

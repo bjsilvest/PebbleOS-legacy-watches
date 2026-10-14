@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 
+#include <pbl/drivers/gpio.h>
 #include <pbl/kernel/sem.h>
 
 #include <board/board.h>
@@ -48,6 +49,11 @@ typedef struct QSPIPortState {
   uint32_t t_exit_deep_us;
   /** Port initialized. */
   bool initialized;
+#elifdef CONFIG_SOC_STM32F4
+  /** Serializes transfers. */
+  struct pbl_sem sem;
+  /** Port initialized. */
+  bool initialized;
 #else
   /** Signals DMA completion. */
   struct pbl_sem dma_semaphore;
@@ -72,6 +78,22 @@ typedef const struct QSPIPort {
 #elifdef CONFIG_SOC_SF32LB52
   /** Clock divider. */
   uint16_t clk_div;
+#elifdef CONFIG_SOC_STM32F4
+  /** Maximum clock frequency in Hz. */
+  uint32_t clock_speed_hz;
+  /** Cycles between status reads when auto-polling. */
+  uint16_t auto_polling_interval;
+  /** Chip select pin and its alternate function. */
+  struct pbl_gpio cs_gpio;
+  uint8_t cs_af;
+  /** Clock pin and its alternate function. */
+  struct pbl_gpio clk_gpio;
+  uint8_t clk_af;
+  /** Data pins, IO0 to IO3, and their alternate function. */
+  struct pbl_gpio data_gpio[QSPI_NUM_DATA_PINS];
+  uint8_t data_af;
+  /** Flash size in bytes, a power of two. */
+  uint32_t flash_size;
 #endif
 } QSPIPort;
 

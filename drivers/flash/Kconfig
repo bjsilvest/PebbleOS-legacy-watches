@@ -18,6 +18,13 @@ config FLASH_GD25Q256E
     help
       Support for the GigaDevice GD25Q256E NOR flash.
 
+config FLASH_MX25U
+    bool "Macronix MX25U (QSPI)"
+    depends on SOC_STM32F4
+    help
+      Support for the Macronix MX25U64 NOR flash on the STM32F412
+      QUADSPI, as found on the Pebble 2 (silk).
+
 config FLASH_QEMU
     bool "QEMU External Flash"
     default y if SOC_QEMU
