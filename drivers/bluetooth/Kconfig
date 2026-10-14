@@ -1,0 +1,35 @@
+# SPDX-FileCopyrightText: 2026 Brian Silvestri
+# SPDX-License-Identifier: Apache-2.0
+
+config BT_CONTROLLER_DA1468X
+    bool "DA1468x controller booted from RAM"
+    depends on SOC_STM32F4 && BT_HCI_UART
+    help
+      Boot a Dialog DA1468x as the H4 HCI controller. Its bootrom loads a
+      small stage 2 over UART, which then receives the controller image at
+      1 Mbaud. Both images run from the radio's RAM; nothing is written to
+      its non-volatile memory.
+
+      The images are built outside this tree from the Dialog SDK, which may
+      not be redistributed, and embedded from the paths below. See
+      docs/boards/silk.
+
+if BT_CONTROLLER_DA1468X
+
+config BT_DA1468X_STAGE2_IMAGE
+    string "Stage 2 image"
+    help
+      Absolute path to the stage 2 loader binary.
+
+config BT_DA1468X_CONTROLLER_IMAGE
+    string "Controller image"
+    help
+      Absolute path to the HCI controller binary.
+
+config BT_DA1468X_HCI_BAUD
+    int "HCI baud rate"
+    default 115200
+    help
+      Baud rate of the controller image's H4 UART.
+
+endif
