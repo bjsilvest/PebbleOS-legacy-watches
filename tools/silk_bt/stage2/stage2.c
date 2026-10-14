@@ -92,17 +92,20 @@ static void prv_wait_magic(void)
         }
 }
 
+/*
+ * Like stock silk's loader, start the image with a system reset rather than a
+ * jump: the bootrom left address 0 remapped to SysRAM, where the image's
+ * vector table now is, and the SDK startup code expects reset state.
+ */
 static void __attribute__((noreturn)) prv_run_image(void)
 {
-        const uint32_t sp = *(volatile uint32_t *)IMAGE_BASE;
-        const uint32_t pc = *(volatile uint32_t *)(IMAGE_BASE + 4);
-
         while (UART2->UART2_USR_REG & UART2_UART2_USR_REG_UART_BUSY_Msk) {
         }
 
         __disable_irq();
-        __asm volatile ("msr msp, %0\n"
-                        "bx %1\n" : : "r" (sp), "r" (pc));
+        NVIC->ICER[0] = ~0UL;
+        NVIC->ICPR[0] = ~0UL;
+        NVIC_SystemReset();
         __builtin_unreachable();
 }
 
