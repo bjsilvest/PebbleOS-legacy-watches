@@ -62,6 +62,7 @@ enum {
   SystemInformationItemBtPair,
   SystemInformationItemBtReset,
   SystemInformationItemBtSmp,
+  SystemInformationItemBtSmp2,
   SystemInformationItemLastReboot,
   SystemInformationItemBtChip,
   SystemInformationItemBtRxBoot,
@@ -149,6 +150,7 @@ typedef struct SystemInformationData {
   char bt_pair_string[24];
   char bt_reset_string[40];
   char last_reboot_string[24];
+  char bt_smp_string[21];
 #endif
   char const *subtitle_text[SystemInformationItem_Count];
   char language_string[16];
@@ -235,6 +237,7 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemBtPair] = i18n_noop("BT Pair"),
   [SystemInformationItemBtReset] = i18n_noop("BT Reset"),
   [SystemInformationItemBtSmp] = i18n_noop("BT SMP"),
+  [SystemInformationItemBtSmp2] = i18n_noop("BT SMP 2"),
   [SystemInformationItemLastReboot] = i18n_noop("Last reboot"),
   [SystemInformationItemBtChip] = i18n_noop("BT Chip"),
   [SystemInformationItemBtRxBoot] = i18n_noop("BT Rx boot"),
@@ -357,7 +360,14 @@ static void prv_information_window_push(SettingsSystemData *data) {
             pbl_bt_hci_uart_reset_snapshot(), (unsigned long)pbl_bt_hci_uart_acl_clamped(),
             (unsigned)pbl_bt_hci_uart_le_acl_len_reported());
   info->subtitle_text[SystemInformationItemBtReset] = info->bt_reset_string;
-  info->subtitle_text[SystemInformationItemBtSmp] = pbl_bt_hci_uart_smp_trace();
+  // The trace is too long for one row: oldest half first.
+  const char *smp = pbl_bt_hci_uart_smp_trace();
+  const size_t smp_len = strlen(smp);
+  const size_t smp_split = MIN(smp_len, sizeof(info->bt_smp_string) - 1);
+  memcpy(info->bt_smp_string, smp, smp_split);
+  info->bt_smp_string[smp_split] = '\0';
+  info->subtitle_text[SystemInformationItemBtSmp] = info->bt_smp_string;
+  info->subtitle_text[SystemInformationItemBtSmp2] = &smp[smp_split];
   // Code, then the first two words of its data: the LR for an assert or fault,
   // the stuck PC and LR for a watchdog.
   RebootReason reason;

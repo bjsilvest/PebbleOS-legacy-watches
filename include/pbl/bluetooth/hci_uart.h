@@ -58,7 +58,9 @@ uint32_t pbl_bt_hci_uart_acl_clamped(void);
  * @brief The SMP opcodes seen on the link, for diagnosing pairing.
  *
  * Newest last: '<' received or '>' sent, the opcode's low hex digit, and for
- * Pairing Failed (5) its reason's low hex digit.
+ * Pairing Failed (5) its reason's low hex digit. A '+' follows a sent PDU for
+ * each of the next few packets the controller reports completed, and 'x'
+ * marks a disconnection (DA1468x only).
  *
  * @return A static string.
  */

@@ -82,11 +82,37 @@ static char s_reset_snapshot[32];
 
 // SMP opcodes seen on the link, oldest first: '<' received, '>' sent, then the
 // opcode in hex, and for Pairing Failed its reason.
-#define SMP_TRACE_LEN    20U
+#define SMP_TRACE_LEN    40U
 #define L2CAP_CID_SMP    0x0006U
 #define SMP_OP_PAIR_FAIL 0x05U
 
 static char s_smp_trace[SMP_TRACE_LEN + 1];
+
+static void prv_trace_append(const char *entry) {
+  pbl_irq_lock();
+  size_t len = strlen(s_smp_trace);
+  const size_t add = strlen(entry);
+  if (len + add > SMP_TRACE_LEN) {
+    // Keep the newest entries.
+    const size_t drop = len + add - SMP_TRACE_LEN;
+    memmove(s_smp_trace, &s_smp_trace[drop], len - drop + 1U);
+    len -= drop;
+  }
+  memcpy(&s_smp_trace[len], entry, add + 1U);
+  pbl_irq_unlock();
+}
+
+// After an SMP PDU is sent, mark the next few completed packets with '+', to
+// show whether the controller got it on air.
+#define SMP_TRACE_COMPLETIONS 4U
+static volatile uint8_t s_smp_completions_left;
+
+static void prv_note_completed(uint16_t count) {
+  while (count-- > 0U && s_smp_completions_left > 0U) {
+    s_smp_completions_left--;
+    prv_trace_append("+");
+  }
+}
 
 static void prv_note_smp(char dir, struct os_mbuf *om) {
   // ACL header (handle + flags, length), L2CAP header (length, CID), opcode, reason
@@ -107,18 +133,10 @@ static void prv_note_smp(char dir, struct os_mbuf *om) {
   if (hdr[8] == SMP_OP_PAIR_FAIL && os_mbuf_copydata(om, 9, 1, &hdr[9]) == 0) {
     entry[2] = "0123456789abcdef"[hdr[9] & 0xfU];
   }
-
-  pbl_irq_lock();
-  size_t len = strlen(s_smp_trace);
-  const size_t add = strlen(entry);
-  if (len + add > SMP_TRACE_LEN) {
-    // Keep the newest entries.
-    const size_t drop = len + add - SMP_TRACE_LEN;
-    memmove(s_smp_trace, &s_smp_trace[drop], len - drop + 1U);
-    len -= drop;
+  prv_trace_append(entry);
+  if (dir == '>') {
+    s_smp_completions_left = SMP_TRACE_COMPLETIONS;
   }
-  memcpy(&s_smp_trace[len], entry, add + 1U);
-  pbl_irq_unlock();
 }
 
 const char *pbl_bt_hci_uart_smp_trace(void) {
@@ -265,6 +283,7 @@ static void prv_note_evt(struct ble_hci_ev *ev) {
       uint8_t *entry = &ev->data[1 + 4 * i];
       uint16_t count = entry[2] | (entry[3] << 8);
       s_acl_completed += count;
+      prv_note_completed(count);
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
       count = prv_acl_track_completed((entry[0] | (entry[1] << 8)) & 0x0fffU, count);
       entry[2] = count & 0xffU;
@@ -276,6 +295,8 @@ static void prv_note_evt(struct ble_hci_ev *ev) {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   if (ev->opcode == BLE_HCI_EVCODE_DISCONN_CMP && ev->length >= 3U) {
     prv_acl_track_forget((ev->data[1] | (ev->data[2] << 8)) & 0x0fffU);
+    prv_trace_append("x");
+    s_smp_completions_left = 0U;
     return;
   }
 #endif
