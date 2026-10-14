@@ -51,10 +51,12 @@ extern const uint8_t da1468x_controller_start[], da1468x_controller_end[];
 #define HCI_PROBE_ATTEMPTS 10
 #define HCI_PROBE_REPLY_MS 200U
 // The controller image sends one marker byte per init step before HCI is up
-// ("m", "c", "p", "b"), the last one just before its HCI transport starts.
-#define MARKERS_MS  1000U
-#define MARKER_LAST 'b'
-#define MAX_MARKERS 8U
+// ("m", "c", "p", "b"), the last one just before its HCI transport starts,
+// then a vendor event (04 ff 01 'H') through the HCI transport.
+#define MARKERS_MS       1000U
+#define MARKER_LAST      'b'
+#define MARKERS_HELLO_MS 300U
+#define MAX_MARKERS      12U
 
 #define SOH 0x01U
 #define STX 0x02U
@@ -232,10 +234,11 @@ static void prv_collect_markers(void) {
 
   memset(s_markers, 0, sizeof(s_markers));
   s_rx_framing_errors = 0;
-  while (n < MAX_MARKERS && prv_getc(&c, MARKERS_MS)) {
+  uint32_t timeout_ms = MARKERS_MS;
+  while (n < MAX_MARKERS && prv_getc(&c, timeout_ms)) {
     s_markers[n++] = (c >= 0x20U && c < 0x7fU) ? (char)c : '?';
     if (c == MARKER_LAST) {
-      break;
+      timeout_ms = MARKERS_HELLO_MS;
     }
   }
 }
@@ -265,8 +268,8 @@ static bool prv_hci_probe(void) {
 
   PBL_LOG_ERR("Controller does not answer HCI Reset");
   // The last reply, to tell silence from a wrong baud rate.
-  sniprintf(s_status, sizeof(s_status), "HCI %uB %02x [%s] f%lu", (unsigned)n, n > 0 ? evt[0] : 0U,
-            s_markers, (unsigned long)s_rx_framing_errors);
+  sniprintf(s_status, sizeof(s_status), "HCI %uB [%s] f%lu", (unsigned)n, s_markers,
+            (unsigned long)s_rx_framing_errors);
   return false;
 }
 
