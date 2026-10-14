@@ -7,4 +7,5 @@ pbl_library_sources(
   system_stm32f4xx.c
   init.c
   idle.c
+  sleep.c
 )

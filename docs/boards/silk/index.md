@@ -115,7 +115,7 @@ STM32 drivers are rewritten against the current APIs, using the old drivers
 | Area | Status |
 |---|---|
 | STM32 SPL (`third_party/hal_stm32`) | done |
-| SoC: clocks, IRQs, memory, idle (`soc/stm32/stm32f4`) | done (idle: WFI only, STOP mode TODO) |
+| SoC: clocks, IRQs, memory, idle (`soc/stm32/stm32f4`) | done, with STOP mode (≤3.5 s, woken by RTC/EXTI) |
 | GPIO, EXTI, delay, RNG, OTP (read-only), MCU ID | done |
 | RTC (stock time format, timezone registers) | done |
 | Watchdog (IWDG, started by the stock bootloader) | done |
@@ -126,9 +126,10 @@ STM32 drivers are rewritten against the current APIs, using the old drivers
 | Board (`fw/board/boards/board_silk.*`) | done for the above |
 | I2C3, AS3701B PMIC, battery ADC | done (stock charger settings) |
 | Vibe (DRV2603 PWM), backlight PWM, BMA255 accel | done (stock values; QEMU does not emulate the BMA255) |
-| ALS, DFSDM mic | todo (fixed-value stand-ins) |
+| Ambient light (ADC1 ch13, PC0 enable) | done |
+| DFSDM mic | todo (silence stand-in; needs DMA) |
 | Hardware platform ID (`PebbleSilk`), bundle `hwrev: silk` | done |
-| STOP mode, DMA | todo |
+| DMA | todo |
 | Bluetooth (DA14681) | todo |
 
 The `silk` board boots in QEMU (`pebble-silk-bb`) through the **stock

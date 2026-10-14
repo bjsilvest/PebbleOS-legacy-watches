@@ -8,6 +8,7 @@
 #include <pbl/drivers/gpio/stm32.h>
 #include <pbl/drivers/i2c/stm32.h>
 #include <pbl/kernel/irq.h>
+#include <pbl/soc/stm32/sleep.h>
 #include <pbl/util/misc.h>
 
 #include <system/passert.h>
@@ -47,6 +48,24 @@ static uint32_t prv_clock_speed(uint32_t desired_hz) {
     prescaler++;
   }
   return pclk1 / (prescaler * divider);
+}
+
+static void prv_stop_block(const struct pbl_i2c_stm32 *i2c) {
+  pbl_irq_lock();
+  if (!i2c->state->stop_blocked) {
+    i2c->state->stop_blocked = true;
+    soc_stm32_stop_block();
+  }
+  pbl_irq_unlock();
+}
+
+static void prv_stop_release(const struct pbl_i2c_stm32 *i2c) {
+  pbl_irq_lock();
+  if (i2c->state->stop_blocked) {
+    i2c->state->stop_blocked = false;
+    soc_stm32_stop_release();
+  }
+  pbl_irq_unlock();
 }
 
 static void prv_disable_all_interrupts(I2C_TypeDef *i2c) {
@@ -101,6 +120,7 @@ static void prv_start_transfer(const struct pbl_i2c_bus *bus) {
 
   i2c->state->xfer_state = PBL_I2C_STM32_WRITE_ADDRESS_TX;
   i2c->state->idx = 0;
+  prv_stop_block(i2c);
 
   i2c->i2c->CR1 |= I2C_CR1_ACK;
   i2c->i2c->CR1 |= I2C_CR1_START;
@@ -113,12 +133,14 @@ static void prv_abort_transfer(const struct pbl_i2c_bus *bus) {
   prv_disable_all_interrupts(i2c->i2c);
   i2c->i2c->CR1 |= I2C_CR1_STOP;
   i2c->state->xfer_state = PBL_I2C_STM32_COMPLETE;
+  prv_stop_release(i2c);
 }
 
 static void prv_end_transfer_irq(const struct pbl_i2c_stm32 *i2c, bool success) {
   prv_disable_all_interrupts(i2c->i2c);
   i2c->i2c->CR1 |= I2C_CR1_STOP;
   i2c->state->xfer_state = PBL_I2C_STM32_COMPLETE;
+  prv_stop_release(i2c);
   pbl_i2c_bus_event(&i2c->bus, success ? PBL_I2C_EVENT_COMPLETE : PBL_I2C_EVENT_ERROR);
 }
 

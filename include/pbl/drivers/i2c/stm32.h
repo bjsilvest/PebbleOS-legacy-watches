@@ -26,6 +26,8 @@ enum pbl_i2c_stm32_xfer_state {
 struct pbl_i2c_stm32_state {
   enum pbl_i2c_stm32_xfer_state xfer_state;
   uint32_t idx;
+  //! A transfer holds off STOP mode, which would stop the controller.
+  bool stop_blocked;
 };
 
 struct pbl_i2c_stm32 {

@@ -1,12 +1,68 @@
-/* SPDX-FileCopyrightText: 2026 Brian Silvestri */
+/* SPDX-FileCopyrightText: 2024 Google LLC */
 /* SPDX-License-Identifier: Apache-2.0 */
 
+//! Idle: WFI, or STOP mode (clocks off, low-power regulator) for longer gaps,
+//! woken by the RTC wakeup timer or any EXTI line, as the stock firmware did.
+
+#include <pbl/drivers/flash.h>
+#include <pbl/drivers/rtc.h>
+#include <pbl/kernel/compiler.h>
 #include <pbl/kernel/idle.h>
+#include <pbl/soc/stm32/sleep.h>
 
-#include <cmsis_core.h>
 #include <kernel/util/idle.h>
+#include <stm32f4xx.h>
 
-// TODO: enter STOP mode for long idle periods, as the stock firmware did.
+//! Wake a little early to be back on the PLL before the deadline.
+#define EARLY_WAKEUP_TICKS 2
+#define MIN_STOP_TICKS     5
+//! Bounded by the RTC wakeup counter (~4 s), and well below the ~8 s IWDG.
+#define MAX_STOP_TICKS ((RTC_TICKS_HZ * 7) / 2)
+
+//! STM32F2/F4 erratum: after waking from STOP or SLEEP the core can misbehave
+//! depending on the bytes after "bx lr". Keep WFI 16-byte aligned and pad the
+//! rest of the cache line with NOPs.
+static PBL_NOINLINE PBL_NAKED void prv_do_wfi(void) {
+  __asm volatile(
+      ".align 4 \n"
+      "wfi      \n"
+      "nop      \n"
+      "bx lr    \n"
+      "nop      \n"
+      "nop      \n"
+      "nop      \n"
+      "nop      \n"
+      "nop      \n");
+}
+
+static void prv_enter_stop(void) {
+  flash_power_down_for_stop_mode();
+
+  RCC->APB1ENR |= RCC_APB1ENR_PWREN;
+
+  // Low-power regulator in STOP (plus low voltage, on the F412), not standby.
+  uint32_t cr = PWR->CR;
+  cr &= ~PWR_CR_PDDS;
+  cr |= PWR_CR_LPDS | PWR_CR_LPLVDS;
+  PWR->CR = cr;
+
+  SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
+  __DSB();
+  prv_do_wfi();
+  __ISB();
+  SCB->SCR &= ~SCB_SCR_SLEEPDEEP_Msk;
+
+  // STOP leaves us on the HSI: back to the PLL.
+  RCC->CR |= RCC_CR_PLLON;
+  while ((RCC->CR & RCC_CR_PLLRDY) == 0) {
+  }
+  RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW) | RCC_CFGR_SW_PLL;
+  while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL) {
+  }
+
+  flash_power_up_after_stop_mode();
+}
+
 void pbl_soc_idle(pbl_tick_t max_ticks) {
   if (!idle_is_allowed()) {
     return;
@@ -15,9 +71,26 @@ void pbl_soc_idle(pbl_tick_t max_ticks) {
   __disable_irq();
 
   if (pbl_idle_confirm()) {
-    __DSB();
-    __WFI();
-    __ISB();
+    if (max_ticks < MIN_STOP_TICKS || !rtc_alarm_is_initialized() || !soc_stm32_stop_is_allowed()) {
+      __DSB();
+      prv_do_wfi();
+      __ISB();
+    } else {
+      pbl_tick_t sleep_ticks = max_ticks - EARLY_WAKEUP_TICKS;
+      if (sleep_ticks > MAX_STOP_TICKS) {
+        sleep_ticks = MAX_STOP_TICKS;
+      }
+
+      // SysTick halts in STOP; account for the time from the RTC instead.
+      SysTick->CTRL &= ~SysTick_CTRL_ENABLE_Msk;
+      rtc_alarm_set(sleep_ticks);
+
+      prv_enter_stop();
+
+      pbl_idle_slept(rtc_alarm_get_elapsed_ticks());
+      SysTick->VAL = 0;
+      SysTick->CTRL |= SysTick_CTRL_ENABLE_Msk;
+    }
   }
 
   __enable_irq();

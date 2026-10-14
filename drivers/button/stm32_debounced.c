@@ -9,6 +9,7 @@
 #include <pbl/drivers/exti.h>
 #include <pbl/input/input.h>
 #include <pbl/kernel/irq.h>
+#include <pbl/soc/stm32/sleep.h>
 #include <pbl/util/bitops.h>
 
 #include <board/board.h>
@@ -66,6 +67,7 @@ static void prv_disable_timer(void) {
     TIM_ITConfig(TIM4, TIM_IT_Update, DISABLE);
     TIM_Cmd(TIM4, DISABLE);
     RCC->APB1ENR &= ~RCC_APB1ENR_TIM4EN;
+    soc_stm32_stop_release();
   }
 }
 
@@ -73,6 +75,8 @@ static void prv_enable_timer(void) {
   pbl_irq_lock();
   if (!s_timer_enabled) {
     s_timer_enabled = true;
+    // TIM4 stops in STOP mode.
+    soc_stm32_stop_block();
     RCC->APB1ENR |= RCC_APB1ENR_TIM4EN;
     TIM_ClearITPendingBit(TIM4, TIM_IT_Update);
     TIM_ITConfig(TIM4, TIM_IT_Update, ENABLE);

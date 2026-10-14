@@ -5,9 +5,30 @@
 
 #include <pbl/drivers/gpio/stm32.h>
 #include <pbl/drivers/pwm.h>
+#include <pbl/kernel/irq.h>
+#include <pbl/soc/stm32/sleep.h>
 
 #include <stm32f4xx.h>
 #include <system/passert.h>
+
+//! APB1 timers whose output is enabled, by index (TIM2 = 0 ... TIM14 = 8).
+static uint32_t s_enabled_mask;
+
+//! Timers stop in STOP mode: block it while any PWM output is on.
+static void prv_set_stop_blocked(const PwmConfig *pwm, bool enable) {
+  const uint32_t bit = 1U << ((((uintptr_t)pwm->timer) - APB1PERIPH_BASE) >> 10);
+
+  pbl_irq_lock();
+  const bool was_enabled = s_enabled_mask & bit;
+  if (enable && !was_enabled) {
+    s_enabled_mask |= bit;
+    soc_stm32_stop_block();
+  } else if (!enable && was_enabled) {
+    s_enabled_mask &= ~bit;
+    soc_stm32_stop_release();
+  }
+  pbl_irq_unlock();
+}
 
 static void prv_oc_init(const PwmConfig *pwm, uint32_t pulse) {
   TIM_OCInitTypeDef oc;
@@ -75,10 +96,12 @@ void pwm_enable(const PwmConfig *pwm, bool enable) {
     pbl_gpio_stm32_af(&pwm->output, pwm->af, PBL_GPIO_PULL_DOWN, GPIO_Speed_100MHz);
     RCC_APB1PeriphClockCmd(pwm->rcc, ENABLE);
     TIM_Cmd(pwm->timer, ENABLE);
+    prv_set_stop_blocked(pwm, true);
   } else {
     TIM_Cmd(pwm->timer, DISABLE);
     RCC_APB1PeriphClockCmd(pwm->rcc, DISABLE);
     // Force the pin low while off.
     pbl_gpio_configure(&pwm->output, PBL_GPIO_OUTPUT_LOW);
+    prv_set_stop_blocked(pwm, false);
   }
 }
