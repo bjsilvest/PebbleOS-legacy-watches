@@ -273,8 +273,12 @@ Bluetooth off instead of crashing: a crash loop before the firmware is
 marked stable ends in the bootloader starting PRF. Settings > System >
 Information shows how far it got without a serial console: "BT Radio" is
 the boot step (for example `Bootrom: none (0 ch)` or `Running (try 1)`),
-and "BT HCI" is `<last command>><last answered command>:<status> #<events>`
-with HCI opcodes in hex.
+"BT HCI" is `<last command>><last answered command>:<status> #<events>`
+with HCI opcodes in hex, and "BT Chip" is the chip ID the bootrom printed.
+If the controller does not answer HCI Reset, "BT Radio" reads
+`HCI <bytes>B <first byte> [<markers>] f<framing errors>`: the controller
+image sends `m` (main), `c` (clocks), `p` (power manager) and `b` (BLE
+manager) before its HCI transport starts.
 
 ### Known limitations
 
