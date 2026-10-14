@@ -278,6 +278,11 @@ BatteryChargeState battery_get_charge_state(void) {
   int32_t percent = MIN((int32_t)qemu_battery_get_percent(), 100);
   int32_t percent_normalized = percent;
   uint8_t charge_percent = (uint8_t)percent;
+#elif defined(CONFIG_BATTERY_EXACT_PERCENT)
+  // The same value the phone gets over the Battery Service, in 1% steps.
+  int32_t percent = MIN(pbl_ratio32_to_percent(s_last_battery_state.percent), 100);
+  int32_t percent_normalized = percent;
+  uint8_t charge_percent = (uint8_t)percent;
 #else
   int32_t percent = pbl_ratio32_to_percent(s_last_battery_state.percent);
 

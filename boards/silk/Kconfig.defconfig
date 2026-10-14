@@ -21,3 +21,8 @@ endchoice
 # HCI thread blocks when the pool runs out, so give it room.
 config NIMBLE_BLE_TRANSPORT_EVT_COUNT
     default 16 if BT_CONTROLLER_DA1468X
+
+# Show the same 1% charge percent as the phone app.
+config BATTERY_EXACT_PERCENT
+    default y
+

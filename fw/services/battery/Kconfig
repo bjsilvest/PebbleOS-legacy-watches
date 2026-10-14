@@ -35,6 +35,14 @@ config BATTERY_WARNING_SECOND_PERCENT
 
 module = SERVICE_BATTERY
 module-str = Battery
+config BATTERY_EXACT_PERCENT
+    bool "Report the exact charge percent"
+    help
+      Report the charge percent to the UI and apps in 1% steps, the same value
+      the Bluetooth Battery Service gives the phone. By default it is rounded
+      to 10% steps and the low power reserve is subtracted, so it reads 0%
+      as low power mode approaches. Only for the voltage based fuel gauge.
+
 source "subsys/logging/Kconfig.template.log_level"
 
 endif
