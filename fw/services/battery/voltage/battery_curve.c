@@ -18,6 +18,7 @@ typedef struct VoltagePoint {
 
 // TODO(ASTERIX,OBELIX): Needs customization for Asterix/Obelix
 #if defined(CONFIG_BOARD_ASTERIX) || defined(CONFIG_BOARD_OBELIX) ||        \
+    defined(CONFIG_BOARD_SILK) ||                                              \
     defined(CONFIG_BOARD_QEMU_EMERY) || defined(CONFIG_BOARD_QEMU_FLINT) || \
     defined(CONFIG_BOARD_QEMU_GABBRO) || defined(CONFIG_BOARD_NATIVE_EMERY)
 // When the voltage drops below these (mV), the watch will start heading for standby (after delay)
