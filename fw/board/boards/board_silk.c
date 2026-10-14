@@ -1,9 +1,10 @@
 /* SPDX-FileCopyrightText: 2024 Google LLC */
 /* SPDX-License-Identifier: Apache-2.0 */
 
+#include <pbl/drivers/dma/stm32.h>
 #include <pbl/drivers/flash/qspi_flash_definitions.h>
 #include <pbl/drivers/i2c/stm32.h>
-#include <pbl/drivers/mic/qemu/mic_definitions.h>
+#include <pbl/drivers/mic/stm32/dfsdm_definitions.h>
 #include <pbl/drivers/pmic/as3701b.h>
 #include <pbl/drivers/uart/stm32.h>
 #include <pbl/kernel/irq.h>
@@ -83,11 +84,34 @@ const struct pbl_as3701b *const AS3701B = &s_as3701b;
 // Microphone
 ///////////////////////////////////////////////////////////////////////////////
 
-// TODO: DFSDM1 channel 2 (CK PC2, SD PB14). Silence until then.
+static struct pbl_dma_stm32_state s_dfsdm_dma_state;
+static const struct pbl_dma_stm32_stream DFSDM_DMA = {
+  .state = &s_dfsdm_dma_state,
+  .stream = DMA2_Stream6,
+  .channel = DMA_Channel_3,
+  .rcc = RCC_AHB1Periph_DMA2,
+  .it_ht = DMA_IT_HTIF6,
+  .it_tc = DMA_IT_TCIF6,
+  .irqn = PBL_IRQN(DMA2_Stream6),
+};
+PBL_IRQ_CONNECT(DMA2_Stream6, 13, pbl_dma_stm32_irq_handler, &DFSDM_DMA, 0);
+
 static MicDeviceState s_mic_state;
 static MicDevice MIC_DEVICE = {
   .state = &s_mic_state,
-  .channels = 1,
+  .filter = (DFSDM_TypeDef *)DFSDM1_Filter0_BASE,
+  .channel = DFSDM1_Channel2,
+  .regular_channel = DFSDM_RegularChannel2,
+  .pdm_frequency = 2000000,
+  .rcc_apb_periph = RCC_APB2Periph_DFSDM,
+  .dma = &DFSDM_DMA,
+  .ck_gpio = PBL_GPIO(STM32_GPIOC, 2, 0),
+  .sd_gpio = PBL_GPIO(STM32_GPIOB, 14, 0),
+  .gpio_af = GPIO_AF8_DFSDM1,
+  .power_on_delay_ms = 50,
+  .settling_delay_ms = 0,
+  .default_volume = 64,
+  .final_right_shift = 11,
 };
 MicDevice *const MIC = &MIC_DEVICE;
 
