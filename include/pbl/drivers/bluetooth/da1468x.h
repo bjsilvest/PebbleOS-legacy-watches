@@ -58,3 +58,10 @@ bool da1468x_has_flow_control(void);
  * Always true on boards without flow control lines. ISR-safe.
  */
 bool da1468x_rts_ready(void);
+
+/**
+ * @brief Allow or stop the controller sending (drive its CTS), once it runs.
+ *
+ * No-op on boards without flow control lines. ISR-safe.
+ */
+void da1468x_set_cts(bool allow);

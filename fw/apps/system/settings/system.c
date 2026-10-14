@@ -67,6 +67,7 @@ enum {
   SystemInformationItemLastReboot,
   SystemInformationItemBtRx,
   SystemInformationItemAppFetch,
+  SystemInformationItemAppFetch2,
   SystemInformationItemBtChip,
   SystemInformationItemBtRxBoot,
   SystemInformationItemBtRxReset,
@@ -154,7 +155,8 @@ typedef struct SystemInformationData {
   char bt_reset_string[40];
   char last_reboot_string[24];
   char bt_smp_string[21];
-  char bt_rx_string[32];
+  char bt_rx_string[48];
+  char app_fetch_string[21];
 #endif
   char const *subtitle_text[SystemInformationItem_Count];
   char language_string[16];
@@ -245,6 +247,7 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemLastReboot] = i18n_noop("Last reboot"),
   [SystemInformationItemBtRx] = i18n_noop("BT Rx"),
   [SystemInformationItemAppFetch] = i18n_noop("App fetch"),
+  [SystemInformationItemAppFetch2] = i18n_noop("App fetch 2"),
   [SystemInformationItemBtChip] = i18n_noop("BT Chip"),
   [SystemInformationItemBtRxBoot] = i18n_noop("BT Rx boot"),
   [SystemInformationItemBtRxReset] = i18n_noop("BT Rx reset"),
@@ -384,7 +387,12 @@ static void prv_information_window_push(SettingsSystemData *data) {
   info->subtitle_text[SystemInformationItemLastReboot] = info->last_reboot_string;
   pbl_bt_hci_uart_copy_rx_stats(info->bt_rx_string, sizeof(info->bt_rx_string));
   info->subtitle_text[SystemInformationItemBtRx] = info->bt_rx_string;
-  info->subtitle_text[SystemInformationItemAppFetch] = app_fetch_trace();
+  const char *fetch = app_fetch_trace();
+  const size_t fetch_split = MIN(strlen(fetch), sizeof(info->app_fetch_string) - 1);
+  memcpy(info->app_fetch_string, fetch, fetch_split);
+  info->app_fetch_string[fetch_split] = '\0';
+  info->subtitle_text[SystemInformationItemAppFetch] = info->app_fetch_string;
+  info->subtitle_text[SystemInformationItemAppFetch2] = &fetch[fetch_split];
   info->subtitle_text[SystemInformationItemBtChip] = da1468x_chip_id();
   info->subtitle_text[SystemInformationItemBtRxBoot] = da1468x_rx_after_markers();
   info->subtitle_text[SystemInformationItemBtRxReset] = da1468x_rx_after_reset();

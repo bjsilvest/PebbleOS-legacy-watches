@@ -74,11 +74,12 @@ const char *pbl_bt_hci_uart_smp_trace(void);
 uint16_t pbl_bt_hci_uart_le_acl_len_reported(void);
 
 /**
- * @brief Describe what the transport skipped on receive, for diagnostics.
+ * @brief Describe flow control and what the transport skipped, for diagnostics.
  *
- * Formats "u<message>@<task> of the last GAPM_UNKNOWN_TASK_IND g<non-HCI DGTL
- * packets skipped>/<last GTL message ID> d<bytes dropped to resynchronize>
- * o<UART overruns>" (DA1468x only; empty otherwise).
+ * Formats "<F flow control|p pacing><RTS waits>!<sends forced past RTS>
+ * r<RX pauses> o<UART overruns> d<bytes dropped to resynchronize>
+ * u<message>@<task> of the last GAPM_UNKNOWN_TASK_IND g<non-HCI DGTL packets
+ * skipped>/<last GTL message ID>" (DA1468x only; empty otherwise).
  *
  * @param[out] buf Buffer for the string.
  * @param len Size of @p buf.

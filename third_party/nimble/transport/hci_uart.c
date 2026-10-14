@@ -21,6 +21,7 @@
 #include <pbl/drivers/bluetooth/da1468x.h>
 #endif
 #include <kernel/pebble_tasks.h>
+#include <kernel/util/delay.h>
 #include <system/passert.h>
 
 // clang-format off
@@ -80,6 +81,8 @@ static volatile uint32_t s_acl_tx;
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
 // The UART has no flow control: count bytes lost to receive overruns.
 static volatile uint32_t s_rx_overruns;
+// Times the receive ring filled and CTS held the controller off.
+static volatile uint32_t s_rx_pauses;
 #endif
 static volatile uint32_t s_acl_completed;
 static volatile uint8_t s_last_reply_len;
@@ -361,6 +364,11 @@ static void prv_rx_irq_handler(UARTDevice *dev, uint8_t data, const UARTRXErrorF
   if ((next + 1U) % RX_RING_SIZE == s_rx_tail) {
     s_rx_paused = true;
     uart_set_rx_interrupt_enabled(dev, false);
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+    // Hold the controller off rather than lose what it sends meanwhile.
+    da1468x_set_cts(false);
+    s_rx_pauses++;
+#endif
   }
 
   pbl_sem_give(&s_rx_ready);
@@ -370,6 +378,7 @@ static void prv_rx_irq_handler(UARTDevice *dev, uint8_t data, const UARTRXErrorF
 // With flow control the controller's RTS gates each byte instead of pacing.
 static bool s_flow_control;
 static volatile uint32_t s_tx_flow_waits;
+static volatile uint32_t s_tx_flow_forced;
 static void prv_tx_irq_handler(UARTDevice *dev);
 // 89 ms of data at 115200 baud.
 static uint8_t s_rx_dma_buf[1024];
@@ -561,6 +570,9 @@ static void prv_hci_task_main(void *unused) {
       if (s_rx_paused) {
         s_rx_paused = false;
         uart_set_rx_interrupt_enabled(BT_HCI_UART, true);
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+        da1468x_set_cts(true);
+#endif
       }
     }
 
@@ -600,6 +612,8 @@ static volatile size_t s_tx_left;
 static PBL_SEM_DEFINE(s_tx_done, 0, 1);
 // RTS stuck deasserted this long means the line is not what we think: send.
 #define TX_FLOW_TIMEOUT_MS 500U
+#define TX_FLOW_SPIN_TRIES 10
+#define TX_FLOW_SPIN_US    10U
 
 static void prv_tx_irq_handler(UARTDevice *dev) {
   if (s_tx_left == 0U) {
@@ -646,9 +660,17 @@ static void prv_write_irq(const uint8_t *data, size_t len) {
       return;
     }
     if (s_tx_left > 0U) {
-      // The controller deasserted RTS.
+      // The controller deasserted RTS. Usually only until its DMA takes the
+      // byte in its FIFO, so look again briefly before sleeping.
       s_tx_flow_waits++;
+      for (int i = 0; i < TX_FLOW_SPIN_TRIES && !da1468x_rts_ready(); i++) {
+        delay_us(TX_FLOW_SPIN_US);
+      }
+      if (da1468x_rts_ready()) {
+        continue;
+      }
       if (waited_ms >= TX_FLOW_TIMEOUT_MS) {
+        s_tx_flow_forced++;
         prv_tx_poll_rest();
         return;
       }
@@ -755,10 +777,11 @@ uint32_t pbl_bt_hci_uart_acl_clamped(void) {
 
 void pbl_bt_hci_uart_copy_rx_stats(char *buf, size_t len) {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
-  sniprintf(buf, len, "u%04x@%04x g%lu/%04x d%lu o%lu %c%lu", (unsigned)s_unknown_msg_id,
-            (unsigned)s_unknown_task_id, (unsigned long)s_dgtl_skipped, (unsigned)s_last_gtl_msg_id,
-            (unsigned long)s_rx_dropped_bytes, (unsigned long)s_rx_overruns,
-            s_flow_control ? 'F' : 'p', (unsigned long)s_tx_flow_waits);
+  sniprintf(
+      buf, len, "%c%lu!%lu r%lu o%lu d%lu u%04x@%04x g%lu/%04x", s_flow_control ? 'F' : 'p',
+      (unsigned long)s_tx_flow_waits, (unsigned long)s_tx_flow_forced, (unsigned long)s_rx_pauses,
+      (unsigned long)s_rx_overruns, (unsigned long)s_rx_dropped_bytes, (unsigned)s_unknown_msg_id,
+      (unsigned)s_unknown_task_id, (unsigned long)s_dgtl_skipped, (unsigned)s_last_gtl_msg_id);
 #else
   buf[0] = '\0';
 #endif

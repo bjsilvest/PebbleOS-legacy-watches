@@ -26,3 +26,6 @@ config NIMBLE_BLE_TRANSPORT_EVT_COUNT
 config BATTERY_EXACT_PERCENT
     default y
 
+# Must match the controller image's DGTL UART (tools/silk_bt).
+config BT_DA1468X_HCI_BAUD
+    default 1000000

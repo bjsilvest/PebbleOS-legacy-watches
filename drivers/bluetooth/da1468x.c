@@ -397,6 +397,12 @@ bool da1468x_rts_ready(void) {
 #endif
 }
 
+void da1468x_set_cts(bool allow) {
+#ifdef BOARD_BT_HAS_FLOW_CONTROL
+  pbl_gpio_set(&BOARD_BT_CTS, allow);
+#endif
+}
+
 bool da1468x_has_flow_control(void) {
 #ifdef BOARD_BT_HAS_FLOW_CONTROL
   // An image without flow control leaves the line to the pull-up.
