@@ -490,10 +490,20 @@ static void prv_hci_task_main(void *unused) {
   } else {
     s_controller_state = ControllerStateFailed;
   }
+
+  // Waiting for events from the host to free buffers can deadlock against it:
+  // turn a stuck thread into a reset that records where it was.
+  PBL_ASSERTN(pbl_task_wdt_add(nullptr, CONFIG_TASK_WDT_TIMEOUT_MS, nullptr, nullptr) >= 0);
 #endif
 
   while (true) {
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+    pbl_task_wdt_set_waiting(true);
+#endif
     pbl_sem_take(&s_rx_ready, PBL_FOREVER);
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+    pbl_task_wdt_set_waiting(false);
+#endif
 
     while (s_rx_tail != s_rx_head) {
       uint32_t tail = s_rx_tail;
