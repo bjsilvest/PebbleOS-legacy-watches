@@ -15,6 +15,14 @@ config PMIC_NPM1300
     help
       Support for the charger of the Nordic nPM1300 PMIC.
 
+config PMIC_AS3701B
+    bool "ams AS3701B"
+    depends on SOC_STM32F4 && I2C
+    help
+      Support for the ams AS3701B PMIC on silk: charger, rails, display
+      VCOM clock and battery voltage measurement. Charger settings are
+      the stock firmware's.
+
 module = DRIVER_PMIC
 module-str = PMIC
 source "subsys/logging/Kconfig.template.log_level"

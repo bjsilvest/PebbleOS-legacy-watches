@@ -4,6 +4,8 @@
 set(sources)
 if(CONFIG_PMIC_NPM1300)
   list(APPEND sources npm1300.c)
+elseif(CONFIG_PMIC_AS3701B)
+  list(APPEND sources as3701b.c)
 endif()
 pbl_library()
 pbl_library_sources(${sources})
