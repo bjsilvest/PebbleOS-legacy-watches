@@ -17,6 +17,13 @@ config MCU_SF32LB
     help
       Support for SiFli SF32LB MCU information.
 
+config MCU_STM32
+    bool "ST STM32"
+    default y if SOC_STM32F4
+    select HAL_STM32
+    help
+      STM32 MCU information (96-bit unique device ID).
+
 config MCU_QEMU
     bool "QEMU"
     default y if SOC_QEMU

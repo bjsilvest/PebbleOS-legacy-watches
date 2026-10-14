@@ -14,6 +14,13 @@ config OTP_FLASH
       OTP backed by SPI NOR flash security registers
       (e.g. GD25 / GD25LQ family). Driver: otp_flash.c.
 
+config OTP_STM32
+    bool "STM32 OTP area"
+    default y if SOC_STM32F4
+    help
+      OTP backed by the STM32F4 one-time programmable area. Read-only:
+      writes are always refused.
+
 config OTP_QEMU
     bool "QEMU"
     default y if SOC_QEMU

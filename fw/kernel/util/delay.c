@@ -12,6 +12,8 @@
 #include <bf0_hal.h>
 #elifdef CONFIG_SOC_POSIX
 #include <unistd.h>
+#elifdef CONFIG_SOC_STM32F4
+#include <stm32f4xx.h>
 #endif
 
 #ifdef CONFIG_SOC_NRF52
@@ -54,5 +56,32 @@ void PBL_NOINLINE delay_us(uint32_t us) {
 }
 
 void delay_init(void) {
+}
+
+#elifdef CONFIG_SOC_STM32F4
+// A calibrated spin loop: subs + taken bne is 3 cycles on the Cortex-M4.
+#define CYCLES_PER_LOOP 3
+
+static uint32_t s_loops_per_us;
+
+void PBL_NOINLINE delay_us(uint32_t us) {
+  uint32_t loops = us * s_loops_per_us;
+
+  if (loops == 0) {
+    return;
+  }
+
+  __asm volatile(
+      "1:                \n"
+      "  subs %[loops], #1 \n"
+      "  bne 1b           \n"
+      : [loops] "+r"(loops)
+      :
+      : "cc");
+}
+
+void delay_init(void) {
+  // Round up so we never delay less than asked.
+  s_loops_per_us = (SystemCoreClock / 1000000 + CYCLES_PER_LOOP - 1) / CYCLES_PER_LOOP;
 }
 #endif
