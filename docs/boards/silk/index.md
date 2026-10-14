@@ -131,7 +131,7 @@ STM32 drivers are rewritten against the current APIs, using the old drivers
 | Internal temperature sensor | done |
 | Hardware platform ID (`PebbleSilk`), bundle `hwrev: silk` | done |
 | DMA for display, QSPI, UART RX | todo (polled for now) |
-| Bluetooth (DA14681) | todo |
+| Bluetooth (DA14681, H4 over UART, NimBLE host) | done, untested on hardware; needs the Dialog SDK, see below |
 
 The `silk` board boots in QEMU (`pebble-silk-bb`) through the **stock
 bootloader** to the watchface, with PRF, stock shared PRF storage and MFG
@@ -218,6 +218,65 @@ runs on a real watch.
 
 ## Bluetooth
 
-NimBLE's H4 UART transport (`CONFIG_BT_HCI_UART`) is the planned host
-interface to the DA14681, running as an HCI controller. Planned for after
-bring-up without Bluetooth.
+The DA14681 runs as an HCI controller and Core's NimBLE host talks H4 to it
+over the bootrom UART pins: USART6 RX on PA12 (radio P1_3) and USART2 TX on
+PA2 (radio P2_3), at 115200 baud with no flow control. Stock silk used SPI
+with a Pebble-specific protocol instead.
+
+The radio has no flash of its own here; everything runs from its RAM and is
+loaded at every boot (`drivers/bluetooth/da1468x.c`):
+
+1. Reset the radio (PC5, active high). Its bootrom prints the chip ID and
+   loads a 480-byte stage 2 at 57600 baud.
+2. Stage 2 (`tools/silk_bt/stage2`) moves itself up in RAM, receives the
+   ~60 KB controller image at 1 Mbaud, checks its CRC-32 and jumps to it.
+3. The driver sends HCI Reset and waits for Command Complete before the host
+   may use the controller.
+
+This takes about 1.5 s and runs in the HCI thread, so boot is not delayed.
+If any step fails three times, the radio stays in reset and Bluetooth is
+reported unavailable; `pbl_bt_start()` returns false instead of letting the
+host start time out. That matters because a crash loop before
+`BOOT_BIT_FW_STABLE` (15 minutes of uptime) would end in the bootloader
+starting PRF.
+
+The controller image is the Dialog SDK's BLE stack in pass-through
+(external host) mode, configured for silk (`tools/silk_bt/config`): the
+DA14681 charger, USB and 1V8 rails stay off, the LP clock is the internal
+RCX, and the radio never sleeps, because H4 without flow control cannot wake
+it. The controller only has a placeholder public address, so the identity
+address is a random static address kept in shared PRF storage
+(`BT_ID_ADDR_STORAGE`).
+
+### Building
+
+The Dialog DA1468x SDK 1.0.14.1081 (with hotfix 002) may not be
+redistributed, and neither may images built from it, so neither is in this
+tree, and firmware built with them is for personal use only. Without them
+silk builds with the fake controller (no Bluetooth).
+
+```shell
+make -C tools/silk_bt SDK=/path/to/DA1468x_DA15xxx_SDK_1.0.14.1081 \
+    CROSS=$PEBBLEOS_SDK_ROOT/arm-none-eabi/bin/arm-none-eabi-
+pbl configure -b build-bt --board silk -DCONFIG_BT_HCI_UART=y \
+    -DCONFIG_BT_CONTROLLER_DA1468X=y \
+    -DCONFIG_BT_DA1468X_STAGE2_IMAGE=$PWD/tools/silk_bt/build/silk_bt_stage2.bin \
+    -DCONFIG_BT_DA1468X_CONTROLLER_IMAGE=$PWD/tools/silk_bt/build/silk_bt.bin
+pbl build -b build-bt
+```
+
+The SDK's BLE library targets DA14681-01 (AE) silicon. The driver logs the
+chip ID the bootrom prints; pre-production AD silicon prints none.
+
+### Known limitations
+
+- **Power:** STOP mode is blocked while the controller runs, because the
+  USART clocks stop in STOP and the controller can send at any time. With
+  the radio never sleeping either, battery life is much shorter than stock.
+  The fix is a wake handshake over the SPI lines stock used, which are free
+  now (radio P0_0/P0_1/P0_4 to PB0/PB1/PA10), and needs a change on the
+  controller side.
+- Radio P2_3 is wired to both PA2 (HCI TX) and PC4 (stock's interrupt
+  input), so PC4 must stay an input.
+- The controller keeps running while Bluetooth is off (airplane mode).
+- QEMU has no DA14681, so only the failure path is tested there.
