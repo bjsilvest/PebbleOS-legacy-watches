@@ -2,6 +2,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 #include <pbl/drivers/flash/qspi_flash_definitions.h>
+#include <pbl/drivers/mic/qemu/mic_definitions.h>
 #include <pbl/drivers/uart/stm32.h>
 #include <pbl/kernel/irq.h>
 
@@ -56,6 +57,17 @@ static QSPIFlash QSPI_FLASH_DEVICE = {
   .default_fast_read_ddr_enabled = false,
 };
 QSPIFlash *const QSPI_FLASH = &QSPI_FLASH_DEVICE;
+
+// Microphone
+///////////////////////////////////////////////////////////////////////////////
+
+// TODO: DFSDM1 channel 2 (CK PC2, SD PB14). Silence until then.
+static MicDeviceState s_mic_state;
+static MicDevice MIC_DEVICE = {
+  .state = &s_mic_state,
+  .channels = 1,
+};
+MicDevice *const MIC = &MIC_DEVICE;
 
 void board_early_init(void) {
 }

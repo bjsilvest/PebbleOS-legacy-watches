@@ -35,6 +35,17 @@ static const BoardConfigAccel BOARD_CONFIG_ACCEL = {
   .default_motion_sensitivity = 55U, // Medium
 };
 
+static const BoardConfigSharpDisplay BOARD_CONFIG_DISPLAY = {
+  .spi = SPI2,
+  .spi_rcc = RCC_APB1Periph_SPI2,
+  .spi_af = GPIO_AF_SPI2,
+  .clk = PBL_GPIO(STM32_GPIOB, 10, 0),
+  .mosi = PBL_GPIO(STM32_GPIOB, 15, 0),
+  .cs = PBL_GPIO(STM32_GPIOB, 9, 0),
+  .on_ctrl = PBL_GPIO(STM32_GPIOA, 0, 0),
+};
+
 extern UARTDevice *const DBG_UART;
 extern QSPIPort *const QSPI;
 extern QSPIFlash *const QSPI_FLASH;
+extern MicDevice *const MIC;
