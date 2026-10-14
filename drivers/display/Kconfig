@@ -23,6 +23,13 @@ config DISPLAY_SHARP_LS013B7DH01_NRF5
     help
       Support for the Sharp LS013B7DH01 display via nRF5.
 
+config DISPLAY_SHARP_LS013B7DH01_STM32
+    bool "Sharp LS013B7DH01 (STM32)"
+    default y if SOC_STM32F4
+    select HAL_STM32
+    help
+      Support for the Sharp LS013B7DH01 display on an STM32F4 SPI.
+
 config DISPLAY_QEMU
     bool "QEMU Framebuffer Display"
     default y if SOC_QEMU

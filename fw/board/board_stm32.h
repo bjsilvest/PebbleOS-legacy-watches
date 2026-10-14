@@ -83,6 +83,18 @@ typedef struct {
   const MagConfig mag_config;
 } BoardConfigMag;
 
+typedef struct {
+  SPI_TypeDef *spi;
+  uint32_t spi_rcc; ///< RCC_APB1Periph_SPIx
+  uint8_t spi_af;   ///< GPIO_AF_SPIx
+
+  const struct pbl_gpio mosi;
+  const struct pbl_gpio clk;
+  const struct pbl_gpio cs;
+
+  const struct pbl_gpio on_ctrl;
+} BoardConfigSharpDisplay;
+
 typedef const struct UARTDevice UARTDevice;
 typedef const struct HRMDevice HRMDevice;
 typedef const struct MicDevice MicDevice;
