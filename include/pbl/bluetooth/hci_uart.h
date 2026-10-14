@@ -35,6 +35,7 @@ void pbl_bt_hci_uart_copy_status(char *buf, size_t len);
  * @brief Record the HCI state, for diagnosing a host reset.
  *
  * Call when the host resets; read back with pbl_bt_hci_uart_reset_snapshot().
+ * Only the first reset since boot is kept.
  */
 void pbl_bt_hci_uart_snapshot(void);
 
@@ -75,8 +76,9 @@ uint16_t pbl_bt_hci_uart_le_acl_len_reported(void);
 /**
  * @brief Describe what the transport skipped on receive, for diagnostics.
  *
- * Formats "g<non-HCI DGTL packets skipped>/<last GTL message ID> d<bytes dropped
- * to resynchronize> o<UART overruns>" (DA1468x only; empty otherwise).
+ * Formats "u<message>@<task> of the last GAPM_UNKNOWN_TASK_IND g<non-HCI DGTL
+ * packets skipped>/<last GTL message ID> d<bytes dropped to resynchronize>
+ * o<UART overruns>" (DA1468x only; empty otherwise).
  *
  * @param[out] buf Buffer for the string.
  * @param len Size of @p buf.

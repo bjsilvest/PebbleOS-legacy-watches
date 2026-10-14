@@ -414,6 +414,18 @@ static struct {
 static volatile uint32_t s_dgtl_skipped;
 static volatile uint32_t s_rx_dropped_bytes;
 static volatile uint16_t s_last_gtl_msg_id;
+// GAPM_UNKNOWN_TASK_IND: the controller got a message no task handles, which
+// leaves an HCI command unanswered. Keep which message and task it was.
+#define GTL_GAPM_UNKNOWN_TASK_IND 0x0d1dU
+static volatile uint16_t s_unknown_msg_id;
+static volatile uint16_t s_unknown_task_id;
+
+// LE Set Privacy Mode is Bluetooth 5.0; the DA14681 (4.2) rejects it, which
+// makes NimBLE abandon adding a bonded peer to the resolving list. Without
+// privacy modes a 4.2 controller behaves as in network mode, so answer it
+// here with success instead.
+#define HCI_OP_LE_SET_PRIVACY_MODE 0x204eU
+static volatile bool s_fake_privacy_mode_reply;
 
 static uint16_t prv_frame_hdr_len(uint8_t type) {
   switch (type) {
@@ -483,6 +495,11 @@ static void prv_frame_byte(uint8_t c) {
 
   if (s_frame.skip) {
     s_dgtl_skipped++;
+    if (s_frame.buf[0] == DGTL_PKT_GTL && s_last_gtl_msg_id == GTL_GAPM_UNKNOWN_TASK_IND &&
+        s_frame.len >= 13U && s_frame.len <= sizeof(s_frame.buf)) {
+      s_unknown_msg_id = s_frame.buf[9] | (s_frame.buf[10] << 8);
+      s_unknown_task_id = s_frame.buf[11] | (s_frame.buf[12] << 8);
+    }
   } else {
     int consumed = hci_h4_sm_rx(&s_hci_h4sm, s_frame.buf, s_frame.len);
     if (consumed != (int)s_frame.len) {
@@ -542,6 +559,21 @@ static void prv_hci_task_main(void *unused) {
         uart_set_rx_interrupt_enabled(BT_HCI_UART, true);
       }
     }
+
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+    // Only between packets, so the fake reply cannot split a real one.
+    if (s_fake_privacy_mode_reply && s_frame.len == 0U) {
+      static const uint8_t reply[] = {
+        HCI_H4_EVT, BLE_HCI_EVCODE_COMMAND_COMPLETE,    4,
+        1,          HCI_OP_LE_SET_PRIVACY_MODE & 0xffU, HCI_OP_LE_SET_PRIVACY_MODE >> 8,
+        0
+      };
+      s_fake_privacy_mode_reply = false;
+      for (size_t i = 0; i < sizeof(reply); i++) {
+        prv_frame_byte(reply[i]);
+      }
+    }
+#endif
   }
 }
 
@@ -668,6 +700,10 @@ bool pbl_bt_hci_uart_wait_ready(uint32_t timeout_ms) {
 }
 
 void pbl_bt_hci_uart_snapshot(void) {
+  // Keep the first reset since boot: later ones follow from it.
+  if (s_reset_snapshot[0] != '\0') {
+    return;
+  }
   sniprintf(s_reset_snapshot, sizeof(s_reset_snapshot), "%04x>%04x/%u a%lu n%lu",
             (unsigned)s_last_cmd, (unsigned)s_last_reply_cmd, (unsigned)s_last_reply_len,
             (unsigned long)s_acl_tx, (unsigned long)s_acl_completed);
@@ -683,9 +719,9 @@ uint32_t pbl_bt_hci_uart_acl_clamped(void) {
 
 void pbl_bt_hci_uart_copy_rx_stats(char *buf, size_t len) {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
-  sniprintf(buf, len, "g%lu/%04x d%lu o%lu", (unsigned long)s_dgtl_skipped,
-            (unsigned)s_last_gtl_msg_id, (unsigned long)s_rx_dropped_bytes,
-            (unsigned long)s_rx_overruns);
+  sniprintf(buf, len, "u%04x@%04x g%lu/%04x d%lu o%lu", (unsigned)s_unknown_msg_id,
+            (unsigned)s_unknown_task_id, (unsigned long)s_dgtl_skipped, (unsigned)s_last_gtl_msg_id,
+            (unsigned long)s_rx_dropped_bytes, (unsigned long)s_rx_overruns);
 #else
   buf[0] = '\0';
 #endif
@@ -716,6 +752,12 @@ int ble_transport_to_ll_cmd_impl(void *buf) {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   if (s_last_cmd == BLE_HCI_OP(BLE_HCI_OGF_CTLR_BASEBAND, BLE_HCI_OCF_CB_RESET)) {
     prv_acl_track_reset();
+  }
+  if (s_last_cmd == HCI_OP_LE_SET_PRIVACY_MODE) {
+    ble_transport_free(buf);
+    s_fake_privacy_mode_reply = true;
+    pbl_sem_give(&s_rx_ready);
+    return 0;
   }
 #endif
 
