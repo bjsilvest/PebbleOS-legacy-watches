@@ -276,7 +276,9 @@ the boot step (for example `Bootrom: none (0 ch)` or `Running (try 1)`),
 "BT HCI" is `<last answered command>:<status> !<last failed command>:<status>`
 with HCI opcodes in hex, "BT Pair" is `r<pairing requests>k<passkey prompts>
 p<pairing status> e<encryption status> d<disconnect reason>` (NimBLE codes in hex), "BT Reset" is the HCI state at the last host reset:
-`<last command>><last answered command>/<reply length> a<ACL sent> n<ACL completed>`, and "BT Chip" is the chip ID the bootrom printed.
+`<last command>><last answered command>/<reply length> a<ACL sent> n<ACL completed> c<clamps>`,
+where `c` counts completed-packet reports the transport clamped because the
+controller over-reports them, and "BT Chip" is the chip ID the bootrom printed.
 If the controller does not answer HCI Reset, "BT Radio" reads
 `HCI [<markers>] <bytes after markers>/<bytes after reset> f<framing errors>`,
 and "BT Rx boot" and "BT Rx reset" show the first of those bytes in hex: the controller
