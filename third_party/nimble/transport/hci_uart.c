@@ -20,6 +20,7 @@
 #include <pbl/drivers/bluetooth/da1468x.h>
 #endif
 #include <kernel/pebble_tasks.h>
+#include <kernel/util/delay.h>
 #include <system/passert.h>
 
 // clang-format off
@@ -521,6 +522,21 @@ static void prv_hci_task_main(void *unused) {
   }
 }
 
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+// The DA1468x's DGTL reads each packet in steps (type, header, parameters),
+// re-arming the read in between, and its UART has only a 16-byte FIFO and no
+// flow control here. Long bursts lost bytes: pairing failed on the 69-byte
+// SMP public key, which the phone rejected as invalid. Send in short bursts
+// with a pause after each, and after each packet type byte.
+#define TX_BURST_BYTES 8U
+#define TX_PAUSE_US    300U
+
+static void prv_tx_pause(void) {
+  uart_wait_for_tx_complete(BT_HCI_UART_TX);
+  delay_us(TX_PAUSE_US);
+}
+#endif
+
 static void prv_write(const uint8_t *data, size_t len) {
   if (s_controller_state != ControllerStateReady) {
     return;
@@ -528,6 +544,11 @@ static void prv_write(const uint8_t *data, size_t len) {
 
   for (size_t i = 0U; i < len; i++) {
     uart_write_byte(BT_HCI_UART_TX, data[i]);
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+    if (len == 1U || (i + 1U) % TX_BURST_BYTES == 0U) {
+      prv_tx_pause();
+    }
+#endif
   }
 }
 
