@@ -307,9 +307,11 @@ manager) before its HCI transport starts, then the vendor event
 - Radio P2_3 is wired to both PA2 (HCI TX) and PC4 (stock's interrupt
   input), so PC4 must stay an input.
 - The controller keeps running while Bluetooth is off (airplane mode).
-- The H4 UART has no flow control, and the controller's DGTL reads each
-  packet in steps behind a 16-byte FIFO, so the transport sends in 8-byte
-  bursts from the TX interrupt with 1 ms pauses, about 5 KB/s. Hardware flow
-  control could use the spare stock SPI lines, with matching controller
-  changes.
+- H4 flow control runs over the spare stock SPI lines: the controller image
+  routes its UART RTS to P0_0 (PB0) and CTS to P0_1 (PB1). The host gates
+  each byte on RTS from the TX interrupt and only drives CTS once the image
+  runs, since the bootrom probes these pins for SPI. Without RTS from the
+  image the transport falls back to 8-byte bursts with 1 ms pauses, which
+  lose bytes when the controller is busy. "BT Rx" ends with `F` (flow
+  control) or `p` (pacing) and the number of RTS waits.
 - QEMU has no DA14681, so only the failure path is tested there.
