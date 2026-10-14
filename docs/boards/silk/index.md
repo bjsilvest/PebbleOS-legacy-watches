@@ -152,6 +152,10 @@ bootloader checks the staged image before erasing anything, and only erases
 from `0x08004000`, so a bad image cannot touch the bootloader. If internal
 flash holds no firmware at all, it boots PRF before looking for an update.
 
+**Hardware test (2026-10-14):** `v4.41.0-68-g4ccca36cc`, sideloaded from the
+Core app onto a real Pebble 2 through the stock update path, boots and runs
+with no issues seen apart from the expected lack of Bluetooth.
+
 QEMU does not emulate the AS3701B (the driver then reports a nominal battery
 voltage) or the IWDG, so watchdog resets (and the bootloader's
 three-strike fallback to PRF) are untested in emulation.
