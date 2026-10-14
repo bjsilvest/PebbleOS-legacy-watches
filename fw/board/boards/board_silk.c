@@ -29,6 +29,35 @@ static UARTDevice DBG_UART_DEVICE = {
 UARTDevice *const DBG_UART = &DBG_UART_DEVICE;
 PBL_IRQ_CONNECT(USART1, 13, uart_irq_handler, DBG_UART, 0);
 
+#ifdef CONFIG_BT_HCI_UART
+// Bluetooth HCI
+///////////////////////////////////////////////////////////////////////////////
+
+static UARTDeviceState s_bt_hci_rx_uart_state;
+static UARTDevice BT_HCI_RX_UART_DEVICE = {
+  .state = &s_bt_hci_rx_uart_state,
+  .periph = USART6,
+  .rcc_apb_periph = RCC_APB2Periph_USART6,
+  .apb2 = true,
+  .rx = PBL_GPIO(STM32_GPIOA, 12, 0),
+  .af = GPIO_AF_USART6,
+  .irqn = PBL_IRQN(USART6),
+};
+UARTDevice *const BT_HCI_UART = &BT_HCI_RX_UART_DEVICE;
+PBL_IRQ_CONNECT(USART6, 12, uart_irq_handler, BT_HCI_UART, 0);
+
+static UARTDeviceState s_bt_hci_tx_uart_state;
+static UARTDevice BT_HCI_TX_UART_DEVICE = {
+  .state = &s_bt_hci_tx_uart_state,
+  .periph = USART2,
+  .rcc_apb_periph = RCC_APB1Periph_USART2,
+  .tx = PBL_GPIO(STM32_GPIOA, 2, 0),
+  .af = GPIO_AF_USART2,
+  .irqn = PBL_IRQN(USART2),
+};
+UARTDevice *const BT_HCI_TX_UART = &BT_HCI_TX_UART_DEVICE;
+#endif
+
 // QSPI flash
 ///////////////////////////////////////////////////////////////////////////////
 

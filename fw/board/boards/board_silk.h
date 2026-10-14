@@ -96,6 +96,16 @@ static const BoardConfigSharpDisplay BOARD_CONFIG_DISPLAY = {
 };
 
 extern UARTDevice *const DBG_UART;
+
+#ifdef CONFIG_BT_HCI_UART
+// DA14681 HCI: the bootrom UART pins, RX on USART6 and TX on USART2.
+extern UARTDevice *const BT_HCI_UART;
+extern UARTDevice *const BT_HCI_TX_UART;
+#define BT_HCI_UART_TX BT_HCI_TX_UART
+
+// DA14681 reset, active high.
+static const struct pbl_gpio BOARD_BT_RESET = PBL_GPIO(STM32_GPIOC, 5, 0);
+#endif
 extern QSPIPort *const QSPI;
 extern QSPIFlash *const QSPI_FLASH;
 extern MicDevice *const MIC;
