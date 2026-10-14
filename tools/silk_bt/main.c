@@ -16,6 +16,8 @@
 #include "sys_watchdog.h"
 #include "ble_mgr.h"
 #include "dgtl.h"
+#include "dgtl_msg.h"
+#include "dgtl_pkt.h"
 #include "platform_devices.h"
 
 static OS_TASK s_init_task;
@@ -81,6 +83,18 @@ static void prv_system_init(void *arg)
         ble_mgr_init();
         prv_mark('b');
         dgtl_init();
+
+        /*
+         * Send a vendor event (04 ff 01 'H') through the DGTL once it owns the
+         * UART, so the host can tell a silent DGTL from a stack that does not
+         * answer HCI.
+         */
+        OS_DELAY(OS_MS_2_TICKS(20));
+        dgtl_msg_t *hello = dgtl_msg_alloc(DGTL_PKT_TYPE_HCI_EVT, 4);
+        hello->data[1] = 0xff;
+        hello->data[2] = 1;
+        hello->data[3] = 'H';
+        dgtl_send(hello);
 
         OS_TASK_DELETE(OS_GET_CURRENT_TASK());
 }
