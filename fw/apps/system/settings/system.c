@@ -353,8 +353,9 @@ static void prv_information_window_push(SettingsSystemData *data) {
   info->subtitle_text[SystemInformationItemBtHci] = info->bt_hci_string;
   strncpy(info->bt_pair_string, pbl_bt_advert_pairing_trace(), sizeof(info->bt_pair_string) - 1);
   info->subtitle_text[SystemInformationItemBtPair] = info->bt_pair_string;
-  sniprintf(info->bt_reset_string, sizeof(info->bt_reset_string), "%s c%lu",
-            pbl_bt_hci_uart_reset_snapshot(), (unsigned long)pbl_bt_hci_uart_acl_clamped());
+  sniprintf(info->bt_reset_string, sizeof(info->bt_reset_string), "%s c%lu b%u",
+            pbl_bt_hci_uart_reset_snapshot(), (unsigned long)pbl_bt_hci_uart_acl_clamped(),
+            (unsigned)pbl_bt_hci_uart_le_acl_len_reported());
   info->subtitle_text[SystemInformationItemBtReset] = info->bt_reset_string;
   info->subtitle_text[SystemInformationItemBtSmp] = pbl_bt_hci_uart_smp_trace();
   // Code, then the first two words of its data: the LR for an assert or fault,

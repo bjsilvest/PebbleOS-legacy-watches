@@ -139,6 +139,31 @@ static struct {
 } s_acl_track[ACL_TRACK_CONNS];
 static volatile uint32_t s_acl_clamped;
 
+// Over the air an LE ACL PDU carries at most 27 bytes without data length
+// extension. The controller completes larger HCI ACL packets once per LL
+// fragment, which shows as over-reported completed packets, and pairing
+// stalls right after the 69-byte SMP public key. Make the host fragment to
+// the LL size instead.
+#define LE_ACL_MAX_LEN 27U
+static uint16_t s_le_acl_len_reported;
+
+static void prv_clamp_le_buffer_size(struct ble_hci_ev *ev) {
+  // Command Complete: num_cmds, opcode, status, LE ACL data packet length, ...
+  if (ev->length < 6U || ev->data[3] != 0U) {
+    return;
+  }
+  const uint16_t opcode = ev->data[1] | (ev->data[2] << 8);
+  if (opcode != BLE_HCI_OP(BLE_HCI_OGF_LE, BLE_HCI_OCF_LE_RD_BUF_SIZE) &&
+      opcode != BLE_HCI_OP(BLE_HCI_OGF_LE, BLE_HCI_OCF_LE_RD_BUF_SIZE_V2)) {
+    return;
+  }
+  s_le_acl_len_reported = ev->data[4] | (ev->data[5] << 8);
+  if (s_le_acl_len_reported > LE_ACL_MAX_LEN) {
+    ev->data[4] = LE_ACL_MAX_LEN;
+    ev->data[5] = 0U;
+  }
+}
+
 static void prv_acl_track_sent(uint16_t handle) {
   pbl_irq_lock();
   size_t free_slot = ACL_TRACK_CONNS;
@@ -258,6 +283,11 @@ static void prv_note_evt(struct ble_hci_ev *ev) {
       ev->opcode == BLE_HCI_EVCODE_COMMAND_STATUS) {
     s_last_reply_len = ev->length;
   }
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  if (ev->opcode == BLE_HCI_EVCODE_COMMAND_COMPLETE) {
+    prv_clamp_le_buffer_size(ev);
+  }
+#endif
   if (ev->opcode == BLE_HCI_EVCODE_COMMAND_COMPLETE && ev->length >= 4U) {
     s_last_reply_cmd = ev->data[1] | (ev->data[2] << 8);
     s_last_reply_status = ev->data[3];
@@ -428,6 +458,14 @@ void pbl_bt_hci_uart_snapshot(void) {
 uint32_t pbl_bt_hci_uart_acl_clamped(void) {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   return s_acl_clamped;
+#else
+  return 0U;
+#endif
+}
+
+uint16_t pbl_bt_hci_uart_le_acl_len_reported(void) {
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  return s_le_acl_len_reported;
 #else
   return 0U;
 #endif

@@ -63,3 +63,9 @@ uint32_t pbl_bt_hci_uart_acl_clamped(void);
  * @return A static string.
  */
 const char *pbl_bt_hci_uart_smp_trace(void);
+
+/**
+ * @brief The LE ACL data packet length the controller reported, before the
+ *        transport capped it to the LL PDU size (DA1468x only; 0 if unknown).
+ */
+uint16_t pbl_bt_hci_uart_le_acl_len_reported(void);
