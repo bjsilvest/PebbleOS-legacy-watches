@@ -47,3 +47,9 @@ void pbl_bt_hci_uart_snapshot(void);
  * @return A static string.
  */
 const char *pbl_bt_hci_uart_reset_snapshot(void);
+
+/**
+ * @brief How many times the controller reported more completed ACL packets
+ *        than were outstanding, and the count was clamped (DA1468x only).
+ */
+uint32_t pbl_bt_hci_uart_acl_clamped(void);

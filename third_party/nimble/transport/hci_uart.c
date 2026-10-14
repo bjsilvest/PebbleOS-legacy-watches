@@ -4,9 +4,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include <pbl/bluetooth/hci_uart.h>
 #include <pbl/drivers/uart.h>
+#include <pbl/kernel/irq.h>
 #include <pbl/kernel/mutex.h>
 #include <pbl/kernel/sem.h>
 #include <pbl/kernel/thread.h>
@@ -78,6 +80,79 @@ static volatile uint32_t s_acl_completed;
 static volatile uint8_t s_last_reply_len;
 static char s_reset_snapshot[32];
 
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+// The DA1468x controller reports more completed ACL packets than were sent
+// (seen during pairing), which NimBLE takes as a broken controller and resets
+// the host, dropping the link. Track what is outstanding per connection and
+// clamp what the controller reports to it.
+#define ACL_TRACK_CONNS 4U
+
+static struct {
+  bool used;
+  uint16_t handle;
+  uint16_t outstanding;
+} s_acl_track[ACL_TRACK_CONNS];
+static volatile uint32_t s_acl_clamped;
+
+static void prv_acl_track_sent(uint16_t handle) {
+  pbl_irq_lock();
+  size_t free_slot = ACL_TRACK_CONNS;
+  for (size_t i = 0; i < ACL_TRACK_CONNS; i++) {
+    if (s_acl_track[i].used && s_acl_track[i].handle == handle) {
+      s_acl_track[i].outstanding++;
+      pbl_irq_unlock();
+      return;
+    }
+    if (!s_acl_track[i].used && free_slot == ACL_TRACK_CONNS) {
+      free_slot = i;
+    }
+  }
+  if (free_slot < ACL_TRACK_CONNS) {
+    s_acl_track[free_slot].used = true;
+    s_acl_track[free_slot].handle = handle;
+    s_acl_track[free_slot].outstanding = 1U;
+  }
+  pbl_irq_unlock();
+}
+
+static uint16_t prv_acl_track_completed(uint16_t handle, uint16_t count) {
+  pbl_irq_lock();
+  for (size_t i = 0; i < ACL_TRACK_CONNS; i++) {
+    if (s_acl_track[i].used && s_acl_track[i].handle == handle) {
+      if (count > s_acl_track[i].outstanding) {
+        count = s_acl_track[i].outstanding;
+        s_acl_clamped++;
+      }
+      s_acl_track[i].outstanding -= count;
+      pbl_irq_unlock();
+      return count;
+    }
+  }
+  pbl_irq_unlock();
+  // Nothing was sent on this connection since it was tracked.
+  if (count > 0U) {
+    s_acl_clamped++;
+  }
+  return 0U;
+}
+
+static void prv_acl_track_forget(uint16_t handle) {
+  pbl_irq_lock();
+  for (size_t i = 0; i < ACL_TRACK_CONNS; i++) {
+    if (s_acl_track[i].used && s_acl_track[i].handle == handle) {
+      s_acl_track[i].used = false;
+    }
+  }
+  pbl_irq_unlock();
+}
+
+static void prv_acl_track_reset(void) {
+  pbl_irq_lock();
+  memset(s_acl_track, 0, sizeof(s_acl_track));
+  pbl_irq_unlock();
+}
+#endif
+
 static struct os_mbuf *prv_alloc_acl_from_ll(void) {
   struct os_mbuf *om;
 
@@ -113,14 +188,27 @@ static const struct hci_h4_allocators s_hci_h4_allocs_from_ll = {
   .evt = prv_alloc_evt,
 };
 
-static void prv_note_evt(const struct ble_hci_ev *ev) {
+static void prv_note_evt(struct ble_hci_ev *ev) {
   s_num_evts++;
   if (ev->opcode == BLE_HCI_EVCODE_NUM_COMP_PKTS && ev->length >= 1U) {
     for (uint8_t i = 0; i < ev->data[0] && 1U + 4U * (i + 1U) <= ev->length; i++) {
-      s_acl_completed += ev->data[1 + 4 * i + 2] | (ev->data[1 + 4 * i + 3] << 8);
+      uint8_t *entry = &ev->data[1 + 4 * i];
+      uint16_t count = entry[2] | (entry[3] << 8);
+      s_acl_completed += count;
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+      count = prv_acl_track_completed((entry[0] | (entry[1] << 8)) & 0x0fffU, count);
+      entry[2] = count & 0xffU;
+      entry[3] = count >> 8;
+#endif
     }
     return;
   }
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  if (ev->opcode == BLE_HCI_EVCODE_DISCONN_CMP && ev->length >= 3U) {
+    prv_acl_track_forget((ev->data[1] | (ev->data[2] << 8)) & 0x0fffU);
+    return;
+  }
+#endif
   if (ev->opcode == BLE_HCI_EVCODE_COMMAND_COMPLETE ||
       ev->opcode == BLE_HCI_EVCODE_COMMAND_STATUS) {
     s_last_reply_len = ev->length;
@@ -233,6 +321,11 @@ static void prv_write(const uint8_t *data, size_t len) {
 static void prv_write_mbuf(uint8_t type, struct os_mbuf *om) {
   if (type == HCI_H4_ACL) {
     s_acl_tx++;
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+    if (om->om_len >= 2U) {
+      prv_acl_track_sent((om->om_data[0] | (om->om_data[1] << 8)) & 0x0fffU);
+    }
+#endif
   }
   pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
   prv_write(&type, 1U);
@@ -285,6 +378,14 @@ void pbl_bt_hci_uart_snapshot(void) {
             (unsigned long)s_acl_tx, (unsigned long)s_acl_completed);
 }
 
+uint32_t pbl_bt_hci_uart_acl_clamped(void) {
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  return s_acl_clamped;
+#else
+  return 0U;
+#endif
+}
+
 const char *pbl_bt_hci_uart_reset_snapshot(void) {
   return s_reset_snapshot;
 }
@@ -299,6 +400,11 @@ int ble_transport_to_ll_cmd_impl(void *buf) {
   uint8_t type = HCI_H4_CMD;
 
   s_last_cmd = le16toh(cmd->opcode);
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  if (s_last_cmd == BLE_HCI_OP(BLE_HCI_OGF_CTLR_BASEBAND, BLE_HCI_OCF_CB_RESET)) {
+    prv_acl_track_reset();
+  }
+#endif
 
   pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
   prv_write(&type, 1U);

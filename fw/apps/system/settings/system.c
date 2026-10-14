@@ -144,6 +144,7 @@ typedef struct SystemInformationData {
   char bt_radio_string[32];
   char bt_hci_string[32];
   char bt_pair_string[24];
+  char bt_reset_string[40];
 #endif
   char const *subtitle_text[SystemInformationItem_Count];
   char language_string[16];
@@ -346,7 +347,9 @@ static void prv_information_window_push(SettingsSystemData *data) {
   info->subtitle_text[SystemInformationItemBtHci] = info->bt_hci_string;
   strncpy(info->bt_pair_string, pbl_bt_advert_pairing_trace(), sizeof(info->bt_pair_string) - 1);
   info->subtitle_text[SystemInformationItemBtPair] = info->bt_pair_string;
-  info->subtitle_text[SystemInformationItemBtReset] = pbl_bt_hci_uart_reset_snapshot();
+  sniprintf(info->bt_reset_string, sizeof(info->bt_reset_string), "%s c%lu",
+            pbl_bt_hci_uart_reset_snapshot(), (unsigned long)pbl_bt_hci_uart_acl_clamped());
+  info->subtitle_text[SystemInformationItemBtReset] = info->bt_reset_string;
   info->subtitle_text[SystemInformationItemBtChip] = da1468x_chip_id();
   info->subtitle_text[SystemInformationItemBtRxBoot] = da1468x_rx_after_markers();
   info->subtitle_text[SystemInformationItemBtRxReset] = da1468x_rx_after_reset();
