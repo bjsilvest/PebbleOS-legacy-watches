@@ -56,6 +56,7 @@ static UARTDevice BT_HCI_TX_UART_DEVICE = {
   .irqn = PBL_IRQN(USART2),
 };
 UARTDevice *const BT_HCI_TX_UART = &BT_HCI_TX_UART_DEVICE;
+PBL_IRQ_CONNECT(USART2, 12, uart_irq_handler, BT_HCI_TX_UART, 0);
 #endif
 
 // QSPI flash

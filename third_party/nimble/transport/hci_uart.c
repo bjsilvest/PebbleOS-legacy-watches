@@ -14,13 +14,13 @@
 #include <pbl/kernel/thread.h>
 #include <pbl/logging/logging.h>
 #include <pbl/task_wdt/task_wdt.h>
+#include <pbl/util/math.h>
 
 #include <board/board.h>
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
 #include <pbl/drivers/bluetooth/da1468x.h>
 #endif
 #include <kernel/pebble_tasks.h>
-#include <kernel/util/delay.h>
 #include <system/passert.h>
 
 // clang-format off
@@ -366,6 +366,10 @@ static void prv_rx_irq_handler(UARTDevice *dev, uint8_t data, const UARTRXErrorF
   pbl_sem_give(&s_rx_ready);
 }
 
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+static void prv_tx_irq_handler(UARTDevice *dev);
+#endif
+
 static void prv_uart_start(void) {
 #ifndef CONFIG_BT_CONTROLLER_DA1468X
   if (BT_HCI_UART_TX != BT_HCI_UART) {
@@ -377,6 +381,9 @@ static void prv_uart_start(void) {
 #endif
   uart_set_rx_interrupt_handler(BT_HCI_UART, prv_rx_irq_handler);
   uart_set_rx_interrupt_enabled(BT_HCI_UART, true);
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  uart_set_tx_interrupt_handler(BT_HCI_UART_TX, prv_tx_irq_handler);
+#endif
   s_controller_state = ControllerStateReady;
 }
 
@@ -538,12 +545,48 @@ static void prv_hci_task_main(void *unused) {
 // flow control here. Long bursts lost bytes: pairing failed on the 69-byte
 // SMP public key, which the phone rejected as invalid. Send in short bursts
 // with a pause after each, and after each packet type byte.
-#define TX_BURST_BYTES 8U
-#define TX_PAUSE_US    300U
+//
+// The host task runs at nearly the highest priority, so the bursts go out from
+// the TX interrupt and the pauses sleep: busy-waiting starved the UI while the
+// phone app synced.
+#define TX_BURST_BYTES      8U
+#define TX_PAUSE_MS         1U
+#define TX_BURST_TIMEOUT_MS 50U
 
-static void prv_tx_pause(void) {
-  uart_wait_for_tx_complete(BT_HCI_UART_TX);
-  delay_us(TX_PAUSE_US);
+static const uint8_t *s_tx_ptr;
+static volatile size_t s_tx_left;
+static PBL_SEM_DEFINE(s_tx_done, 0, 1);
+
+static void prv_tx_irq_handler(UARTDevice *dev) {
+  if (s_tx_left == 0U) {
+    uart_set_tx_interrupt_enabled(dev, false);
+    return;
+  }
+  uart_write_byte(dev, *s_tx_ptr++);
+  if (--s_tx_left == 0U) {
+    uart_set_tx_interrupt_enabled(dev, false);
+    pbl_sem_give(&s_tx_done);
+  }
+}
+
+static void prv_write_burst(const uint8_t *data, size_t len) {
+  s_tx_ptr = data;
+  s_tx_left = len;
+  uart_set_tx_interrupt_enabled(BT_HCI_UART_TX, true);
+  if (pbl_sem_take(&s_tx_done, PBL_MSEC(TX_BURST_TIMEOUT_MS)) != 0) {
+    // Should not happen; finish the burst by polling rather than lose it.
+    pbl_irq_lock();
+    uart_set_tx_interrupt_enabled(BT_HCI_UART_TX, false);
+    const uint8_t *ptr = s_tx_ptr;
+    size_t left = s_tx_left;
+    s_tx_left = 0U;
+    pbl_irq_unlock();
+    while (left-- > 0U) {
+      uart_write_byte(BT_HCI_UART_TX, *ptr++);
+    }
+    (void)pbl_sem_take(&s_tx_done, PBL_NO_WAIT);
+  }
+  pbl_thread_sleep(PBL_MSEC(TX_PAUSE_MS));
 }
 #endif
 
@@ -552,14 +595,15 @@ static void prv_write(const uint8_t *data, size_t len) {
     return;
   }
 
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  for (size_t i = 0U; i < len; i += TX_BURST_BYTES) {
+    prv_write_burst(&data[i], MIN(len - i, (size_t)TX_BURST_BYTES));
+  }
+#else
   for (size_t i = 0U; i < len; i++) {
     uart_write_byte(BT_HCI_UART_TX, data[i]);
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
-    if (len == 1U || (i + 1U) % TX_BURST_BYTES == 0U) {
-      prv_tx_pause();
-    }
-#endif
   }
+#endif
 }
 
 static void prv_write_mbuf(uint8_t type, struct os_mbuf *om) {
