@@ -18,6 +18,13 @@ config AMBIENT_LIGHT_W1160
     help
       Support for the W1160 ambient light sensor.
 
+config AMBIENT_LIGHT_STM32_ADC
+    bool "Analog sensor on the STM32 ADC"
+    depends on SOC_STM32F4
+    help
+      Photodiode read through ADC1 against VREFINT, powered by a GPIO
+      (silk).
+
 config AMBIENT_LIGHT_QEMU
     bool "QEMU"
     default y if SOC_QEMU
@@ -36,6 +43,7 @@ config AMBIENT_LIGHT_BITS
     default 12 if AMBIENT_LIGHT_OPT3001
     default 16 if AMBIENT_LIGHT_W1160
     default 12 if AMBIENT_LIGHT_QEMU
+    default 12 if AMBIENT_LIGHT_STM32_ADC
     default 12 if AMBIENT_LIGHT_POSIX
     help
       Number of bits in the ambient light sensor reading. Used to derive

@@ -14,6 +14,8 @@ static const BoardConfig BOARD_CONFIG = {
   .ambient_k_delta_threshold = 50,
   .photo_en = PBL_GPIO(STM32_GPIOC, 0, 0),
   .als_always_on = true,
+  .als_adc_channel = ADC_Channel_13,
+  .als_adc_pin = PBL_GPIO(STM32_GPIOC, 3, 0),
   .backlight_on_percent = 25,
 };
 
