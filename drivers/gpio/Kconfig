@@ -23,6 +23,13 @@ config GPIO_SF32LB
     help
       Support for the SiFli SF32LB GPIO controller.
 
+config GPIO_STM32
+    bool "ST STM32"
+    default y if SOC_STM32F4
+    select HAL_STM32
+    help
+      Support for the STM32F4 GPIO controller.
+
 config GPIO_QEMU
     bool "QEMU GPIO"
     default y if SOC_QEMU
