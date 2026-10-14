@@ -46,6 +46,9 @@ def enabled(config, key):
 
 
 def max_resources_size(config):
+    if enabled(config, "CONFIG_FLASH_LAYOUT_SILK"):
+        # Stock silk resource banks are 512K; overflowing bank 1 hits PRF
+        return 512 * BYTES_PER_K
     if enabled(config, "CONFIG_SOC_NRF52"):
         return 1024 * BYTES_PER_K
     if enabled(config, "CONFIG_SOC_SF32LB52") or enabled(config, "CONFIG_QEMU"):
@@ -164,7 +167,11 @@ def cmd_qemu_image_micro(args):
 
 def cmd_qemu_image_spi(args):
     config = read_config(args.config)
-    if enabled(config, "CONFIG_QEMU"):
+    if enabled(config, "CONFIG_FLASH_LAYOUT_SILK"):
+        # Silk stock layout: resources at 0x100000, inside 32MB QEMU flash
+        resources_begin = 0x100000
+        image_size = 0x2000000
+    elif enabled(config, "CONFIG_QEMU"):
         # QEMU generic boards: resources at offset 0x620000 in 32MB flash
         resources_begin = 0x620000
         image_size = 0x2000000
