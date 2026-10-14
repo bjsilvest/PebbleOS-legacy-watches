@@ -14,7 +14,7 @@
 #include <bf0_hal.h>
 #endif
 
-#if MICRO_FAMILY_STM32F4
+#ifdef CONFIG_SOC_STM32F4
 #include <pbl/kernel/compiler.h>
 
 #include <stm32f4xx.h>

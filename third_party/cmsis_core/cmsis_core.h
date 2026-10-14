@@ -7,7 +7,7 @@
 #include "pebble/qemu_cm4.h"
 #elif defined(CONFIG_SOC_QEMU_CORTEX_M33)
 #include "pebble/qemu_cm33.h"
-#elif defined(MICRO_FAMILY_STM32F4)
+#elif defined(CONFIG_SOC_STM32F4)
 #include <stm32f4xx.h>
 #elif defined(CONFIG_SOC_NRF52)
 #pragma GCC diagnostic push

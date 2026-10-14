@@ -25,6 +25,8 @@
 #define CORE_DUMP_MAX_IMAGES 1
 #elif defined(CONFIG_QEMU) || defined(CONFIG_SOC_POSIX)
 #define CORE_DUMP_MAX_IMAGES 1
+#elifdef CONFIG_SOC_STM32F4
+#define CORE_DUMP_MAX_IMAGES 2
 #else
 #error "Unsupported micro family"
 #endif

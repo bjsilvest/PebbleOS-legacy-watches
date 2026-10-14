@@ -9,6 +9,8 @@
 #include "board_nrf5.h"
 #elifdef CONFIG_SOC_SF32LB52
 #include "board_sf32lb52.h"
+#elifdef CONFIG_SOC_STM32F4
+#include "board_stm32.h"
 #elifdef CONFIG_SOC_POSIX
 #include "board_posix.h"
 #elif !defined(SDK) && !defined(UNITTEST)

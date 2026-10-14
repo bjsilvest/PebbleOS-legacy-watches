@@ -20,6 +20,12 @@ config SOC_SF32LB52
     select CPU_HAS_FPU
     select RAMFUNC
 
+config SOC_STM32F4
+    bool "ST STM32F4"
+    select HAL_STM32
+    select CPU_CORTEX_M4
+    select CPU_HAS_FPU
+
 config SOC_QEMU
     bool "QEMU emulated"
 
@@ -36,6 +42,7 @@ config SOC
     string
     default "NRF52" if SOC_NRF52
     default "SF32LB52" if SOC_SF32LB52
+    default "STM32F4" if SOC_STM32F4
     help
       Stringified SoC name, for places that need the name as a token
       (e.g. sftool -c). Empty on QEMU and POSIX boards.
