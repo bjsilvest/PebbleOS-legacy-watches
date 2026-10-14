@@ -279,9 +279,12 @@ with HCI opcodes in hex, "BT Pair" is `r<pairing requests>k<passkey prompts>
 p<pairing status> e<encryption status> d<disconnect reason>` (NimBLE codes in hex), "BT Reset" is the HCI state at the last host reset:
 `<last command>><last answered command>/<reply length> a<ACL sent> n<ACL completed> c<clamps>`,
 where `c` counts completed-packet reports the transport clamped because the
-controller over-reports them, "BT SMP" is the newest SMP opcodes on the link
+controller over-reports them, and `b` is the LE ACL data packet length the controller
+reported (the transport caps it to 27 bytes, the LL PDU size, so the host
+fragments large packets itself), "BT SMP" is the newest SMP opcodes on the link
 (`<` received, `>` sent, the opcode's low hex digit, and for Pairing Failed
-the reason's), and "BT Chip" is the chip ID the bootrom printed.
+the reason's), "Last reboot" is the last reboot reason code and its first two data words
+(the LR of an assert or fault), and "BT Chip" is the chip ID the bootrom printed.
 If the controller does not answer HCI Reset, "BT Radio" reads
 `HCI [<markers>] <bytes after markers>/<bytes after reset> f<framing errors>`,
 and "BT Rx boot" and "BT Rx reset" show the first of those bytes in hex: the controller
