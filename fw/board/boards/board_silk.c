@@ -33,6 +33,20 @@ PBL_IRQ_CONNECT(USART1, 13, uart_irq_handler, DBG_UART, 0);
 // Bluetooth HCI
 ///////////////////////////////////////////////////////////////////////////////
 
+// USART6_RX: DMA2 stream 1, channel 5. The H4 UART has no flow control, so
+// RX must not depend on interrupt latency.
+static struct pbl_dma_stm32_state s_bt_hci_rx_dma_state;
+static const struct pbl_dma_stm32_stream BT_HCI_RX_DMA = {
+  .state = &s_bt_hci_rx_dma_state,
+  .stream = DMA2_Stream1,
+  .channel = DMA_Channel_5,
+  .rcc = RCC_AHB1Periph_DMA2,
+  .it_ht = DMA_IT_HTIF1,
+  .it_tc = DMA_IT_TCIF1,
+  .irqn = PBL_IRQN(DMA2_Stream1),
+};
+PBL_IRQ_CONNECT(DMA2_Stream1, 12, pbl_dma_stm32_irq_handler, &BT_HCI_RX_DMA, 0);
+
 static UARTDeviceState s_bt_hci_rx_uart_state;
 static UARTDevice BT_HCI_RX_UART_DEVICE = {
   .state = &s_bt_hci_rx_uart_state,
@@ -42,6 +56,7 @@ static UARTDevice BT_HCI_RX_UART_DEVICE = {
   .rx = PBL_GPIO(STM32_GPIOA, 12, 0),
   .af = GPIO_AF_USART6,
   .irqn = PBL_IRQN(USART6),
+  .rx_dma = &BT_HCI_RX_DMA,
 };
 UARTDevice *const BT_HCI_UART = &BT_HCI_RX_UART_DEVICE;
 PBL_IRQ_CONNECT(USART6, 12, uart_irq_handler, BT_HCI_UART, 0);

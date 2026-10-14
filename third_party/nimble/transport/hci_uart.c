@@ -368,6 +368,8 @@ static void prv_rx_irq_handler(UARTDevice *dev, uint8_t data, const UARTRXErrorF
 
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
 static void prv_tx_irq_handler(UARTDevice *dev);
+// 89 ms of data at 115200 baud.
+static uint8_t s_rx_dma_buf[1024];
 #endif
 
 static void prv_uart_start(void) {
@@ -383,6 +385,10 @@ static void prv_uart_start(void) {
   uart_set_rx_interrupt_enabled(BT_HCI_UART, true);
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   uart_set_tx_interrupt_handler(BT_HCI_UART_TX, prv_tx_irq_handler);
+  // Without flow control, a byte must be read before the next arrives (87 us),
+  // which interrupts locked for longer (e.g. flash writes after pairing) broke:
+  // receive by DMA where the board has it.
+  uart_start_rx_dma(BT_HCI_UART, s_rx_dma_buf, sizeof(s_rx_dma_buf));
 #endif
   s_controller_state = ControllerStateReady;
 }
