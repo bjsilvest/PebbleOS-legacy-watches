@@ -220,7 +220,7 @@ runs on a real watch.
 
 The DA14681 runs as an HCI controller and Core's NimBLE host talks H4 to it
 over the bootrom UART pins: USART6 RX on PA12 (radio P1_3) and USART2 TX on
-PA2 (radio P2_3), at 115200 baud with no flow control. Stock silk used SPI
+PA2 (radio P2_3), at 1 Mbaud (`BT_DA1468X_HCI_BAUD`, matching the controller image) with RTS/CTS flow control on the spare SPI lines. Stock silk used SPI
 with a Pebble-specific protocol instead.
 
 The radio has no flash of its own here; everything runs from its RAM and is
@@ -309,8 +309,11 @@ manager) before its HCI transport starts, then the vendor event
 - The controller keeps running while Bluetooth is off (airplane mode).
 - H4 flow control runs over the spare stock SPI lines: the controller image
   routes its UART RTS to P0_0 (PB0) and CTS to P0_1 (PB1). The host gates
-  each byte on RTS from the TX interrupt and only drives CTS once the image
-  runs, since the bootrom probes these pins for SPI. Without RTS from the
+  each byte on RTS from the TX interrupt, deasserts CTS while its receive
+  ring is full, and only drives CTS once the image runs, since the bootrom
+  probes these pins for SPI. At 115200 baud the controller's DGTL deadlocked
+  against its BLE manager under load (both of its queues full), so the link
+  runs at 1 Mbaud. Without RTS from the
   image the transport falls back to 8-byte bursts with 1 ms pauses, which
   lose bytes when the controller is busy. "BT Rx" ends with `F` (flow
   control) or `p` (pacing) and the number of RTS waits.
