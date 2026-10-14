@@ -23,6 +23,13 @@ config PWM_SF32LB
     help
       Support for the SiFli SF32LB PWM controller.
 
+config PWM_STM32
+    bool "ST STM32 timers"
+    default y if SOC_STM32F4
+    select HAL_STM32
+    help
+      PWM on the STM32F4 APB1 timer output channels.
+
 config PWM_QEMU
     bool "QEMU PWM"
     default y if SOC_QEMU
