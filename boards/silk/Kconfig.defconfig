@@ -16,3 +16,8 @@ config RESOURCES_BOARD
 choice BT_ID_ADDR_SOURCE
     default BT_ID_ADDR_SERIAL
 endchoice
+
+# The DA14681 completes each 27-byte ACL fragment with its own event, and the
+# HCI thread blocks when the pool runs out, so give it room.
+config NIMBLE_BLE_TRANSPORT_EVT_COUNT
+    default 16 if BT_CONTROLLER_DA1468X
