@@ -38,9 +38,10 @@ config BT_HCI_SF32LB52
 
 config BT_HCI_UART
     bool "H4 over UART"
-    depends on QEMU || SOC_POSIX
+    depends on QEMU || SOC_POSIX || SOC_STM32F4
     help
       Talk H4 HCI to an external controller over the board's BT_HCI_UART.
+      Boards with separate RX and TX UARTs also define BT_HCI_UART_TX.
       On QEMU this is the fourth serial port, on native boards the -b
       option; either can be attached to a host controller such as an
       nRF52840 dongle running Zephyr's hci_uart.

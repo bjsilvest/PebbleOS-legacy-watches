@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <pbl/bluetooth/hci_uart.h>
 #include <pbl/drivers/uart.h>
 #include <pbl/kernel/mutex.h>
 #include <pbl/kernel/sem.h>
@@ -11,6 +12,9 @@
 #include <pbl/logging/logging.h>
 
 #include <board/board.h>
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#include <pbl/drivers/bluetooth/da1468x.h>
+#endif
 #include <kernel/pebble_tasks.h>
 #include <system/passert.h>
 
@@ -23,6 +27,11 @@
 #include <nimble/transport_impl.h>
 
 PBL_LOG_MODULE_DECLARE(nimble, CONFIG_NIMBLE_LOG_LEVEL);
+
+// Boards with split RX/TX UARTs define BT_HCI_UART_TX; BT_HCI_UART receives.
+#ifndef BT_HCI_UART_TX
+#define BT_HCI_UART_TX BT_HCI_UART
+#endif
 
 #define RX_RING_SIZE     1024U
 #define EVT_POOL_POLL_MS 5U
@@ -39,6 +48,13 @@ static uint8_t s_rx_ring[RX_RING_SIZE];
 static volatile uint32_t s_rx_head;
 static volatile uint32_t s_rx_tail;
 static volatile bool s_rx_paused;
+
+// Set once the controller can take HCI traffic (or never will).
+static volatile enum {
+  ControllerStatePending,
+  ControllerStateReady,
+  ControllerStateFailed,
+} s_controller_state;
 
 static struct os_mbuf *prv_alloc_acl_from_ll(void) {
   struct os_mbuf *om;
@@ -105,7 +121,32 @@ static void prv_rx_irq_handler(UARTDevice *dev, uint8_t data, const UARTRXErrorF
   pbl_sem_give(&s_rx_ready);
 }
 
+static void prv_uart_start(void) {
+#ifndef CONFIG_BT_CONTROLLER_DA1468X
+  if (BT_HCI_UART_TX != BT_HCI_UART) {
+    uart_init_rx_only(BT_HCI_UART);
+    uart_init_tx_only(BT_HCI_UART_TX);
+  } else {
+    uart_init(BT_HCI_UART);
+  }
+#endif
+  uart_set_rx_interrupt_handler(BT_HCI_UART, prv_rx_irq_handler);
+  uart_set_rx_interrupt_enabled(BT_HCI_UART, true);
+  s_controller_state = ControllerStateReady;
+}
+
 static void prv_hci_task_main(void *unused) {
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  // Loading the controller takes about a second, so it happens here rather
+  // than in ble_transport_ll_init(). A failure leaves Bluetooth off instead of
+  // crashing, since a crash loop would end in the bootloader starting PRF.
+  if (da1468x_boot()) {
+    prv_uart_start();
+  } else {
+    s_controller_state = ControllerStateFailed;
+  }
+#endif
+
   while (true) {
     pbl_sem_take(&s_rx_ready, PBL_FOREVER);
 
@@ -130,8 +171,12 @@ static void prv_hci_task_main(void *unused) {
 }
 
 static void prv_write(const uint8_t *data, size_t len) {
+  if (s_controller_state != ControllerStateReady) {
+    return;
+  }
+
   for (size_t i = 0U; i < len; i++) {
-    uart_write_byte(BT_HCI_UART, data[i]);
+    uart_write_byte(BT_HCI_UART_TX, data[i]);
   }
 }
 
@@ -159,12 +204,25 @@ void ble_transport_ll_init(void) {
     .stack_size = sizeof(s_hci_task_stack),
   };
 
+#ifndef CONFIG_BT_CONTROLLER_DA1468X
+  prv_uart_start();
+#endif
+
   s_hci_task_handle = pebble_task_create(PebbleTask_BTHCI, &attr);
   PBL_ASSERTN(s_hci_task_handle);
+}
 
-  uart_init(BT_HCI_UART);
-  uart_set_rx_interrupt_handler(BT_HCI_UART, prv_rx_irq_handler);
-  uart_set_rx_interrupt_enabled(BT_HCI_UART, true);
+bool pbl_bt_hci_uart_wait_ready(uint32_t timeout_ms) {
+  const uint32_t step_ms = 50U;
+
+  for (uint32_t waited = 0U; s_controller_state == ControllerStatePending; waited += step_ms) {
+    if (waited >= timeout_ms) {
+      return false;
+    }
+    pbl_thread_sleep(PBL_MSEC(step_ms));
+  }
+
+  return s_controller_state == ControllerStateReady;
 }
 
 int ble_transport_to_ll_cmd_impl(void *buf) {

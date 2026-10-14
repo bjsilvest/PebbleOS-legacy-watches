@@ -4,6 +4,7 @@
 #include "gh3x2x_tuning_service.h"
 #include "nimble_store.h"
 
+#include <pbl/bluetooth/hci_uart.h>
 #include <pbl/bluetooth/id_addr.h>
 #include <pbl/bluetooth/init.h>
 #include <pbl/kernel/sem.h>
@@ -27,6 +28,11 @@
 PBL_LOG_MODULE_DEFINE(bt, CONFIG_BT_LOG_LEVEL);
 
 static const uint32_t s_bt_stack_start_stop_timeout_ms = 10000;
+
+#ifdef CONFIG_BT_HCI_UART
+// Below the caller's task watchdog timeout.
+#define BT_HCI_UART_READY_TIMEOUT_MS 3500U
+#endif
 
 extern void pebble_pairing_service_init(void);
 extern void ppog_reversed_service_init(void);
@@ -165,6 +171,15 @@ bool pbl_bt_start(struct pbl_bt_config *config) {
     PBL_LOG_ERR("Unexpected driver state %u; refusing to start", (unsigned)s_driver_state);
     return false;
   }
+
+#ifdef CONFIG_BT_HCI_UART
+  // A controller that never came up would time the host start out below,
+  // which crashes; report the failure instead.
+  if (!pbl_bt_hci_uart_wait_ready(BT_HCI_UART_READY_TIMEOUT_MS)) {
+    PBL_LOG_ERR("HCI controller not available");
+    return false;
+  }
+#endif
 
   s_driver_state = DriverStateStarting;
   // Drain a stale host_started signal (e.g. from an autonomous host re-sync)
