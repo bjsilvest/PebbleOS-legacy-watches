@@ -59,6 +59,7 @@ enum {
   SystemInformationItemBtRadio,
   SystemInformationItemBtHci,
   SystemInformationItemBtPair,
+  SystemInformationItemBtReset,
   SystemInformationItemBtChip,
   SystemInformationItemBtRxBoot,
   SystemInformationItemBtRxReset,
@@ -227,6 +228,7 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemBtRadio] = i18n_noop("BT Radio"),
   [SystemInformationItemBtHci] = i18n_noop("BT HCI"),
   [SystemInformationItemBtPair] = i18n_noop("BT Pair"),
+  [SystemInformationItemBtReset] = i18n_noop("BT Reset"),
   [SystemInformationItemBtChip] = i18n_noop("BT Chip"),
   [SystemInformationItemBtRxBoot] = i18n_noop("BT Rx boot"),
   [SystemInformationItemBtRxReset] = i18n_noop("BT Rx reset"),
@@ -344,6 +346,7 @@ static void prv_information_window_push(SettingsSystemData *data) {
   info->subtitle_text[SystemInformationItemBtHci] = info->bt_hci_string;
   strncpy(info->bt_pair_string, pbl_bt_advert_pairing_trace(), sizeof(info->bt_pair_string) - 1);
   info->subtitle_text[SystemInformationItemBtPair] = info->bt_pair_string;
+  info->subtitle_text[SystemInformationItemBtReset] = pbl_bt_hci_uart_reset_snapshot();
   info->subtitle_text[SystemInformationItemBtChip] = da1468x_chip_id();
   info->subtitle_text[SystemInformationItemBtRxBoot] = da1468x_rx_after_markers();
   info->subtitle_text[SystemInformationItemBtRxReset] = da1468x_rx_after_reset();

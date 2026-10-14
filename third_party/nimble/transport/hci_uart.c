@@ -71,6 +71,12 @@ static volatile uint8_t s_last_reply_status;
 static volatile uint32_t s_num_evts;
 static volatile uint16_t s_last_fail_cmd;
 static volatile uint8_t s_last_fail_status;
+// ACL packets sent and completed as the controller reports them, and the
+// length of the last command reply, to tell which check a host reset tripped.
+static volatile uint32_t s_acl_tx;
+static volatile uint32_t s_acl_completed;
+static volatile uint8_t s_last_reply_len;
+static char s_reset_snapshot[32];
 
 static struct os_mbuf *prv_alloc_acl_from_ll(void) {
   struct os_mbuf *om;
@@ -109,6 +115,16 @@ static const struct hci_h4_allocators s_hci_h4_allocs_from_ll = {
 
 static void prv_note_evt(const struct ble_hci_ev *ev) {
   s_num_evts++;
+  if (ev->opcode == BLE_HCI_EVCODE_NUM_COMP_PKTS && ev->length >= 1U) {
+    for (uint8_t i = 0; i < ev->data[0] && 1U + 4U * (i + 1U) <= ev->length; i++) {
+      s_acl_completed += ev->data[1 + 4 * i + 2] | (ev->data[1 + 4 * i + 3] << 8);
+    }
+    return;
+  }
+  if (ev->opcode == BLE_HCI_EVCODE_COMMAND_COMPLETE ||
+      ev->opcode == BLE_HCI_EVCODE_COMMAND_STATUS) {
+    s_last_reply_len = ev->length;
+  }
   if (ev->opcode == BLE_HCI_EVCODE_COMMAND_COMPLETE && ev->length >= 4U) {
     s_last_reply_cmd = ev->data[1] | (ev->data[2] << 8);
     s_last_reply_status = ev->data[3];
@@ -215,6 +231,9 @@ static void prv_write(const uint8_t *data, size_t len) {
 }
 
 static void prv_write_mbuf(uint8_t type, struct os_mbuf *om) {
+  if (type == HCI_H4_ACL) {
+    s_acl_tx++;
+  }
   pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
   prv_write(&type, 1U);
   for (struct os_mbuf *x = om; x != NULL; x = SLIST_NEXT(x, om_next)) {
@@ -258,6 +277,16 @@ bool pbl_bt_hci_uart_wait_ready(uint32_t timeout_ms) {
   }
 
   return s_controller_state == ControllerStateReady;
+}
+
+void pbl_bt_hci_uart_snapshot(void) {
+  sniprintf(s_reset_snapshot, sizeof(s_reset_snapshot), "%04x>%04x/%u a%lu n%lu",
+            (unsigned)s_last_cmd, (unsigned)s_last_reply_cmd, (unsigned)s_last_reply_len,
+            (unsigned long)s_acl_tx, (unsigned long)s_acl_completed);
+}
+
+const char *pbl_bt_hci_uart_reset_snapshot(void) {
+  return s_reset_snapshot;
 }
 
 void pbl_bt_hci_uart_copy_status(char *buf, size_t len) {

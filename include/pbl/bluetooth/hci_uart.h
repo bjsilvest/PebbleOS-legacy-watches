@@ -30,3 +30,20 @@ bool pbl_bt_hci_uart_wait_ready(uint32_t timeout_ms);
  * @param len Size of @p buf.
  */
 void pbl_bt_hci_uart_copy_status(char *buf, size_t len);
+
+/**
+ * @brief Record the HCI state, for diagnosing a host reset.
+ *
+ * Call when the host resets; read back with pbl_bt_hci_uart_reset_snapshot().
+ */
+void pbl_bt_hci_uart_snapshot(void);
+
+/**
+ * @brief The HCI state at the last pbl_bt_hci_uart_snapshot().
+ *
+ * Formats "<last command>><last answered command>/<reply length> a<ACL packets sent>
+ * n<ACL packets the controller completed>", opcodes in hex; empty before any snapshot.
+ *
+ * @return A static string.
+ */
+const char *pbl_bt_hci_uart_reset_snapshot(void);

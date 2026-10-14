@@ -70,6 +70,9 @@ static void prv_sync_cb(void) {
 
 static void prv_reset_cb(int reason) {
   PBL_LOG_WRN("NimBLE host reset (reason: 0x%04x)", (uint16_t)reason);
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  pbl_bt_hci_uart_snapshot();
+#endif
 #ifdef CONFIG_BT_HCI_SF32LB52
   // Controller stopped answering HCI. Crash so the coredump captures LCPU RAM
   // (core_dump wakes the LCPU itself); the reboot cold-recovers the controller.
