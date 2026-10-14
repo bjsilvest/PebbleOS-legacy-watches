@@ -51,6 +51,7 @@
 #include <shell/system_app_ids.auto.h>
 #include <system/bootbits.h>
 #include <system/passert.h>
+#include <system/reboot_reason.h>
 #include <system/version.h>
 
 enum {
@@ -61,6 +62,7 @@ enum {
   SystemInformationItemBtPair,
   SystemInformationItemBtReset,
   SystemInformationItemBtSmp,
+  SystemInformationItemLastReboot,
   SystemInformationItemBtChip,
   SystemInformationItemBtRxBoot,
   SystemInformationItemBtRxReset,
@@ -146,6 +148,7 @@ typedef struct SystemInformationData {
   char bt_hci_string[32];
   char bt_pair_string[24];
   char bt_reset_string[40];
+  char last_reboot_string[24];
 #endif
   char const *subtitle_text[SystemInformationItem_Count];
   char language_string[16];
@@ -232,6 +235,7 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemBtPair] = i18n_noop("BT Pair"),
   [SystemInformationItemBtReset] = i18n_noop("BT Reset"),
   [SystemInformationItemBtSmp] = i18n_noop("BT SMP"),
+  [SystemInformationItemLastReboot] = i18n_noop("Last reboot"),
   [SystemInformationItemBtChip] = i18n_noop("BT Chip"),
   [SystemInformationItemBtRxBoot] = i18n_noop("BT Rx boot"),
   [SystemInformationItemBtRxReset] = i18n_noop("BT Rx reset"),
@@ -353,6 +357,14 @@ static void prv_information_window_push(SettingsSystemData *data) {
             pbl_bt_hci_uart_reset_snapshot(), (unsigned long)pbl_bt_hci_uart_acl_clamped());
   info->subtitle_text[SystemInformationItemBtReset] = info->bt_reset_string;
   info->subtitle_text[SystemInformationItemBtSmp] = pbl_bt_hci_uart_smp_trace();
+  // Code, then the first two words of its data: the LR for an assert or fault,
+  // the stuck PC and LR for a watchdog.
+  RebootReason reason;
+  reboot_reason_copy_last(&reason);
+  const uint32_t *words = (const uint32_t *)&reason;
+  sniprintf(info->last_reboot_string, sizeof(info->last_reboot_string), "%u %08lx %08lx",
+            (unsigned)reason.code, (unsigned long)words[1], (unsigned long)words[2]);
+  info->subtitle_text[SystemInformationItemLastReboot] = info->last_reboot_string;
   info->subtitle_text[SystemInformationItemBtChip] = da1468x_chip_id();
   info->subtitle_text[SystemInformationItemBtRxBoot] = da1468x_rx_after_markers();
   info->subtitle_text[SystemInformationItemBtRxReset] = da1468x_rx_after_reset();
