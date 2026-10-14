@@ -41,7 +41,7 @@ extern const uint8_t da1468x_controller_start[], da1468x_controller_end[];
 // AE silicon takes 220-400 ms from reset to its first chip ID character.
 #define BOOTROM_FIRST_CHAR_MS 600U
 #define BOOTROM_CHAR_MS       100U
-#define BOOTROM_MAX_ID_LEN    32U
+#define BOOTROM_MAX_ID_LEN    48U
 #define STAGE2_START_MS       5U
 #define STAGE2_REPLY_MS       100U
 // Stage 2 checksums the image bytewise at 16 MHz, about 0.3 s.
@@ -120,21 +120,30 @@ static void prv_flush_rx(void) {
 static bool prv_wait_bootrom_start(void) {
   char id[BOOTROM_MAX_ID_LEN + 1] = {0};
   size_t id_len = 0;
+  uint8_t first[2] = {0};
   uint32_t timeout_ms = BOOTROM_FIRST_CHAR_MS;
 
   for (size_t i = 0; i < BOOTROM_MAX_ID_LEN; i++) {
     uint8_t c;
     if (!prv_getc(&c, timeout_ms)) {
       PBL_LOG_ERR("No bootrom start (got %u chars)", (unsigned)i);
-      sniprintf(s_status, sizeof(s_status), "Bootrom: none (%u ch)", (unsigned)i);
+      sniprintf(s_status, sizeof(s_status), "Bootrom: none (%u ch %02x %02x)", (unsigned)i,
+                first[0], first[1]);
       return false;
+    }
+    if (i < sizeof(first)) {
+      first[i] = c;
     }
     if (c == STX) {
       PBL_LOG_INFO("DA1468x bootrom up, ID \"%s\"", id);
       return true;
     }
-    timeout_ms = BOOTROM_CHAR_MS;
-    if (c >= 0x20U && c < 0x7fU) {
+    // The lines glitch while the bootrom probes its interfaces, so only the
+    // chip ID ("DA14681...") means it is up and sending.
+    if (c == 'D') {
+      timeout_ms = BOOTROM_CHAR_MS;
+    }
+    if (c >= 0x20U && c < 0x7fU && id_len < BOOTROM_MAX_ID_LEN) {
       id[id_len++] = (char)c;
     }
   }
