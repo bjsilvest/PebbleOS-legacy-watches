@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 Brian Silvestri
+# SPDX-License-Identifier: Apache-2.0
+
+# Pebble 2 (silk) storage layout on the flint emulator hardware. Used to
+# bring up and test the silk flash layout and flash guard before the STM32F4
+# port exists.
+
+config BOARD_QEMU_SILK
+    bool
+    default y
+
+# Reuse the qemu_flint board definitions (display, buttons, etc.).
+config BOARD_QEMU_FLINT
+    bool
+    default y
+
+choice
+    prompt "Emulated watch color"
+    help
+      Watch color reported by manufacturing info on the emulator.
+
+config QEMU_WATCH_COLOR_P2D_BLACK
+    bool "Black"
+
+config QEMU_WATCH_COLOR_P2D_WHITE
+    bool "White"
+
+endchoice

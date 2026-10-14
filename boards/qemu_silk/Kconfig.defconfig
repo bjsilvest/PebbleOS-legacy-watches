@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Brian Silvestri
+# SPDX-License-Identifier: Apache-2.0
+
+config QEMU_MACHINE
+    default "pebble-flint"
+
+config RESOURCES_BOARD
+    default "qemu_silk"
