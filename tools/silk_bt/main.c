@@ -11,6 +11,7 @@
 #include "hw_cpm.h"
 #include "hw_gpio.h"
 #include "hw_uart.h"
+#include "hw_wkup.h"
 #include "sys_clock_mgr.h"
 #include "sys_power_mgr.h"
 #include "sys_watchdog.h"
@@ -114,8 +115,18 @@ static void prv_system_init(void *arg)
         prv_mark('p');
         resource_init();
 
-        /* No flow control: stay awake so UART bytes from the host are never lost. */
-        pm_set_sleep_mode(pm_mode_active);
+        /*
+         * Sleep between BLE events. The UART adapter only lets the system sleep
+         * while the host has CTS deasserted (it does when idle), deasserts RTS
+         * first so the host holds off, and wakes on CTS asserted again, as in
+         * the SDK's ble_external_host demo.
+         */
+        hw_wkup_init(NULL);
+#if dg_configBLACK_ORCA_IC_REV == BLACK_ORCA_IC_REV_A
+        hw_wkup_set_counter_threshold(1);
+#endif
+        hw_wkup_register_interrupt(NULL, 1);
+        pm_set_sleep_mode(pm_mode_extended_sleep);
 
         ble_mgr_init();
         prv_mark('b');
