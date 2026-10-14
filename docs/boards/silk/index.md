@@ -132,6 +132,7 @@ STM32 drivers are rewritten against the current APIs, using the old drivers
 | Hardware platform ID (`PebbleSilk`), bundle `hwrev: silk` | done |
 | DMA for display, QSPI, UART RX | todo (polled for now) |
 | Bluetooth (DA14681, H4 over UART, NimBLE host) | done, untested on hardware; needs the Dialog SDK, see below |
+| Heart rate (AS7000 on I2C3, Pebble 2 HR only) | todo: port the old `as7000` driver, but use the ams firmware already in the sensor's flash, since the update image was not released; no SpO2/HRV |
 
 The `silk` board boots in QEMU (`pebble-silk-bb`) through the **stock
 bootloader** to the watchface, with PRF, stock shared PRF storage and MFG
