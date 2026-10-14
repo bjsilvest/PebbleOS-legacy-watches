@@ -13,6 +13,10 @@
 #include <string.h>
 
 #include <pbl/drivers/ambient_light.h>
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#include <pbl/bluetooth/hci_uart.h>
+#include <pbl/drivers/bluetooth/da1468x.h>
+#endif
 #include <pbl/services/blob_db/api.h>
 #include <pbl/services/bluetooth/local_id.h>
 #include <pbl/services/i18n/i18n.h>
@@ -50,6 +54,10 @@
 
 enum {
   SystemInformationItemBtAddress = 0,
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  SystemInformationItemBtRadio,
+  SystemInformationItemBtHci,
+#endif
   SystemInformationItemFirmware,
   SystemInformationItemLanguage,
   SystemInformationItemRecovery,
@@ -126,6 +134,10 @@ typedef struct SystemInformationData {
   char serial_string[MFG_SERIAL_NUMBER_SIZE + 1];
   char hw_version_string[MFG_HW_VERSION_SIZE + 1];
   char uptime_string[16]; // "xxd xxh xxm xxs"
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  char bt_radio_string[32];
+  char bt_hci_string[32];
+#endif
   char const *subtitle_text[SystemInformationItem_Count];
   char language_string[16];
 } SystemInformationData;
@@ -205,6 +217,10 @@ static ConfirmationDialog *prv_settings_confirm(const char *title, const char *t
 
 static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemBtAddress] = i18n_noop("BT Address"),
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  [SystemInformationItemBtRadio] = i18n_noop("BT Radio"),
+  [SystemInformationItemBtHci] = i18n_noop("BT HCI"),
+#endif
   [SystemInformationItemFirmware] = i18n_noop("Firmware"),
   [SystemInformationItemLanguage] = i18n_noop("Language"),
   [SystemInformationItemRecovery] = i18n_noop("Recovery"),
@@ -311,6 +327,12 @@ static void prv_information_window_push(SettingsSystemData *data) {
             i18n_get_version());
 
   info->subtitle_text[SystemInformationItemBtAddress] = info->bt_mac_addr;
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  strncpy(info->bt_radio_string, da1468x_status(), sizeof(info->bt_radio_string) - 1);
+  pbl_bt_hci_uart_copy_status(info->bt_hci_string, sizeof(info->bt_hci_string));
+  info->subtitle_text[SystemInformationItemBtRadio] = info->bt_radio_string;
+  info->subtitle_text[SystemInformationItemBtHci] = info->bt_hci_string;
+#endif
   info->subtitle_text[SystemInformationItemFirmware] =
       (char *)(strlen(TINTIN_METADATA.version_tag) >= 2 ? TINTIN_METADATA.version_tag
                                                         : TINTIN_METADATA.version_short);
