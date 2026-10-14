@@ -30,3 +30,17 @@ const char *da1468x_status(void);
  * @return A static string, empty if none was printed (AD silicon) or no boot got that far.
  */
 const char *da1468x_chip_id(void);
+
+/**
+ * @brief The first bytes the controller sent after its init markers, for diagnostics.
+ *
+ * @return A static hex string, empty if nothing came.
+ */
+const char *da1468x_rx_after_markers(void);
+
+/**
+ * @brief The first bytes the controller sent after the last HCI Reset, if it failed.
+ *
+ * @return A static hex string, empty if nothing came.
+ */
+const char *da1468x_rx_after_reset(void);

@@ -26,6 +26,7 @@
 #include <pbl/kernel/thread.h>
 #include <pbl/logging/logging.h>
 #include <pbl/soc/stm32/sleep.h>
+#include <pbl/util/math.h>
 
 #include <board/board.h>
 #include <kernel/util/delay.h>
@@ -56,7 +57,12 @@ extern const uint8_t da1468x_controller_start[], da1468x_controller_end[];
 #define MARKERS_MS       1000U
 #define MARKER_LAST      'b'
 #define MARKERS_HELLO_MS 300U
-#define MAX_MARKERS      12U
+#define MAX_MARKERS      8U
+// What the controller sends after its markers and in reply to HCI Reset is
+// kept as hex for the status, up to this many bytes.
+#define RX_HEX_BYTES 8U
+#define MAX_RX_AFTER 256U
+#define MAX_PROBE_RX 64U
 
 #define SOH 0x01U
 #define STX 0x02U
@@ -75,6 +81,9 @@ static char s_status[32] = "Not started";
 static char s_chip_id[24];
 static char s_markers[MAX_MARKERS + 1];
 static volatile uint32_t s_rx_framing_errors;
+static uint32_t s_rx_after_count;
+static char s_rx_after_hex[2 * RX_HEX_BYTES + 1];
+static char s_rx_probe_hex[2 * RX_HEX_BYTES + 1];
 
 static void prv_rx_irq_handler(UARTDevice *dev, uint8_t data, const UARTRXErrorFlags *err_flags) {
   // The bootrom drives the lines while probing other interfaces, which can
@@ -227,49 +236,81 @@ static bool prv_stage2_load_controller(void) {
   return true;
 }
 
-// Collect the controller's init markers, to show how far it got.
+static void prv_to_hex(char *out, const uint8_t *data, size_t n) {
+  static const char digits[] = "0123456789abcdef";
+
+  for (size_t i = 0; i < n; i++) {
+    out[2 * i] = digits[data[i] >> 4];
+    out[2 * i + 1] = digits[data[i] & 0xfU];
+  }
+  out[2 * n] = '\0';
+}
+
+// Collect the controller's init markers, to show how far it got, then what it
+// sends once its HCI transport is up.
 static void prv_collect_markers(void) {
+  uint8_t after[RX_HEX_BYTES];
   size_t n = 0;
   uint8_t c;
 
   memset(s_markers, 0, sizeof(s_markers));
   s_rx_framing_errors = 0;
-  uint32_t timeout_ms = MARKERS_MS;
-  while (n < MAX_MARKERS && prv_getc(&c, timeout_ms)) {
+  s_rx_after_count = 0;
+  while (n < MAX_MARKERS && prv_getc(&c, MARKERS_MS)) {
     s_markers[n++] = (c >= 0x20U && c < 0x7fU) ? (char)c : '?';
     if (c == MARKER_LAST) {
-      timeout_ms = MARKERS_HELLO_MS;
+      break;
     }
   }
+
+  while (s_rx_after_count < MAX_RX_AFTER && prv_getc(&c, MARKERS_HELLO_MS)) {
+    if (s_rx_after_count < sizeof(after)) {
+      after[s_rx_after_count] = c;
+    }
+    s_rx_after_count++;
+  }
+  prv_to_hex(s_rx_after_hex, after, MIN(s_rx_after_count, sizeof(after)));
 }
 
 // HCI Reset must complete before the host is let at the controller: a
 // controller that runs but does not speak HCI would otherwise time the host
-// start out, which crashes.
+// start out, which crashes. Other bytes may come before the reply, so look
+// for it in what arrives.
 static bool prv_hci_probe(void) {
   static const uint8_t reset_cmd[] = {0x01, 0x03, 0x0c, 0x00};
   // Command Complete: 04 0e 04 <num_cmds> 03 0c <status>
-  uint8_t evt[7];
+  static const uint8_t reply[] = {0x04, 0x0e, 0x04, 0x00, 0x03, 0x0c, 0x00};
+  uint8_t first[RX_HEX_BYTES];
   size_t n = 0;
 
   for (int attempt = 0; attempt < HCI_PROBE_ATTEMPTS; attempt++) {
-    n = 0;
+    size_t matched = 0;
+    uint8_t c;
 
+    n = 0;
     prv_flush_rx();
     prv_write(reset_cmd, sizeof(reset_cmd));
-    while (n < sizeof(evt) && prv_getc(&evt[n], HCI_PROBE_REPLY_MS)) {
+    while (n < MAX_PROBE_RX && prv_getc(&c, HCI_PROBE_REPLY_MS)) {
+      if (n < sizeof(first)) {
+        first[n] = c;
+      }
       n++;
-    }
-    if (n == sizeof(evt) && evt[0] == 0x04 && evt[1] == 0x0e && evt[2] == 0x04 && evt[4] == 0x03 &&
-        evt[5] == 0x0c && evt[6] == 0x00) {
-      return true;
+      // Byte 3 is the number of commands the controller can take: any value.
+      if (matched == 3 || c == reply[matched]) {
+        matched++;
+      } else {
+        matched = (c == reply[0]) ? 1 : 0;
+      }
+      if (matched == sizeof(reply)) {
+        return true;
+      }
     }
   }
 
   PBL_LOG_ERR("Controller does not answer HCI Reset");
-  // The last reply, to tell silence from a wrong baud rate.
-  sniprintf(s_status, sizeof(s_status), "HCI %uB [%s] f%lu", (unsigned)n, s_markers,
-            (unsigned long)s_rx_framing_errors);
+  prv_to_hex(s_rx_probe_hex, first, MIN(n, sizeof(first)));
+  sniprintf(s_status, sizeof(s_status), "HCI [%s] %lu/%u f%lu", s_markers,
+            (unsigned long)s_rx_after_count, (unsigned)n, (unsigned long)s_rx_framing_errors);
   return false;
 }
 
@@ -341,4 +382,12 @@ const char *da1468x_status(void) {
 
 const char *da1468x_chip_id(void) {
   return s_chip_id;
+}
+
+const char *da1468x_rx_after_markers(void) {
+  return s_rx_after_hex;
+}
+
+const char *da1468x_rx_after_reset(void) {
+  return s_rx_probe_hex;
 }

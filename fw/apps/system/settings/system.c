@@ -58,6 +58,8 @@ enum {
   SystemInformationItemBtRadio,
   SystemInformationItemBtHci,
   SystemInformationItemBtChip,
+  SystemInformationItemBtRxBoot,
+  SystemInformationItemBtRxReset,
 #endif
   SystemInformationItemFirmware,
   SystemInformationItemLanguage,
@@ -222,6 +224,8 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemBtRadio] = i18n_noop("BT Radio"),
   [SystemInformationItemBtHci] = i18n_noop("BT HCI"),
   [SystemInformationItemBtChip] = i18n_noop("BT Chip"),
+  [SystemInformationItemBtRxBoot] = i18n_noop("BT Rx boot"),
+  [SystemInformationItemBtRxReset] = i18n_noop("BT Rx reset"),
 #endif
   [SystemInformationItemFirmware] = i18n_noop("Firmware"),
   [SystemInformationItemLanguage] = i18n_noop("Language"),
@@ -335,6 +339,8 @@ static void prv_information_window_push(SettingsSystemData *data) {
   info->subtitle_text[SystemInformationItemBtRadio] = info->bt_radio_string;
   info->subtitle_text[SystemInformationItemBtHci] = info->bt_hci_string;
   info->subtitle_text[SystemInformationItemBtChip] = da1468x_chip_id();
+  info->subtitle_text[SystemInformationItemBtRxBoot] = da1468x_rx_after_markers();
+  info->subtitle_text[SystemInformationItemBtRxReset] = da1468x_rx_after_reset();
 #endif
   info->subtitle_text[SystemInformationItemFirmware] =
       (char *)(strlen(TINTIN_METADATA.version_tag) >= 2 ? TINTIN_METADATA.version_tag
