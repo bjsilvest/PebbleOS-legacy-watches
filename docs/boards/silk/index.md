@@ -284,7 +284,10 @@ reported (the transport caps it to 27 bytes, the LL PDU size, so the host
 fragments large packets itself), "BT SMP" is the newest SMP opcodes on the link
 (`<` received, `>` sent, the opcode's low hex digit, and for Pairing Failed
 the reason's; a `+` after a sent PDU for each of the next few packets the
-controller completed, `x` for a disconnection; over two rows), "Last reboot" is the last reboot reason code and its first two data words
+controller completed, `x` for a disconnection; over two rows), "BT Rx" is
+`g<non-HCI DGTL packets skipped>/<last GTL message ID> d<bytes dropped> o<UART overruns>`
+(the controller's DGTL also sends its own GTL messages, which the transport
+skips because NimBLE's H4 parser asserts on them), "Last reboot" is the last reboot reason code and its first two data words
 (the LR of an assert or fault), and "BT Chip" is the chip ID the bootrom printed.
 If the controller does not answer HCI Reset, "BT Radio" reads
 `HCI [<markers>] <bytes after markers>/<bytes after reset> f<framing errors>`,
