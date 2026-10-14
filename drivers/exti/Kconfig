@@ -23,6 +23,13 @@ config EXTI_SF32LB
     help
       Support for the SiFli SF32LB external interrupt controller.
 
+config EXTI_STM32
+    bool "ST STM32"
+    default y if SOC_STM32F4
+    select HAL_STM32
+    help
+      Support for the STM32F4 external interrupt controller.
+
 module = DRIVER_EXTI
 module-str = External Interrupt
 source "subsys/logging/Kconfig.template.log_level"

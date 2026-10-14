@@ -19,6 +19,14 @@ config BUTTON_SF32LB
     help
       Support for buttons on SiFli SF32LB GPIOs.
 
+config BUTTON_STM32
+    bool "ST STM32"
+    default y if SOC_STM32F4
+    select HAL_STM32
+    select INPUT
+    help
+      Support for buttons on STM32F4 GPIOs, debounced with TIM4.
+
 config BUTTON_QEMU
     bool "QEMU"
     default y if SOC_QEMU
