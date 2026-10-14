@@ -285,6 +285,11 @@ static bool prv_boot_once(void) {
 }
 
 bool da1468x_boot(void) {
+  // STOP mode stops the USART clocks, and the threads sleep while waiting for
+  // replies. Once the controller runs it can send at any time and its UART
+  // has no flow control, so the block stays.
+  soc_stm32_stop_block();
+
   // The bootrom times out between characters, so a preempted load can fail;
   // retry before giving up.
   for (int attempt = 1; attempt <= BOOT_ATTEMPTS; attempt++) {
@@ -292,13 +297,11 @@ bool da1468x_boot(void) {
     if (prv_boot_once()) {
       PBL_LOG_INFO("DA1468x controller running (attempt %d)", attempt);
       sniprintf(s_status, sizeof(s_status), "Running (try %d)", attempt);
-      // The controller can send at any time and its UART has no flow control,
-      // but STOP mode stops the USART clocks.
-      soc_stm32_stop_block();
       return true;
     }
   }
 
+  soc_stm32_stop_release();
   PBL_LOG_ERR("DA1468x boot failed, Bluetooth disabled");
   return false;
 }
