@@ -80,6 +80,51 @@ static volatile uint32_t s_acl_completed;
 static volatile uint8_t s_last_reply_len;
 static char s_reset_snapshot[32];
 
+// SMP opcodes seen on the link, oldest first: '<' received, '>' sent, then the
+// opcode in hex, and for Pairing Failed its reason.
+#define SMP_TRACE_LEN    20U
+#define L2CAP_CID_SMP    0x0006U
+#define SMP_OP_PAIR_FAIL 0x05U
+
+static char s_smp_trace[SMP_TRACE_LEN + 1];
+
+static void prv_note_smp(char dir, struct os_mbuf *om) {
+  // ACL header (handle + flags, length), L2CAP header (length, CID), opcode, reason
+  uint8_t hdr[10];
+
+  if (os_mbuf_copydata(om, 0, 9, hdr) != 0) {
+    return;
+  }
+  // Only the first fragment of an L2CAP PDU carries its header.
+  if (((hdr[1] >> 4) & 0x3U) == 0x1U) {
+    return;
+  }
+  if ((hdr[6] | (hdr[7] << 8)) != L2CAP_CID_SMP) {
+    return;
+  }
+
+  char entry[4] = {dir, "0123456789abcdef"[hdr[8] & 0xfU], '\0', '\0'};
+  if (hdr[8] == SMP_OP_PAIR_FAIL && os_mbuf_copydata(om, 9, 1, &hdr[9]) == 0) {
+    entry[2] = "0123456789abcdef"[hdr[9] & 0xfU];
+  }
+
+  pbl_irq_lock();
+  size_t len = strlen(s_smp_trace);
+  const size_t add = strlen(entry);
+  if (len + add > SMP_TRACE_LEN) {
+    // Keep the newest entries.
+    const size_t drop = len + add - SMP_TRACE_LEN;
+    memmove(s_smp_trace, &s_smp_trace[drop], len - drop + 1U);
+    len -= drop;
+  }
+  memcpy(&s_smp_trace[len], entry, add + 1U);
+  pbl_irq_unlock();
+}
+
+const char *pbl_bt_hci_uart_smp_trace(void) {
+  return s_smp_trace;
+}
+
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
 // The DA1468x controller reports more completed ACL packets than were sent
 // (seen during pairing), which NimBLE takes as a broken controller and resets
@@ -234,6 +279,7 @@ static int prv_hci_frame_cb(uint8_t pkt_type, void *data) {
       prv_note_evt(data);
       return ble_transport_to_hs_evt(data);
     case HCI_H4_ACL:
+      prv_note_smp('<', data);
       return ble_transport_to_hs_acl(data);
     default:
       WTF;
@@ -321,6 +367,7 @@ static void prv_write(const uint8_t *data, size_t len) {
 static void prv_write_mbuf(uint8_t type, struct os_mbuf *om) {
   if (type == HCI_H4_ACL) {
     s_acl_tx++;
+    prv_note_smp('>', om);
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
     if (om->om_len >= 2U) {
       prv_acl_track_sent((om->om_data[0] | (om->om_data[1] << 8)) & 0x0fffU);

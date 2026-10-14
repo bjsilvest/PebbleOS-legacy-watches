@@ -53,3 +53,13 @@ const char *pbl_bt_hci_uart_reset_snapshot(void);
  *        than were outstanding, and the count was clamped (DA1468x only).
  */
 uint32_t pbl_bt_hci_uart_acl_clamped(void);
+
+/**
+ * @brief The SMP opcodes seen on the link, for diagnosing pairing.
+ *
+ * Newest last: '<' received or '>' sent, the opcode's low hex digit, and for
+ * Pairing Failed (5) its reason's low hex digit.
+ *
+ * @return A static string.
+ */
+const char *pbl_bt_hci_uart_smp_trace(void);
