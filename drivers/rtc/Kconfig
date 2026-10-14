@@ -24,6 +24,13 @@ config RTC_SF32LB
     help
       Support for the SiFli SF32LB RTC.
 
+config RTC_STM32
+    bool "ST STM32"
+    default y if SOC_STM32F4
+    select HAL_STM32
+    help
+      Support for the STM32F4 RTC.
+
 config RTC_QEMU
     bool "QEMU RTC"
     default y if SOC_QEMU
