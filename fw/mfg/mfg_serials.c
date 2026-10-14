@@ -7,11 +7,20 @@
 
 #include <pbl/util/size.h>
 
+#ifdef CONFIG_BOARD_SILK
+static const uint8_t OTP_SERIAL_SLOT_INDICES[] = {OTP_SERIAL1, OTP_SERIAL2, OTP_SERIAL3,
+                                                  OTP_SERIAL4, OTP_SERIAL5};
+static const uint8_t OTP_PCBA_SLOT_INDICES[] = {OTP_PCBA_SERIAL1, OTP_PCBA_SERIAL2,
+                                                OTP_PCBA_SERIAL3};
+static const uint8_t OTP_HWVER_SLOT_INDICES[] = {OTP_HWVER1, OTP_HWVER2, OTP_HWVER3, OTP_HWVER4,
+                                                 OTP_HWVER5};
+#else
 static const uint8_t OTP_SERIAL_SLOT_INDICES[] = {
   OTP_SERIAL,
 };
 static const uint8_t OTP_PCBA_SLOT_INDICES[] = {OTP_PCBA_SERIAL};
 static const uint8_t OTP_HWVER_SLOT_INDICES[] = {OTP_HWVER};
+#endif
 
 static const char DUMMY_SERIAL[MFG_SERIAL_NUMBER_SIZE + 1] = "XXXXXXXXXXXX";
 // FIXME: shouldn't the dummy HWVER be 9 X's?

@@ -19,7 +19,29 @@
  * @{
  */
 
-#if defined(CONFIG_BOARD_ASTERIX) || defined(CONFIG_BOARD_OBELIX) ||         \
+#ifdef CONFIG_BOARD_SILK
+/** @brief OTP slot indexes. The stock factory flow could write each value
+ *  several times; the most recent locked slot wins. */
+enum {
+  OTP_HWVER1 = 0,
+  OTP_HWVER2 = 1,
+  OTP_HWVER3 = 2,
+  OTP_HWVER4 = 3,
+  OTP_HWVER5 = 4,
+
+  OTP_SERIAL1 = 5,
+  OTP_SERIAL2 = 6,
+  OTP_SERIAL3 = 7,
+  OTP_SERIAL4 = 8,
+  OTP_SERIAL5 = 9,
+
+  OTP_PCBA_SERIAL1 = 10,
+  OTP_PCBA_SERIAL2 = 11,
+  OTP_PCBA_SERIAL3 = 12,
+
+  NUM_OTP_SLOTS = 16,
+};
+#elif defined(CONFIG_BOARD_ASTERIX) || defined(CONFIG_BOARD_OBELIX) ||         \
     defined(CONFIG_BOARD_GETAFIX) || defined(CONFIG_BOARD_QEMU_EMERY) ||     \
     defined(CONFIG_BOARD_QEMU_FLINT) || defined(CONFIG_BOARD_QEMU_GABBRO) || \
     defined(CONFIG_BOARD_NATIVE_EMERY)
