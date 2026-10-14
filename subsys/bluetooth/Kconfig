@@ -74,6 +74,14 @@ config BT_ID_ADDR_SF32LB52_EFUSE
     help
       Public address derived from the unique ID in the SoC's eFUSE.
 
+config BT_ID_ADDR_SERIAL
+    bool "Random static address from the serial number"
+    select BT_ID_ADDR
+    help
+      Derive a random static address from the watch's serial number on every
+      boot, as the legacy DA14681 firmware did. It needs no storage, so it
+      never changes, and matches the address the legacy firmware used.
+
 config BT_ID_ADDR_STORAGE
     bool "Stored random static address"
     depends on SERVICE_SHARED_PRF_STORAGE

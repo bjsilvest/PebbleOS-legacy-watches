@@ -11,7 +11,8 @@ config QEMU_MACHINE
 config RESOURCES_BOARD
     default "qemu_silk"
 
-# The DA14681 controller only has the SDK's placeholder public address.
+# The DA14681 controller only has the SDK's placeholder public address. Derive
+# a random static one from the serial number like the legacy firmware.
 choice BT_ID_ADDR_SOURCE
-    default BT_ID_ADDR_STORAGE
+    default BT_ID_ADDR_SERIAL
 endchoice
