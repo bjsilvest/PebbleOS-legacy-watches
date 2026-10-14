@@ -15,6 +15,7 @@
 #include "sys_power_mgr.h"
 #include "sys_watchdog.h"
 #include "ble_mgr.h"
+#include "ad_uart.h"
 #include "dgtl.h"
 #include "dgtl_msg.h"
 #include "dgtl_pkt.h"
@@ -69,6 +70,33 @@ static void prv_periph_init(void)
                                  HW_GPIO_FUNC_UART2_RTSN);
         hw_gpio_set_pin_function(HW_GPIO_PORT_0, HW_GPIO_PIN_1, HW_GPIO_MODE_INPUT,
                                  HW_GPIO_FUNC_UART2_CTSN);
+        /* Wake line to the host (PA10), high while data for it is pending. */
+        hw_gpio_configure_pin(HW_GPIO_PORT_0, HW_GPIO_PIN_4, HW_GPIO_MODE_OUTPUT,
+                              HW_GPIO_FUNC_GPIO, false);
+}
+
+/*
+ * The host may deassert CTS and enter STOP mode when idle. Raise the wake line
+ * for as long as a write to it is in progress, so it wakes and reasserts CTS.
+ * The DGTL writes one packet at a time. Linked with --wrap.
+ */
+void __real_ad_uart_write_async(uart_device dev, const char *wbuf, size_t wlen,
+                                ad_uart_user_cb cb, void *user_data);
+
+static ad_uart_user_cb s_write_cb;
+
+static void prv_write_done(void *user_data, uint16_t transferred)
+{
+        hw_gpio_set_inactive(HW_GPIO_PORT_0, HW_GPIO_PIN_4);
+        s_write_cb(user_data, transferred);
+}
+
+void __wrap_ad_uart_write_async(uart_device dev, const char *wbuf, size_t wlen,
+                                ad_uart_user_cb cb, void *user_data)
+{
+        s_write_cb = cb;
+        hw_gpio_set_active(HW_GPIO_PORT_0, HW_GPIO_PIN_4);
+        __real_ad_uart_write_async(dev, wbuf, wlen, prv_write_done, user_data);
 }
 
 static void prv_system_init(void *arg)

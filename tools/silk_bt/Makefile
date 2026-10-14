@@ -62,6 +62,7 @@ $(OUT)/obj/main.c.o: main.c $(CONFIG_H) config/platform_devices.h
 
 $(OUT)/silk_bt.elf: $(OBJS) $(LDSCRIPTS)
 	$(CC) $(CPUFLAGS) -Wl,--gc-sections --specs=nano.specs --specs=nosys.specs \
+	  -Wl,--wrap=ad_uart_write_async \
 	  -L$(OUT) -L$(SDK)/sdk/bsp/misc -L$(SDK)/sdk/interfaces/ble_stack/DA14681-01-Release \
 	  -T$(OUT)/mem.ld -T$(OUT)/sections.ld -Wl,-Map,$(OUT)/silk_bt.map \
 	  -o $@ $(OBJS) -lble_stack_da14681_01
