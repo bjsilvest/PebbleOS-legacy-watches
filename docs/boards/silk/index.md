@@ -276,7 +276,8 @@ the boot step (for example `Bootrom: none (0 ch)` or `Running (try 1)`),
 "BT HCI" is `<last command>><last answered command>:<status> #<events>`
 with HCI opcodes in hex, and "BT Chip" is the chip ID the bootrom printed.
 If the controller does not answer HCI Reset, "BT Radio" reads
-`HCI <bytes>B <first byte> [<markers>] f<framing errors>`: the controller
+`HCI [<markers>] <bytes after markers>/<bytes after reset> f<framing errors>`,
+and "BT Rx boot" and "BT Rx reset" show the first of those bytes in hex: the controller
 image sends `m` (main), `c` (clocks), `p` (power manager) and `b` (BLE
 manager) before its HCI transport starts, then the vendor event
 `04 ff 01 'H'` through it (shown as `???H`).
