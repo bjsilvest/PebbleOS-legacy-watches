@@ -33,6 +33,8 @@ static PBL_MUTEX_DEFINE(s_mag_mutex);
 static bool s_initialized;
 static bool s_present;
 static int s_use_refcount;
+//! Watch worn rotated by 180 degrees: X and Y flip.
+static bool s_rotated_180;
 
 static bool prv_read(uint8_t reg, uint8_t len, uint8_t *data) {
   pbl_i2c_use(I2C_MAG3110);
@@ -159,13 +161,18 @@ MagReadStatus mag_read_data(MagData *data) {
     rv = MagReadClobbered;
   }
 
-  data->x = prv_align_axis(0, &raw_data[1]);
-  data->y = prv_align_axis(1, &raw_data[1]);
+  const int rotate = s_rotated_180 ? -1 : 1;
+  data->x = rotate * prv_align_axis(0, &raw_data[1]);
+  data->y = rotate * prv_align_axis(1, &raw_data[1]);
   data->z = prv_align_axis(2, &raw_data[1]);
 
 done:
   pbl_mutex_unlock(&s_mag_mutex);
   return rv;
+}
+
+void mag_set_rotated(bool rotated) {
+  s_rotated_180 = rotated;
 }
 
 bool mag_change_sample_rate(MagSampleRate rate) {
