@@ -1,13 +1,14 @@
 # Snowy (Pebble Time)
 
-Planned port of PebbleOS to the Pebble Time (`snowy_dvt`) and Pebble Time
-Steel (`snowy_s3`, codename "bobby"). The stock board file says all snowy
+Port of PebbleOS to the Pebble Time (`snowy_dvt`, board `snowy`). The Pebble
+Time Steel (`snowy_s3`, codename "bobby") is not targeted yet. The stock board file says all snowy
 boards are electrically identical apart from minor quirks. The hardware is an
 STM32F439 main MCU, a TI CC2564B Bluetooth controller, a MAX14690 PMIC, 16 MiB
 of parallel NOR flash, and a 144×168 64-color display driven through an
 iCE40LP FPGA. The port runs the `basalt` platform.
 
-This page is an inventory for planning. Nothing here has been ported yet.
+Status: boots in QEMU through the stock bootloader to the watchface. Not
+yet run on hardware, and no Bluetooth.
 
 ## Sources
 
@@ -103,23 +104,48 @@ curve, and platform ID `PebbleBobbyDVT` (`PebbleSnowyDVT` for the Time).
 
 ## Port status
 
-| Area | Status | Starting point |
-|---|---|---|
-| SoC (STM32F439: clocks, FMC, IRQs, idle/STOP) | todo | silk's `soc/stm32/stm32f4`; F439 clock tree and FMC are new |
-| GPIO, EXTI, RTC, IWDG, UART, buttons, I2C, PWM, ADC, temperature | todo | silk drivers, re-pinned |
-| S29VS NOR flash (FMC) + flash guard | todo | Core `drivers/flash/spansion_s29vs.c` |
-| iCE40LP display + FPGA bitstream | todo | Core `drivers/display/ice40lp/`, `Snowy_LP1K_framebuffer.fpga` |
-| MAX14690 PMIC, battery | todo | Core `drivers/pmic/max14690_pmic.c` |
-| BMI160 accel, MAG3110 compass | todo | Core `drivers/imu/` |
-| Vibe, backlight, ALS | todo | silk's PWM/ADC drivers |
-| Mic (I2S, not DFSDM) | todo | Core `drivers/mic/stm32/pdm.c` |
-| Factory data (read-only) | todo | Core `fw/mfg/snowy/mfg_info.c`, setters disabled |
-| Bluetooth (CC2564B, NimBLE over H4) | todo | pebble-dev `cc2564.c` + silk's `hci_uart` transport |
-| Resources (512 KiB banks) | todo | silk's emoji subset |
+| Area | Status |
+|---|---|
+| Platform `basalt` (8-bit color 144x168, basalt + aplite apps) | done |
+| SoC: STM32F439 IRQs, 192K SRAM + 64K CCM, 96 MHz (4 WS), STOP | done; STOP untested |
+| GPIO (ports A-H), EXTI, RTC (LSE bypass), IWDG, debug UART (USART3), buttons | done |
+| S29VS NOR (FMC), flash guard, PRF hardware lock | done (polled) |
+| iCE40LP display (SPI6, FPGA bitstream, MCO1 32 kHz) | done (polled; DMA todo) |
+| MAX14690 PMIC: charger, LDO2/LDO3, battery and Vsys via MON | done, untested on hardware |
+| BMI160 accel (SPI1) | done, untested on hardware |
+| Vibe (TIM10 H-bridge, PF4 enable), backlight (TIM12), ALS | done, untested on hardware |
+| I2S PDM mic (SPI2, DMA1 stream 3, OpenPDMFilter) | done, untested on hardware |
+| Factory data (stock OTP slots and MFG struct, read-only) | done |
+| MAG3110 compass | todo |
+| Bluetooth (CC2564B, NimBLE over H4) | todo |
+| Resources: silk's plus color-only ones, 105 color emoji | done (513,755 of 524,288 bytes) |
 
-The SDK QEMU has a `pebble-snowy-bb` machine (the basalt emulator). It is
-the planned target for the hardware port, like `pebble-silk-bb` was for silk.
-How much of the flash and display it emulates is not checked yet.
+QEMU emulates neither the PMIC nor the BMI160 (both log that and carry on),
+nor the IWDG.
+
+### Building and QEMU
+
+```shell
+pbl configure -b build-snowy --board snowy
+pbl build -b build-snowy
+python3 tools/qemu_silk_canary.py --board snowy --build-dir build-snowy \
+    --machine pebble-snowy-bb --qemu $PEBBLEOS_SDK_ROOT/qemu/bin/qemu-pebble
+```
+
+The canary boots through the **stock snowy bootloader** (from git history)
+with PRF, stock shared PRF storage and MFG info filled with random data, and
+fails if any of them change. With that MFG data the bootloader finds no boot
+FPGA bitstream and falls back to the FPGA's NVCM, as expected.
+
+### RAM
+
+The F439 has only 192K of contiguous SRAM. Basalt apps take 96K and the
+worker 12K, which leaves 84K for the kernel. Like stock, the kernel stacks
+and heap live in the 64K CCM (`CONFIG_CCM_SIZE`), which DMA cannot reach.
+NimBLE's pools (not its UART DMA buffer), the task timer pool and the BLE
+host stack are also placed there (`.ccm_bss`). The kernel heap is about
+29K, against about 56K on silk: watch for heap exhaustion. Candidates to
+win RAM back include NimBLE's unused ISO buffer pool.
 
 ## Bluetooth plan
 
