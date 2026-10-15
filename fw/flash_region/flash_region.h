@@ -7,6 +7,8 @@
 
 #ifdef CONFIG_FLASH_LAYOUT_SILK
 #include "flash_region_mx25u.h"
+#elifdef CONFIG_FLASH_LAYOUT_SNOWY
+#include "flash_region_s29vs.h"
 #elif defined(CONFIG_FLASH_QEMU) || defined(CONFIG_FLASH_POSIX)
 #include "flash_region_qemu.h"
 #elifdef CONFIG_FLASH_GD25LQ255E

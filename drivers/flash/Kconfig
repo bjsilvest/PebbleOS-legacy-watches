@@ -25,6 +25,13 @@ config FLASH_MX25U
       Support for the Macronix MX25U64 NOR flash on the STM32F412
       QUADSPI, as found on the Pebble 2 (silk).
 
+config FLASH_S29VS
+    bool "Spansion S29VS (FMC)"
+    depends on HAL_STM32_STM32F439
+    help
+      Support for the Spansion S29VS parallel NOR flash on the STM32F439
+      FMC, as found on the Pebble Time (snowy).
+
 config FLASH_QEMU
     bool "QEMU External Flash"
     default y if SOC_QEMU
@@ -43,6 +50,14 @@ config FLASH_LAYOUT_SILK
     help
       Use the stock Pebble 2 external flash layout, keeping the stock
       bootloader's PRF, shared PRF storage and MFG info where they are.
+
+config FLASH_LAYOUT_SNOWY
+    bool "Pebble Time (snowy) stock flash layout"
+    select FLASH_GUARD
+    help
+      Use the stock Pebble Time external flash layout, keeping the stock
+      bootloader's PRF, shared PRF storage and MFG info (with the boot FPGA
+      bitstream) where they are.
 
 config FLASH_GUARD
     bool "Guard regions the firmware does not own"
