@@ -41,9 +41,13 @@ static void prv_enter_stop(void) {
   RCC->APB1ENR |= RCC_APB1ENR_PWREN;
 
   // Low-power regulator in STOP (plus low voltage, on the F412), not standby.
+  // On the F439 the same bit is LPUDS (under-drive), which stays clear.
   uint32_t cr = PWR->CR;
   cr &= ~PWR_CR_PDDS;
-  cr |= PWR_CR_LPDS | PWR_CR_LPLVDS;
+  cr |= PWR_CR_LPDS;
+#if defined(CONFIG_HAL_STM32_STM32F412)
+  cr |= PWR_CR_LPLVDS;
+#endif
   PWR->CR = cr;
 
   SCB->SCR |= SCB_SCR_SLEEPDEEP_Msk;
@@ -59,6 +63,11 @@ static void prv_enter_stop(void) {
   RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW) | RCC_CFGR_SW_PLL;
   while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL) {
   }
+#if defined(CONFIG_HAL_STM32_STM32F439)
+  RCC->CR |= RCC_CR_PLLI2SON;
+  while ((RCC->CR & RCC_CR_PLLI2SRDY) == 0) {
+  }
+#endif
 
   flash_power_up_after_stop_mode();
 }

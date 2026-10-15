@@ -1,0 +1,86 @@
+/* SPDX-FileCopyrightText: 2026 Brian Silvestri */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+//! STM32F412xG IRQ lines, from its CMSIS IRQn_Type.
+
+#pragma once
+
+#define PBL_SOC_IRQN_WWDG               0
+#define PBL_SOC_IRQN_PVD                1
+#define PBL_SOC_IRQN_TAMP_STAMP         2
+#define PBL_SOC_IRQN_RTC_WKUP           3
+#define PBL_SOC_IRQN_FLASH              4
+#define PBL_SOC_IRQN_RCC                5
+#define PBL_SOC_IRQN_EXTI0              6
+#define PBL_SOC_IRQN_EXTI1              7
+#define PBL_SOC_IRQN_EXTI2              8
+#define PBL_SOC_IRQN_EXTI3              9
+#define PBL_SOC_IRQN_EXTI4              10
+#define PBL_SOC_IRQN_DMA1_Stream0       11
+#define PBL_SOC_IRQN_DMA1_Stream1       12
+#define PBL_SOC_IRQN_DMA1_Stream2       13
+#define PBL_SOC_IRQN_DMA1_Stream3       14
+#define PBL_SOC_IRQN_DMA1_Stream4       15
+#define PBL_SOC_IRQN_DMA1_Stream5       16
+#define PBL_SOC_IRQN_DMA1_Stream6       17
+#define PBL_SOC_IRQN_ADC                18
+#define PBL_SOC_IRQN_CAN1_TX            19
+#define PBL_SOC_IRQN_CAN1_RX0           20
+#define PBL_SOC_IRQN_CAN1_RX1           21
+#define PBL_SOC_IRQN_CAN1_SCE           22
+#define PBL_SOC_IRQN_EXTI9_5            23
+#define PBL_SOC_IRQN_TIM1_BRK_TIM9      24
+#define PBL_SOC_IRQN_TIM1_UP_TIM10      25
+#define PBL_SOC_IRQN_TIM1_TRG_COM_TIM11 26
+#define PBL_SOC_IRQN_TIM1_CC            27
+#define PBL_SOC_IRQN_TIM2               28
+#define PBL_SOC_IRQN_TIM3               29
+#define PBL_SOC_IRQN_TIM4               30
+#define PBL_SOC_IRQN_I2C1_EV            31
+#define PBL_SOC_IRQN_I2C1_ER            32
+#define PBL_SOC_IRQN_I2C2_EV            33
+#define PBL_SOC_IRQN_I2C2_ER            34
+#define PBL_SOC_IRQN_SPI1               35
+#define PBL_SOC_IRQN_SPI2               36
+#define PBL_SOC_IRQN_USART1             37
+#define PBL_SOC_IRQN_USART2             38
+#define PBL_SOC_IRQN_USART3             39
+#define PBL_SOC_IRQN_EXTI15_10          40
+#define PBL_SOC_IRQN_RTC_Alarm          41
+#define PBL_SOC_IRQN_OTG_FS_WKUP        42
+#define PBL_SOC_IRQN_TIM8_BRK_TIM12     43
+#define PBL_SOC_IRQN_TIM8_UP_TIM13      44
+#define PBL_SOC_IRQN_TIM8_TRG_COM_TIM14 45
+#define PBL_SOC_IRQN_TIM8_CC            46
+#define PBL_SOC_IRQN_DMA1_Stream7       47
+#define PBL_SOC_IRQN_FSMC               48
+#define PBL_SOC_IRQN_SDIO               49
+#define PBL_SOC_IRQN_TIM5               50
+#define PBL_SOC_IRQN_SPI3               51
+#define PBL_SOC_IRQN_TIM6               54
+#define PBL_SOC_IRQN_TIM7               55
+#define PBL_SOC_IRQN_DMA2_Stream0       56
+#define PBL_SOC_IRQN_DMA2_Stream1       57
+#define PBL_SOC_IRQN_DMA2_Stream2       58
+#define PBL_SOC_IRQN_DMA2_Stream3       59
+#define PBL_SOC_IRQN_DMA2_Stream4       60
+#define PBL_SOC_IRQN_DFSDM1_FLT0        61
+#define PBL_SOC_IRQN_DFSDM1_FLT1        62
+#define PBL_SOC_IRQN_CAN2_TX            63
+#define PBL_SOC_IRQN_CAN2_RX0           64
+#define PBL_SOC_IRQN_CAN2_RX1           65
+#define PBL_SOC_IRQN_CAN2_SCE           66
+#define PBL_SOC_IRQN_OTG_FS             67
+#define PBL_SOC_IRQN_DMA2_Stream5       68
+#define PBL_SOC_IRQN_DMA2_Stream6       69
+#define PBL_SOC_IRQN_DMA2_Stream7       70
+#define PBL_SOC_IRQN_USART6             71
+#define PBL_SOC_IRQN_I2C3_EV            72
+#define PBL_SOC_IRQN_I2C3_ER            73
+#define PBL_SOC_IRQN_RNG                80
+#define PBL_SOC_IRQN_FPU                81
+#define PBL_SOC_IRQN_SPI4               84
+#define PBL_SOC_IRQN_SPI5               85
+#define PBL_SOC_IRQN_QUADSPI            92
+#define PBL_SOC_IRQN_FMPI2C1_EV         95
+#define PBL_SOC_IRQN_FMPI2C1_ER         96
