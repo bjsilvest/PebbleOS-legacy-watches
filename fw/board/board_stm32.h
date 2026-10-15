@@ -133,11 +133,15 @@ typedef struct {
   const struct pbl_gpio on_ctrl;
 } BoardConfigSharpDisplay;
 
+struct pbl_dma_stm32_stream;
+
 //! Display driven through an iCE40LP framebuffer FPGA on a write-only SPI.
 typedef struct {
   SPI_TypeDef *spi;
   uint32_t spi_rcc; ///< RCC_APB2Periph_SPIx
   uint8_t spi_af;   ///< GPIO_AF_SPIx
+  //! SPI TX DMA stream
+  const struct pbl_dma_stm32_stream *tx_dma;
 
   const struct pbl_gpio sclk;
   const struct pbl_gpio mosi;

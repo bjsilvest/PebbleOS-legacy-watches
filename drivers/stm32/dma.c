@@ -64,6 +64,41 @@ void pbl_dma_stm32_start_circular_u16(const struct pbl_dma_stm32_stream *dma,
   prv_start_circular(dma, periph_addr, buffer, size_bytes, 2, priority, cb, context);
 }
 
+void pbl_dma_stm32_start_tx(const struct pbl_dma_stm32_stream *dma, volatile void *periph_addr,
+                            const void *buffer, uint32_t size_bytes, uint32_t priority,
+                            PblDmaStm32Callback cb, void *context) {
+  dma->state->cb = cb;
+  dma->state->context = context;
+
+  RCC_AHB1PeriphClockCmd(dma->rcc, ENABLE);
+
+  DMA_Cmd(dma->stream, DISABLE);
+  while (DMA_GetCmdStatus(dma->stream) != DISABLE) {
+  }
+  DMA_DeInit(dma->stream);
+
+  DMA_InitTypeDef init;
+  DMA_StructInit(&init);
+  init.DMA_Channel = dma->channel;
+  init.DMA_PeripheralBaseAddr = (uint32_t)(uintptr_t)periph_addr;
+  init.DMA_Memory0BaseAddr = (uint32_t)(uintptr_t)buffer;
+  init.DMA_DIR = DMA_DIR_MemoryToPeripheral;
+  init.DMA_BufferSize = size_bytes;
+  init.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+  init.DMA_MemoryInc = DMA_MemoryInc_Enable;
+  init.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;
+  init.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte;
+  init.DMA_Mode = DMA_Mode_Normal;
+  init.DMA_Priority = priority;
+  init.DMA_FIFOMode = DMA_FIFOMode_Disable;
+  DMA_Init(dma->stream, &init);
+
+  DMA_ClearITPendingBit(dma->stream, dma->it_ht | dma->it_tc);
+  DMA_ITConfig(dma->stream, DMA_IT_TC, ENABLE);
+  pbl_irq_enable(dma->irqn);
+  DMA_Cmd(dma->stream, ENABLE);
+}
+
 uint32_t pbl_dma_stm32_remaining(const struct pbl_dma_stm32_stream *dma) {
   return DMA_GetCurrDataCounter(dma->stream);
 }

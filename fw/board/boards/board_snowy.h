@@ -104,10 +104,13 @@ static const BacklightPwmConfig BACKLIGHT_PWM = {
 static const struct pbl_gpio BOARD_MAG_INT = PBL_GPIO(STM32_GPIOF, 14, 0);
 extern const struct pbl_i2c_dev *const I2C_MAG3110;
 
+extern const struct pbl_dma_stm32_stream ICE40LP_TX_DMA;
+
 static const BoardConfigIce40Display BOARD_CONFIG_DISPLAY = {
   .spi = SPI6,
   .spi_rcc = RCC_APB2Periph_SPI6,
   .spi_af = GPIO_AF_SPI6,
+  .tx_dma = &ICE40LP_TX_DMA,
   .sclk = PBL_GPIO(STM32_GPIOG, 13, 0),
   .mosi = PBL_GPIO(STM32_GPIOG, 14, 0),
   .scs = PBL_GPIO(STM32_GPIOG, 8, PBL_GPIO_ACTIVE_LOW),

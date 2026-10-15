@@ -50,6 +50,23 @@ UARTDevice *const BT_HCI_UART = &BT_HCI_UART_DEVICE;
 PBL_IRQ_CONNECT(USART1, 12, uart_irq_handler, BT_HCI_UART, 0);
 #endif
 
+// Display: SPI6_TX on DMA2 stream 5, channel 1
+///////////////////////////////////////////////////////////////////////////////
+
+static struct pbl_dma_stm32_state s_ice40lp_tx_dma_state;
+const struct pbl_dma_stm32_stream ICE40LP_TX_DMA = {
+  .state = &s_ice40lp_tx_dma_state,
+  .stream = DMA2_Stream5,
+  .channel = DMA_Channel_1,
+  .rcc = RCC_AHB1Periph_DMA2,
+  .it_ht = DMA_IT_HTIF5,
+  .it_tc = DMA_IT_TCIF5,
+  .irqn = PBL_IRQN(DMA2_Stream5),
+};
+// Same priority as the EXTI handlers, so the DMA handler cannot preempt the
+// BUSY one.
+PBL_IRQ_CONNECT(DMA2_Stream5, 14, pbl_dma_stm32_irq_handler, &ICE40LP_TX_DMA, 0);
+
 // I2C1: PMIC and compass
 ///////////////////////////////////////////////////////////////////////////////
 

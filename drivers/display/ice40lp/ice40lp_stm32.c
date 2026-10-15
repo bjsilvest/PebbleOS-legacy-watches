@@ -6,8 +6,11 @@
 //!
 //! The FPGA is programmed with its bitstream at init, then takes frames: SCS
 //! low, CMD_FRAME_BEGIN, then one line per panel column. BUSY is high while
-//! the FPGA cannot take more data. Transfers are polled for now; completion
-//! is still reported through a kernel event, as with a DMA transfer.
+//! the FPGA cannot take more data. Lines go out by DMA from two line buffers:
+//! when one is done the next starts, from the DMA interrupt or, if BUSY is
+//! high, from BUSY's falling edge, and the line after it is prepared in the
+//! buffer just freed. STOP mode is blocked during a frame. The boot frame,
+//! sent before the kernel runs, is polled.
 //!
 //! Nothing here asserts on a misbehaving FPGA: a crash loop before the
 //! firmware is marked stable ends in the stock bootloader starting PRF.
@@ -16,8 +19,13 @@
 #include <string.h>
 
 #include <pbl/drivers/display/display.h>
+#include <pbl/drivers/dma/stm32.h>
+#include <pbl/drivers/exti.h>
 #include <pbl/drivers/gpio/stm32.h>
+#include <pbl/drivers/rtc.h>
+#include <pbl/kernel/irq.h>
 #include <pbl/logging/logging.h>
+#include <pbl/soc/stm32/sleep.h>
 
 #include <board/board.h>
 #include <kernel/events.h>
@@ -33,6 +41,8 @@
 
 //! A full frame should take no longer than 33 ms.
 #define BUSY_TIMEOUT_US 40000
+//! Give up on a DMA frame that has not finished by then.
+#define FRAME_TIMEOUT_MS 200U
 //! Typical NVCM configuration time is 56 ms.
 #define CDONE_TIMEOUT_US 100000
 
@@ -40,9 +50,19 @@ extern const uint8_t ice40lp_bitstream_start[];
 extern const uint8_t ice40lp_bitstream_end[];
 
 static uint8_t s_line[DISP_PIXELS];
-static bool s_updating;
+static volatile bool s_updating;
 static bool s_programmed;
 static UpdateCompleteCallback s_uccb;
+
+// DMA frame state. Line n is prepared in s_lines[n & 1].
+static uint8_t s_lines[2][DISP_PIXELS];
+static const uint8_t *s_fb;
+static volatile int s_sent;
+static volatile bool s_frame_active;
+static volatile bool s_waiting_busy;
+static RtcTicks s_frame_start;
+
+static void prv_busy_isr(void);
 
 static uint16_t prv_baud_prescaler(uint32_t hz) {
   RCC_ClocksTypeDef clocks;
@@ -176,6 +196,8 @@ void display_init(void) {
   pbl_gpio_configure(&cfg->rail_6v6, PBL_GPIO_OUTPUT_INACTIVE);
   pbl_gpio_configure(&cfg->rail_4v5, PBL_GPIO_OUTPUT_INACTIVE);
 
+  exti_configure_pin(pbl_exti_stm32_config(&cfg->busy), ExtiTrigger_Falling, prv_busy_isr);
+
   s_programmed = prv_program();
   prv_power_enable();
 }
@@ -215,6 +237,107 @@ static void prv_send_frame(const uint8_t *fb) {
   pbl_gpio_set(scs, false);
 }
 
+static void prv_terminate_transfer(void *data);
+
+static void prv_post_terminate(void) {
+  PebbleEvent e = {
+    .type = PEBBLE_CALLBACK_EVENT,
+    .callback = {
+      .callback = prv_terminate_transfer,
+    },
+  };
+  event_put_isr(&e);
+}
+
+//! With interrupts locked or from an interrupt.
+static void prv_end_frame(void) {
+  const BoardConfigIce40Display *cfg = &BOARD_CONFIG_DISPLAY;
+
+  exti_disable(pbl_exti_stm32_config(&cfg->busy));
+  s_waiting_busy = false;
+  // The last byte may still be shifting out.
+  while (!(cfg->spi->SR & SPI_SR_TXE)) {
+  }
+  while (cfg->spi->SR & SPI_SR_BSY) {
+  }
+  SPI_I2S_DMACmd(cfg->spi, SPI_I2S_DMAReq_Tx, DISABLE);
+  pbl_gpio_set(&cfg->scs, false);
+  s_frame_active = false;
+  soc_stm32_stop_release();
+}
+
+static void prv_dma_done(void *context, bool is_complete);
+
+//! Start line s_sent and prepare the one after it.
+static void prv_send_next_line(void) {
+  const int line = s_sent;
+  s_sent = line + 1;
+  pbl_dma_stm32_start_tx(BOARD_CONFIG_DISPLAY.tx_dma, &BOARD_CONFIG_DISPLAY.spi->DR,
+                         s_lines[line & 1], DISP_PIXELS, DMA_Priority_VeryHigh, prv_dma_done,
+                         nullptr);
+  if (s_sent < DISP_LINES) {
+    prv_get_line(s_fb, s_sent, s_lines[s_sent & 1]);
+  }
+}
+
+static void prv_busy_isr(void) {
+  if (!s_waiting_busy) {
+    return;
+  }
+  s_waiting_busy = false;
+  exti_disable(pbl_exti_stm32_config(&BOARD_CONFIG_DISPLAY.busy));
+  prv_send_next_line();
+}
+
+static void prv_dma_done(void *context, bool is_complete) {
+  if (!s_frame_active) {
+    return;
+  }
+  if (s_sent >= DISP_LINES) {
+    prv_end_frame();
+    prv_post_terminate();
+    return;
+  }
+  if (prv_busy()) {
+    // Arm before looking again, so the falling edge cannot be missed.
+    s_waiting_busy = true;
+    exti_enable(pbl_exti_stm32_config(&BOARD_CONFIG_DISPLAY.busy));
+    if (prv_busy()) {
+      return;
+    }
+    s_waiting_busy = false;
+    exti_disable(pbl_exti_stm32_config(&BOARD_CONFIG_DISPLAY.busy));
+  }
+  prv_send_next_line();
+}
+
+//! In KernelMain.
+static void prv_start_dma_frame(const uint8_t *fb) {
+  const BoardConfigIce40Display *cfg = &BOARD_CONFIG_DISPLAY;
+
+  if (!prv_wait_not_busy()) {
+    // A new frame (SCS falling edge) resets the FPGA's frame logic.
+    PBL_LOG_WRN("Display busy before frame");
+  }
+
+  s_fb = fb;
+  s_sent = 0;
+  prv_get_line(fb, 0, s_lines[0]);
+
+  soc_stm32_stop_block();
+  pbl_gpio_set(&cfg->scs, true);
+  delay_us(5);
+  const uint8_t cmd = CMD_FRAME_BEGIN;
+  prv_spi_write(&cmd, 1);
+  SPI_I2S_DMACmd(cfg->spi, SPI_I2S_DMAReq_Tx, ENABLE);
+
+  s_frame_start = rtc_get_ticks();
+  pbl_irq_lock();
+  s_frame_active = true;
+  prv_send_next_line();
+  pbl_irq_unlock();
+}
+
 void display_clear(void) {
 }
 
@@ -225,6 +348,9 @@ void display_set_rotated(bool rotated) {
 }
 
 static void prv_terminate_transfer(void *data) {
+  if (!s_updating) {
+    return;
+  }
   s_updating = false;
   s_uccb();
 }
@@ -245,7 +371,8 @@ void display_update(NextRowCallback nrcb, UpdateCompleteCallback uccb) {
   s_updating = true;
 
   if (fb && s_programmed) {
-    prv_send_frame(fb);
+    prv_start_dma_frame(fb);
+    return;
   }
 
   PebbleEvent e = {
@@ -258,6 +385,22 @@ void display_update(NextRowCallback nrcb, UpdateCompleteCallback uccb) {
 }
 
 bool display_update_in_progress(void) {
+  if (s_updating && s_frame_active &&
+      (rtc_get_ticks() - s_frame_start) > (FRAME_TIMEOUT_MS * RTC_TICKS_HZ) / 1000U) {
+    // Stuck (e.g. BUSY never fell): end the frame rather than hang the UI.
+    bool ended = false;
+    pbl_irq_lock();
+    if (s_frame_active) {
+      pbl_dma_stm32_stop(BOARD_CONFIG_DISPLAY.tx_dma);
+      prv_end_frame();
+      ended = true;
+    }
+    pbl_irq_unlock();
+    if (ended) {
+      PBL_LOG_WRN("Display frame timed out at line %d", s_sent);
+      prv_post_terminate();
+    }
+  }
   return s_updating;
 }
 

@@ -51,6 +51,14 @@ void pbl_dma_stm32_start_circular_u16(const struct pbl_dma_stm32_stream *dma,
                                       volatile void *periph_addr, void *buffer, uint32_t size_bytes,
                                       uint32_t priority, PblDmaStm32Callback cb, void *context);
 
+/**
+ * One-shot memory-to-peripheral transfer of bytes. @p cb is called with
+ * is_complete true when the last byte has been handed to the peripheral.
+ */
+void pbl_dma_stm32_start_tx(const struct pbl_dma_stm32_stream *dma, volatile void *periph_addr,
+                            const void *buffer, uint32_t size_bytes, uint32_t priority,
+                            PblDmaStm32Callback cb, void *context);
+
 /** Transfers left before the circular buffer wraps (the NDTR register). */
 uint32_t pbl_dma_stm32_remaining(const struct pbl_dma_stm32_stream *dma);
 
