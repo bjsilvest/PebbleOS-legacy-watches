@@ -22,13 +22,33 @@ void backlight_init(void) {
            TIMER_PERIOD_RESOLUTION * PWM_OUTPUT_FREQUENCY_HZ);
 }
 
+static void prv_supply_set(bool on) {
+#ifdef CONFIG_REGULATOR
+  static bool s_supply_on;
+
+  if (BACKLIGHT_PWM.supply == nullptr || on == s_supply_on) {
+    return;
+  }
+
+  if (on) {
+    s_supply_on = (pbl_regulator_enable(BACKLIGHT_PWM.supply) == 0);
+  } else {
+    s_supply_on = (pbl_regulator_disable(BACKLIGHT_PWM.supply) != 0);
+  }
+#else
+  (void)on;
+#endif
+}
+
 void backlight_set_brightness(uint8_t brightness) {
   if (brightness == 0) {
     pwm_enable(&BACKLIGHT_PWM.pwm, false);
     if (pbl_gpio_is_connected(&BACKLIGHT_PWM.ctl)) {
       pbl_gpio_set(&BACKLIGHT_PWM.ctl, false);
     }
+    prv_supply_set(false);
   } else {
+    prv_supply_set(true);
     if (pbl_gpio_is_connected(&BACKLIGHT_PWM.ctl)) {
       pbl_gpio_set(&BACKLIGHT_PWM.ctl, true);
     }
