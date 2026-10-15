@@ -107,4 +107,13 @@ MagReadStatus mag_read_data(MagData *data);
  */
 bool mag_change_sample_rate(MagSampleRate rate);
 
+/**
+ * @brief Set whether the watch is worn rotated 180 degrees.
+ *
+ * When rotated, the X and Y axes of subsequent samples are inverted.
+ *
+ * @param rotated true if rotated.
+ */
+void mag_set_rotated(bool rotated);
+
 /** @} */
