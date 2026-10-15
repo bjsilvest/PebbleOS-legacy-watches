@@ -306,22 +306,28 @@ static bool prv_addr_is_rpa(const uint8_t *addr) {
   return (addr[5] & 0xc0U) == 0x40U;
 }
 
-//! The 4.2 controller sends the legacy LE Connection Complete. When the controller uses a
-//! resolvable private address, pass it on as the enhanced one carrying that address as our local
-//! RPA, so NimBLE pairs with the address on the air while keeping the identity address.
+//! When the controller uses a resolvable private address set as its random address, it reports
+//! no local RPA. Report that address as our local RPA, so NimBLE pairs with the address on the
+//! air while keeping the identity address. The legacy LE Connection Complete becomes the enhanced
+//! one; the enhanced one, sent when the controller resolved the peer, gets the field filled in.
 static void prv_conn_complete_add_local_rpa(struct ble_hci_ev *ev) {
   if (!s_rnd_in_use_valid || !prv_addr_is_rpa(s_rnd_in_use) ||
-      ev->opcode != BLE_HCI_EVCODE_LE_META || ev->length != LE_CONN_COMPLETE_LEN ||
-      ev->data[0] != BLE_HCI_LE_SUBEV_CONN_COMPLETE) {
+      ev->opcode != BLE_HCI_EVCODE_LE_META) {
     return;
   }
-  const size_t tail_len = LE_CONN_COMPLETE_LEN - LE_CONN_COMPLETE_ITVL_OFF;
   uint8_t *rpas = &ev->data[LE_CONN_COMPLETE_ITVL_OFF];
-  memmove(rpas + 12U, rpas, tail_len);
+  if (ev->length == LE_CONN_COMPLETE_LEN && ev->data[0] == BLE_HCI_LE_SUBEV_CONN_COMPLETE) {
+    const size_t tail_len = LE_CONN_COMPLETE_LEN - LE_CONN_COMPLETE_ITVL_OFF;
+    memmove(rpas + 12U, rpas, tail_len);
+    memset(rpas + 6U, 0, 6U);
+    ev->data[0] = BLE_HCI_LE_SUBEV_ENH_CONN_COMPLETE;
+    ev->length = LE_ENH_CONN_COMPLETE_LEN;
+  } else if (ev->length != LE_ENH_CONN_COMPLETE_LEN ||
+             ev->data[0] != BLE_HCI_LE_SUBEV_ENH_CONN_COMPLETE ||
+             memcmp(rpas, (const uint8_t[6]){0}, 6U) != 0) {
+    return;
+  }
   memcpy(rpas, s_rnd_in_use, 6U);
-  memset(rpas + 6U, 0, 6U);
-  ev->data[0] = BLE_HCI_LE_SUBEV_ENH_CONN_COMPLETE;
-  ev->length = LE_ENH_CONN_COMPLETE_LEN;
 }
 
 static void prv_note_rnd_addr_reply(struct ble_hci_ev *ev) {
