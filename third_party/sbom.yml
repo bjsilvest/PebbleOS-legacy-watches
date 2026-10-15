@@ -120,6 +120,16 @@ components:
     commit: d8ce9fc9bcc527094554bffc00822fb24d7907c1
     license: LicenseRef-AS7000
 
+  - name: ti-bt-service-pack
+    path: ti_bt_sp
+    type: firmware
+    supplier: Texas Instruments Incorporated
+    description: CC256xB initialization script (TIInit_6.7.16.bts), unmodified
+    version: 6.7.16
+    commit: 3aa1d75f3c2ae77f6e4d36194e3d281b899ab149
+    license: LicenseRef-TI-Text-File
+    url: https://git.ti.com/cgit/ti-bt/service-packs
+
   - name: picolibc
     path: picolibc
     build-paths: [picolibc/install]
