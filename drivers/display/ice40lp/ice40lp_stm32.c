@@ -52,6 +52,8 @@ extern const uint8_t ice40lp_bitstream_end[];
 static uint8_t s_line[DISP_PIXELS];
 static volatile bool s_updating;
 static bool s_programmed;
+//! Watch worn rotated by 180 degrees: frames go out flipped both ways.
+static bool s_rotated_180;
 static UpdateCompleteCallback s_uccb;
 
 // DMA frame state. Line n is prepared in s_lines[n & 1].
@@ -205,8 +207,16 @@ void display_init(void) {
 //! One panel line: the MSBs of every pixel's color channels, then the LSBs.
 static void prv_get_line(const uint8_t *fb, int index, uint8_t *line) {
   for (int src = 0; src < DISP_PIXELS; src += 2) {
-    const uint8_t even = fb[PBL_DISPLAY_WIDTH * (PBL_DISPLAY_HEIGHT - 2 - src) + index];
-    const uint8_t odd = fb[PBL_DISPLAY_WIDTH * (PBL_DISPLAY_HEIGHT - 1 - src) + index];
+    uint8_t even;
+    uint8_t odd;
+    if (s_rotated_180) {
+      const int col = PBL_DISPLAY_WIDTH - 1 - index;
+      even = fb[PBL_DISPLAY_WIDTH * (src + 1) + col];
+      odd = fb[PBL_DISPLAY_WIDTH * src + col];
+    } else {
+      even = fb[PBL_DISPLAY_WIDTH * (PBL_DISPLAY_HEIGHT - 2 - src) + index];
+      odd = fb[PBL_DISPLAY_WIDTH * (PBL_DISPLAY_HEIGHT - 1 - src) + index];
+    }
     line[src / 2] = (odd & 0b00101010) | ((even & 0b00101010) >> 1);
     line[src / 2 + DISP_PIXELS / 2] = ((odd & 0b00010101) << 1) | (even & 0b00010101);
   }
@@ -345,6 +355,7 @@ void display_set_enabled(bool enabled) {
 }
 
 void display_set_rotated(bool rotated) {
+  s_rotated_180 = rotated;
 }
 
 static void prv_terminate_transfer(void *data) {
