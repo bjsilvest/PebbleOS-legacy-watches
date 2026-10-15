@@ -77,6 +77,39 @@ typedef const struct HRMDevice {
   const struct pbl_regulator *led_supply;
 } HRMDevice;
 
+#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+/** @brief Registers dumped by the PRV probe: 0x10-0x13, then 0x20-0x33. */
+#define AS7000_PROBE_NUM_REGS 24
+
+/** @brief PRV probe snapshot, kept after the sensor turns off. */
+typedef struct {
+  /** Application IDs written, and read back once the sensor was ready. */
+  uint8_t requested;
+  uint8_t running;
+  /** A boot with PRV requested failed; HRM runs alone since. */
+  bool prv_failed;
+  /** Successful boots. */
+  uint16_t boots;
+  /** Handshakes sampled. */
+  uint32_t handshakes;
+  /** BPM register at the last handshake. */
+  uint8_t bpm;
+  /** Register values at the last handshake. */
+  uint8_t regs[AS7000_PROBE_NUM_REGS];
+  /** Bit n set once register n changed between handshakes. */
+  uint32_t changed;
+} AS7000Probe;
+
+/**
+ * @brief Get the PRV probe snapshot.
+ *
+ * @param dev HRM device.
+ * @param[out] probe Snapshot.
+ * @return True if the sensor is present.
+ */
+bool as7000_get_probe(HRMDevice *dev, AS7000Probe *probe);
+#endif
+
 /**
  * @brief Get the sensor information read at init.
  *

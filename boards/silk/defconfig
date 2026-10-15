@@ -56,3 +56,5 @@ CONFIG_AMBIENT_LIGHT_STM32_ADC=y
 
 CONFIG_HRM=y
 CONFIG_HRM_AS7000=y
+# Diagnostic: probe the sensor's PRV application
+CONFIG_HRM_AS7000_PRV_PROBE=y

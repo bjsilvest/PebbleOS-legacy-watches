@@ -55,6 +55,10 @@
 #include <system/reboot_reason.h>
 #include <system/version.h>
 
+#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+#include <pbl/drivers/hrm/as7000.h>
+#endif
+
 enum {
   SystemInformationItemBtAddress = 0,
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
@@ -71,6 +75,13 @@ enum {
   SystemInformationItemBtChip,
   SystemInformationItemBtRxBoot,
   SystemInformationItemBtRxReset,
+#endif
+#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+  SystemInformationItemHrmPrv,
+  SystemInformationItemHrmRegs1,
+  SystemInformationItemHrmRegs2,
+  SystemInformationItemHrmRegs3,
+  SystemInformationItemHrmChanged,
 #endif
   SystemInformationItemFirmware,
   SystemInformationItemLanguage,
@@ -157,6 +168,11 @@ typedef struct SystemInformationData {
   char bt_smp_string[21];
   char bt_rx_string[48];
   char app_fetch_string[21];
+#endif
+#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+  char hrm_prv_string[32];
+  char hrm_regs_string[3][17];
+  char hrm_changed_string[12];
 #endif
   char const *subtitle_text[SystemInformationItem_Count];
   char language_string[16];
@@ -251,6 +267,13 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemBtChip] = i18n_noop("BT Chip"),
   [SystemInformationItemBtRxBoot] = i18n_noop("BT Rx boot"),
   [SystemInformationItemBtRxReset] = i18n_noop("BT Rx reset"),
+#endif
+#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+  [SystemInformationItemHrmPrv] = i18n_noop("HRM PRV"),
+  [SystemInformationItemHrmRegs1] = i18n_noop("HRM 10-13 20-23"),
+  [SystemInformationItemHrmRegs2] = i18n_noop("HRM 24-2B"),
+  [SystemInformationItemHrmRegs3] = i18n_noop("HRM 2C-33"),
+  [SystemInformationItemHrmChanged] = i18n_noop("HRM changed"),
 #endif
   [SystemInformationItemFirmware] = i18n_noop("Firmware"),
   [SystemInformationItemLanguage] = i18n_noop("Language"),
@@ -396,6 +419,28 @@ static void prv_information_window_push(SettingsSystemData *data) {
   info->subtitle_text[SystemInformationItemBtChip] = da1468x_chip_id();
   info->subtitle_text[SystemInformationItemBtRxBoot] = da1468x_rx_after_markers();
   info->subtitle_text[SystemInformationItemBtRxReset] = da1468x_rx_after_reset();
+#endif
+#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+  AS7000Probe probe = {};
+  if (!as7000_get_probe(HRM, &probe)) {
+    strncpy(info->hrm_prv_string, "no sensor", sizeof(info->hrm_prv_string) - 1);
+  } else {
+    sniprintf(info->hrm_prv_string, sizeof(info->hrm_prv_string),
+              "r%02x a%02x%s b%u n%lu %ubpm", probe.requested, probe.running,
+              probe.prv_failed ? " F" : "", probe.boots, (unsigned long)probe.handshakes,
+              probe.bpm);
+  }
+  for (int row = 0; row < 3; row++) {
+    char *out = info->hrm_regs_string[row];
+    for (int i = 0; i < 8; i++) {
+      sniprintf(&out[i * 2], 3, "%02x", probe.regs[row * 8 + i]);
+    }
+    info->subtitle_text[SystemInformationItemHrmRegs1 + row] = out;
+  }
+  sniprintf(info->hrm_changed_string, sizeof(info->hrm_changed_string), "%06lx",
+            (unsigned long)probe.changed);
+  info->subtitle_text[SystemInformationItemHrmPrv] = info->hrm_prv_string;
+  info->subtitle_text[SystemInformationItemHrmChanged] = info->hrm_changed_string;
 #endif
   info->subtitle_text[SystemInformationItemFirmware] =
       (char *)(strlen(TINTIN_METADATA.version_tag) >= 2 ? TINTIN_METADATA.version_tag

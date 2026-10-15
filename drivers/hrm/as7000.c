@@ -10,6 +10,7 @@
 #include <pbl/logging/logging.h>
 #include <pbl/services/hrm/hrm_manager.h>
 #include <pbl/services/system_task.h>
+#include <pbl/util/size.h>
 
 #include <board/board.h>
 #include <kernel/util/sleep.h>
@@ -59,7 +60,9 @@ enum {
   AS7000AppId_Idle = 0x00,
   AS7000AppId_Loader = 0x01,
   AS7000AppId_HRM = 0x02,
+  AS7000AppId_PRV = 0x04,
 };
+
 
 // Signal quality index thresholds, upper bounds
 #define SQI_EXCELLENT 2
@@ -94,6 +97,34 @@ static bool prv_write_u16(HRMDevice *dev, uint8_t reg, uint16_t value) {
   const uint8_t buf[2] = {value >> 8, value & 0xff};
   return prv_write(dev, reg, buf, sizeof(buf));
 }
+
+#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+// Undocumented registers around the PPG block, where the PRV results may be
+static const uint8_t s_probe_ranges[][2] = {{0x10, 4}, {0x20, 20}};
+
+static AS7000Probe s_probe;
+
+static void prv_probe_read(HRMDevice *dev, uint8_t bpm) {
+  uint8_t regs[AS7000_PROBE_NUM_REGS];
+  uint8_t *pos = regs;
+
+  for (size_t i = 0; i < ARRAY_LENGTH(s_probe_ranges); i++) {
+    if (!prv_read(dev, s_probe_ranges[i][0], pos, s_probe_ranges[i][1])) {
+      return;
+    }
+    pos += s_probe_ranges[i][1];
+  }
+
+  for (int i = 0; i < AS7000_PROBE_NUM_REGS; i++) {
+    if (s_probe.handshakes > 0 && regs[i] != s_probe.regs[i]) {
+      s_probe.changed |= 1U << i;
+    }
+    s_probe.regs[i] = regs[i];
+  }
+  s_probe.bpm = bpm;
+  s_probe.handshakes++;
+}
+#endif
 
 static void prv_put_be16(uint8_t *buf, int16_t value) {
   buf[0] = (uint16_t)value >> 8;
@@ -174,6 +205,12 @@ static void prv_handle_handshake(void *context) {
   if (intervals == 2 || intervals == 10 || (intervals > 0 && intervals % 30 == 0)) {
     prv_write_u16(dev, ADDR_HOST_ONE_SECOND_TIME_MSB, average_ms * 10);
   }
+
+#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+  if (read_ok) {
+    prv_probe_read(dev, regs.bpm);
+  }
+#endif
 
   uint8_t sync;
   prv_read(dev, ADDR_SYNC, &sync, 1);
@@ -298,7 +335,15 @@ static bool prv_start_hrm_app(HRMDevice *dev) {
 
   pbl_gpio_configure(&dev->int_gpio, PBL_GPIO_INPUT | PBL_GPIO_PULL_UP);
 
-  if (!prv_write_u8(dev, ADDR_APP_IDS, AS7000AppId_HRM)) {
+  uint8_t apps = AS7000AppId_HRM;
+#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+  // Ask for PRV too until a boot with it fails, then fall back to HRM alone
+  if (!s_probe.prv_failed) {
+    apps |= AS7000AppId_PRV;
+  }
+  s_probe.requested = apps;
+#endif
+  if (!prv_write_u8(dev, ADDR_APP_IDS, apps)) {
     PBL_LOG_ERR("AS7000 failed to start the HRM app");
     return false;
   }
@@ -309,12 +354,21 @@ static bool prv_start_hrm_app(HRMDevice *dev) {
   }
   if (!prv_wait_int(dev, false, 2000)) {
     PBL_LOG_ERR("AS7000 HRM app not ready");
+#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+    if (apps & AS7000AppId_PRV) {
+      s_probe.prv_failed = true;
+    }
+#endif
     return false;
   }
 
-  uint8_t app_ids;
+  uint8_t app_ids = 0;
   prv_read(dev, ADDR_APP_IDS, &app_ids, 1);
   PBL_LOG_DBG("AS7000 running apps 0x%x", app_ids);
+#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+  s_probe.running = app_ids;
+  s_probe.boots++;
+#endif
 
   return true;
 }
@@ -472,6 +526,15 @@ void hrm_set_activity_scene(HRMDevice *dev, HRMActivityScene scene) {
   (void)dev;
   (void)scene;
 }
+
+#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+bool as7000_get_probe(HRMDevice *dev, AS7000Probe *probe) {
+  pbl_mutex_lock(&dev->state->lock, PBL_FOREVER);
+  *probe = s_probe;
+  pbl_mutex_unlock(&dev->state->lock);
+  return hrm_is_present(dev);
+}
+#endif
 
 bool as7000_get_version_info(HRMDevice *dev, AS7000InfoRecord *info) {
   *info = dev->state->info;

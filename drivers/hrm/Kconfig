@@ -22,6 +22,16 @@ config HRM_AS7000
       only. The sensor is probed at boot, so the Pebble 2 SE runs the same
       firmware.
 
+config HRM_AS7000_PRV_PROBE
+    bool "AS7000 PRV probe (diagnostic)"
+    depends on HRM_AS7000
+    help
+      Ask the sensor to run its undocumented PRV (pulse rate variability)
+      application next to HRM, and record the registers around the PPG
+      block at each handshake for Settings > System > Information. Falls
+      back to HRM alone if the sensor does not start with PRV. Never
+      writes the sensor flash.
+
 config HRM_SPO2
     bool
     default y if HRM_GH3X2X || HRM_QEMU
