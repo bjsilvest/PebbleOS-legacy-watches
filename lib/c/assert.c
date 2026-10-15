@@ -14,5 +14,5 @@ void __assert_func(const char *file, int line, const char *func, const char *e) 
 
   PBL_LOG_ERR("assert in %s:%d", file, line);
   PBL_LOG_ERR("%s, expr: %s", func, e);
-  passert_failed_hashed_no_message_with_lr(lr);
+  PBL_ASSERTN_LR(0, lr);
 }
