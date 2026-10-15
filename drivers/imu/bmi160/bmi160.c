@@ -55,6 +55,8 @@ static uint8_t curr_fifo_num_samples_wm = 0;
 
 //! Watch worn rotated by 180 degrees: X and Y flip.
 static bool s_rotated_180 = false;
+//! Shake threshold from the sensitivity setting, 0 for the stock one.
+static uint8_t s_shake_threshold;
 
 static bool s_double_tap_detection_enabled = false;
 static bool s_shake_detection_enabled = false;
@@ -788,29 +790,30 @@ int accel_peek(AccelDriverSample *data) {
 
 void accel_set_shake_sensitivity_high(bool sensitivity_high) {
   // Configure the threshold level at which the BMI160 will think shake has occurred
+  const AccelConfig *cfg = &BOARD_CONFIG_ACCEL.accel_config;
+  uint8_t threshold = s_shake_threshold ?: cfg->shake_thresholds[AccelThresholdHigh];
   if (sensitivity_high) {
-    prv_write_reg(BMI160_REG_INT_MOTION_1,
-                  BOARD_CONFIG_ACCEL.accel_config.shake_thresholds[AccelThresholdLow]);
-  } else {
-    prv_write_reg(BMI160_REG_INT_MOTION_1,
-                  BOARD_CONFIG_ACCEL.accel_config.shake_thresholds[AccelThresholdHigh]);
+    threshold = cfg->shake_thresholds[AccelThresholdLow];
   }
+  prv_write_reg(BMI160_REG_INT_MOTION_1, threshold);
 }
 
 void accel_set_shake_sensitivity_percent(uint8_t percent) {
-  // Map percent [0,100] to threshold [high, low]
-  const uint8_t high_threshold =
-      BOARD_CONFIG_ACCEL.accel_config.shake_thresholds[AccelThresholdHigh];
-  const uint8_t low_threshold = BOARD_CONFIG_ACCEL.accel_config.shake_thresholds[AccelThresholdLow];
+  // Higher is more sensitive. The settings default (55, "Medium") keeps the
+  // stock threshold, 100 is the stock high sensitivity one, 0 twice the stock.
+  const int medium = 55;
+  const int normal = BOARD_CONFIG_ACCEL.accel_config.shake_thresholds[AccelThresholdHigh];
+  const int sensitive = BOARD_CONFIG_ACCEL.accel_config.shake_thresholds[AccelThresholdLow];
+  const int p = MIN(percent, 100);
 
-  if (percent >= 100) {
-    accel_set_shake_sensitivity_high(false /* sensitivity_high */);
-    return;
+  int threshold;
+  if (p >= medium) {
+    threshold = normal - ((normal - sensitive) * (p - medium)) / (100 - medium);
+  } else {
+    threshold = normal + (normal * (medium - p)) / medium;
   }
-
-  const uint8_t threshold =
-      high_threshold + ((low_threshold - high_threshold) * (100 - percent)) / 100;
-  prv_write_reg(BMI160_REG_INT_MOTION_1, threshold);
+  s_shake_threshold = MIN(threshold, UINT8_MAX);
+  prv_write_reg(BMI160_REG_INT_MOTION_1, s_shake_threshold);
 }
 
 static void prv_enable_shake_detection(void) {
