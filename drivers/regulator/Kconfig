@@ -14,3 +14,9 @@ config REGULATOR_NPM1300
     select REGULATOR
     help
       Support for the BUCK and LDSW rails of the Nordic nPM1300 PMIC.
+
+config REGULATOR_GPIO
+    bool "GPIO switched regulators"
+    select REGULATOR
+    help
+      Support for rails switched by a single enable output.
