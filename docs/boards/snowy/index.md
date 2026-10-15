@@ -120,6 +120,7 @@ curve, and platform ID `PebbleBobbyDVT` (`PebbleSnowyDVT` for the Time).
 | MAG3110 compass (I2C1 0x0E, data ready PF14) | done, untested on hardware |
 | Bluetooth (CC2564B, NimBLE over H4, TI init script) | done, untested on hardware |
 | CC2564 deep sleep (eHCILL), STOP mode while BT runs | done behind `BT_CC2564_SLEEP` (off by default), untested on hardware |
+| Album art and notification pictures (`SERVICE_IMAGING_PICTURES`, one 4-bpp image of 6.5-9K at a time in the kernel heap) | on, untested on hardware |
 | Resources: silk's plus color-only ones, 105 color emoji | done (513,755 of 524,288 bytes) |
 
 QEMU emulates neither the PMIC nor the BMI160 (both log that and carry on),

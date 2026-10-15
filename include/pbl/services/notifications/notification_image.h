@@ -24,10 +24,10 @@ struct GBitmap;
 /**
  * @brief Whether the platform supports notification images.
  *
- * Images need a color display and enough RAM for the decoded bitmap, so only emery and gabbro
- * qualify, the same bar as album art.
+ * Images need a color display and enough RAM for the decoded bitmap
+ * (CONFIG_SERVICE_IMAGING_PICTURES), the same bar as album art.
  */
-#if defined(CONFIG_PLATFORM_EMERY) || defined(CONFIG_PLATFORM_GABBRO)
+#ifdef CONFIG_SERVICE_IMAGING_PICTURES
 #define NOTIFICATION_IMAGE_SUPPORTED 1
 #else
 #define NOTIFICATION_IMAGE_SUPPORTED 0

@@ -33,9 +33,9 @@
 #include <shell/prefs.h>
 #include <shell/system_theme.h>
 
-// Album art needs a colour display with enough RAM for a full-screen 4-bpp cover; only emery and
-// gabbro qualify. Flint and lower never request it, so their layout stays text-only.
-#if defined(CONFIG_PLATFORM_EMERY) || defined(CONFIG_PLATFORM_GABBRO)
+// Album art needs a colour display with enough kernel heap for a 4-bpp cover
+// (CONFIG_SERVICE_IMAGING_PICTURES). Without it the layout stays text-only.
+#ifdef CONFIG_SERVICE_IMAGING_PICTURES
 #define MUSIC_ALBUM_ART_SUPPORTED 1
 #else
 #define MUSIC_ALBUM_ART_SUPPORTED 0

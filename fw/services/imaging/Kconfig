@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 Brian Silvestri
+# SPDX-License-Identifier: Apache-2.0
+
+config SERVICE_IMAGING_PICTURES
+    bool "Album art and notification pictures"
+    depends on SCREEN_COLOR_DEPTH_BITS_8
+    default y if PLATFORM_EMERY || PLATFORM_GABBRO
+    help
+      Show album art in the music app and pictures in notifications, fetched
+      from the phone through the imaging endpoint at the watch's size, 4 bits
+      per pixel. Needs a color display, and room in the kernel heap for one
+      decoded image at a time; an image that does not fit is dropped and the
+      text-only layout shown.

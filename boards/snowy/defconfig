@@ -72,3 +72,7 @@ CONFIG_NIMBLE_BLE_HS_FLOW_CTRL_TX_ON_DISCONNECT=y
 
 CONFIG_MAG=y
 CONFIG_MAG_MAG3110=y
+
+# Album art and notification pictures: one 4-bpp image (6.5-9K) at a time in
+# the kernel heap; one that does not fit is dropped.
+CONFIG_SERVICE_IMAGING_PICTURES=y
