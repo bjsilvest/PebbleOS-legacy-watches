@@ -79,7 +79,7 @@ enum {
   SystemInformationItemBtSmp,
   SystemInformationItemBtSmp2,
   SystemInformationItemLastReboot,
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#if defined(CONFIG_BT_CONTROLLER_DA1468X) || defined(CONFIG_BT_CC2564_SLEEP)
   SystemInformationItemBtRx,
 #endif
   SystemInformationItemAppFetch,
@@ -276,7 +276,7 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemBtSmp] = i18n_noop("BT SMP"),
   [SystemInformationItemBtSmp2] = i18n_noop("BT SMP 2"),
   [SystemInformationItemLastReboot] = i18n_noop("Last reboot"),
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#if defined(CONFIG_BT_CONTROLLER_DA1468X) || defined(CONFIG_BT_CC2564_SLEEP)
   [SystemInformationItemBtRx] = i18n_noop("BT Rx"),
 #endif
   [SystemInformationItemAppFetch] = i18n_noop("App fetch"),
@@ -433,7 +433,7 @@ static void prv_information_window_push(SettingsSystemData *data) {
   sniprintf(info->last_reboot_string, sizeof(info->last_reboot_string), "%u %08lx %08lx",
             (unsigned)reason.code, (unsigned long)words[1], (unsigned long)words[2]);
   info->subtitle_text[SystemInformationItemLastReboot] = info->last_reboot_string;
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#if defined(CONFIG_BT_CONTROLLER_DA1468X) || defined(CONFIG_BT_CC2564_SLEEP)
   pbl_bt_hci_uart_copy_rx_stats(info->bt_rx_string, sizeof(info->bt_rx_string));
   info->subtitle_text[SystemInformationItemBtRx] = info->bt_rx_string;
 #endif

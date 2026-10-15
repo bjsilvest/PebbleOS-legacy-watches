@@ -119,7 +119,7 @@ curve, and platform ID `PebbleBobbyDVT` (`PebbleSnowyDVT` for the Time).
 | Factory data (stock OTP slots and MFG struct, read-only) | done |
 | MAG3110 compass | todo |
 | Bluetooth (CC2564B, NimBLE over H4, TI init script) | done, untested on hardware |
-| CC2564 deep sleep (eHCILL); STOP mode while BT runs | todo (STOP blocked for now) |
+| CC2564 deep sleep (eHCILL), STOP mode while BT runs | done behind `BT_CC2564_SLEEP` (off by default), untested on hardware |
 | Resources: silk's plus color-only ones, 105 color emoji | done (513,755 of 524,288 bytes) |
 
 QEMU emulates neither the PMIC nor the BMI160 (both log that and carry on),
@@ -186,10 +186,29 @@ Settings > System > Information shows "BT Radio" (boot progress, e.g.
 Chip", "BT HCI", "BT Pair", "BT Reset", "BT SMP" and "Last reboot", as on
 silk.
 
-Open items:
+### Deep sleep (eHCILL)
 
-- **Power.** Deep sleep (eHCILL) in the transport, which would also let
-  STOP mode back in.
+With `CONFIG_BT_CC2564_SLEEP=y` the controller deep sleeps using TI's eHCILL
+(SWRA288), as the init script configures it (20 ms inactivity timeout,
+100 ms WAKE_UP_IND retransmission, 150 us RTS pulse), and the host enters
+STOP meanwhile. The transport:
+
+- on GO_TO_SLEEP_IND (0x30): holds our RTS (PA12) high as a GPIO, arms a
+  wake interrupt on CTS (PA11, EXTI11, both edges), sends GO_TO_SLEEP_ACK and
+  releases its STOP block;
+- on the CTS wake pulse: releases RTS, waits for WAKE_UP_IND and answers
+  WAKE_UP_ACK; a CTS edge with no WAKE_UP_IND within 50 ms counts as a false
+  wake and it goes back to sleep;
+- to send while asleep: releases RTS, sends WAKE_UP_IND and waits up to
+  100 ms (5 tries) for WAKE_UP_ACK, a crossing WAKE_UP_IND counting as one.
+  The wake-up byte goes out even if the controller holds our CTS
+  deasserted.
+
+It is off by default until basic Bluetooth is confirmed on hardware. "BT
+Rx" then shows `<state A/S/W/C> z<sleeps> c<controller wakes> h<host
+wakes> r<wake retries> f<false wakes>`.
+
+Open items:
 - **Two bonds.** The stock PRF keeps its own pairing in stock shared PRF
   storage; importing it (as silk does) is not done yet.
 - Raise the baud rate towards the script's 3 Mbaud once the link is proven.

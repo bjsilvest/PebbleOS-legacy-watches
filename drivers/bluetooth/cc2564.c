@@ -11,8 +11,9 @@
 //! supports eHCILL. The H4 transport takes the UART over afterwards.
 //!
 //! STOP mode stops the UART while RTS still tells the controller it may
-//! send, so STOP is blocked while the controller runs, until the transport
-//! handles eHCILL.
+//! send. Without BT_CC2564_SLEEP, STOP is blocked while the controller
+//! runs; with it, the transport's eHCILL (TI SWRA288) lets STOP in while
+//! the controller sleeps, holding RTS high meanwhile.
 //!
 //! Every wait is bounded and a failure leaves Bluetooth off instead of
 //! crashing: a crash loop before the firmware is marked stable ends in the
@@ -23,6 +24,7 @@
 #include <string.h>
 
 #include <pbl/drivers/bluetooth/cc2564.h>
+#include <pbl/drivers/exti.h>
 #include <pbl/drivers/gpio/stm32.h>
 #include <pbl/drivers/uart.h>
 #include <pbl/kernel/sem.h>
@@ -40,6 +42,8 @@ PBL_LOG_MODULE_DECLARE(nimble, CONFIG_NIMBLE_LOG_LEVEL);
 
 #define H4_CMD 0x01U
 #define H4_EVT 0x04U
+
+#define HCILL_GO_TO_SLEEP_IND 0x30U
 
 #define EVT_COMMAND_COMPLETE 0x0eU
 #define EVT_COMMAND_STATUS   0x0fU
@@ -78,6 +82,8 @@ static PBL_SEM_DEFINE(s_rx_sem, 0, 1);
 
 static uint8_t s_evt[260];
 static uint16_t s_evt_len;
+// The controller asked to sleep (eHCILL) before the transport took over.
+static bool s_sleep_ind_pending;
 
 static void prv_boot_rx_irq_handler(UARTDevice *dev, uint8_t data,
                                     const UARTRXErrorFlags *err_flags) {
@@ -95,6 +101,9 @@ static bool prv_assemble_event(void) {
     const uint8_t c = s_rx_ring[s_rx_tail];
     s_rx_tail = (s_rx_tail + 1U) % RX_RING_SIZE;
     if (s_evt_len == 0U && c != H4_EVT) {
+      if (c == HCILL_GO_TO_SLEEP_IND) {
+        s_sleep_ind_pending = true;
+      }
       continue;
     }
     s_evt[s_evt_len++] = c;
@@ -178,6 +187,7 @@ static void prv_uart_init(void) {
   uart_init(BT_HCI_UART);
   uart_set_baud_rate(BT_HCI_UART, BOOT_BAUD);
   s_evt_len = 0U;
+  s_sleep_ind_pending = false;
   s_rx_head = 0U;
   s_rx_tail = 0U;
   (void)pbl_sem_take(&s_rx_sem, PBL_NO_WAIT);
@@ -249,10 +259,13 @@ static bool prv_run_bts(void) {
     if (opcode == OP_VS_UPDATE_BAUDRATE && len >= 8U) {
       const uint32_t baud = CONFIG_BT_CC2564_HCI_BAUD;
       memcpy(&pkt[4], &baud, sizeof(baud));
-    } else if (opcode == OP_VS_SLEEP_MODE && len >= 6U) {
-      // Deep sleep (eHCILL) off for now; big sleep as the script sets it.
+    }
+#ifndef CONFIG_BT_CC2564_SLEEP
+    else if (opcode == OP_VS_SLEEP_MODE && len >= 6U) {
+      // Deep sleep (eHCILL) off; big sleep as the script sets it.
       pkt[5] = 0U;
     }
+#endif
 
     const int status = prv_command(pkt, MIN((size_t)len, sizeof(pkt)), nullptr, 0U);
     if (status != 0) {
@@ -293,6 +306,7 @@ bool cc2564_boot(void) {
     }
 
     uart_set_rx_interrupt_enabled(BT_HCI_UART, false);
+    // Held while the controller is awake; the transport's eHCILL releases it.
     soc_stm32_stop_block();
     sniprintf(s_status, sizeof(s_status), "Running (try %d)", attempt);
     return true;
@@ -303,6 +317,47 @@ bool cc2564_boot(void) {
   pbl_gpio_set(&BOARD_BT_SHUTDOWN, true);
   PBL_LOG_ERR("CC2564 failed to start: %s", s_status);
   return false;
+}
+
+bool cc2564_take_sleep_ind(void) {
+  const bool pending = s_sleep_ind_pending;
+  s_sleep_ind_pending = false;
+  return pending;
+}
+
+void cc2564_hold_rts(bool hold) {
+  if (hold) {
+    // High: the controller must not send.
+    pbl_gpio_configure(&BOARD_BT_HOST_RTS, PBL_GPIO_OUTPUT_HIGH);
+  } else {
+    pbl_gpio_stm32_af(&BOARD_BT_HOST_RTS, GPIO_AF_USART1, 0, GPIO_Speed_50MHz);
+  }
+}
+
+void cc2564_cts_wake_enable(ExtiHandlerCallback cb) {
+  // The controller pulses its RTS (our CTS) to wake us.
+  const ExtiConfig exti = pbl_exti_stm32_config(&BOARD_BT_CTS);
+  exti_configure_pin(exti, ExtiTrigger_RisingFalling, cb);
+  exti_enable(exti);
+}
+
+void cc2564_send_hcill(uint8_t msg) {
+  // The controller may hold our CTS deasserted while it sleeps; a wake-up
+  // message must get through anyway.
+  USART_TypeDef *usart = BOARD_BT_HCI_USART;
+  const bool cts_ok = prv_wait_cts(10U);
+  if (!cts_ok) {
+    usart->CR3 &= ~USART_CR3_CTSE;
+  }
+  uart_write_byte(BT_HCI_UART, msg);
+  uart_wait_for_tx_complete(BT_HCI_UART);
+  if (!cts_ok) {
+    usart->CR3 |= USART_CR3_CTSE;
+  }
+}
+
+void cc2564_cts_wake_disable(void) {
+  exti_disable(pbl_exti_stm32_config(&BOARD_BT_CTS));
 }
 
 const char *cc2564_status(void) {

@@ -24,6 +24,8 @@
 #endif
 #ifdef CONFIG_BT_CONTROLLER_CC2564
 #include <pbl/drivers/bluetooth/cc2564.h>
+#include <pbl/drivers/rtc.h>
+#include <pbl/soc/stm32/sleep.h>
 
 #include <host/ble_store.h>
 #include <mbedtls/aes.h>
@@ -825,6 +827,172 @@ static void prv_try_sleep(void) {
 }
 #endif
 
+#ifdef CONFIG_BT_CC2564_SLEEP
+// TI's eHCILL (SWRA288): the controller asks to sleep after it has been idle
+// (GO_TO_SLEEP_IND); we hold our RTS high, so it keeps what it has, arm a
+// wake interrupt on CTS, acknowledge and let STOP in. Either side wakes the
+// other: the controller pulses its RTS (our CTS) and sends WAKE_UP_IND once
+// we release RTS, or we send WAKE_UP_IND and wait for WAKE_UP_ACK. One STOP
+// block is held whenever we are not asleep.
+#define HCILL_GO_TO_SLEEP_IND 0x30U
+#define HCILL_GO_TO_SLEEP_ACK 0x31U
+#define HCILL_WAKE_UP_IND     0x32U
+#define HCILL_WAKE_UP_ACK     0x33U
+#define HCILL_WAKE_TIMEOUT_MS 100U
+#define HCILL_WAKE_ATTEMPTS   5
+//! A CTS edge with no WAKE_UP_IND this long after it was not a wake pulse.
+#define HCILL_CTRL_WAKE_TIMEOUT_MS 50U
+
+static volatile enum {
+  HcillAwake,
+  HcillAsleep,
+  HcillWaking,     // we sent WAKE_UP_IND
+  HcillCtrlWaking, // the controller pulsed CTS: waiting for its WAKE_UP_IND
+} s_hcill = HcillAwake;
+static PBL_SEM_DEFINE(s_hcill_awake, 0, 1);
+static volatile uint32_t s_hcill_sleeps;
+static volatile uint32_t s_hcill_ctrl_wakes;
+static volatile uint32_t s_hcill_host_wakes;
+static volatile uint32_t s_hcill_wake_retries;
+static volatile uint32_t s_hcill_false_wakes;
+static volatile RtcTicks s_hcill_ctrl_wake_ticks;
+
+//! With s_tx_mutex held.
+static void prv_hcill_send(uint8_t msg) {
+  cc2564_send_hcill(msg);
+}
+
+static void prv_hcill_cts_wake_isr(void) {
+  if (s_hcill != HcillAsleep) {
+    return;
+  }
+  cc2564_cts_wake_disable();
+  soc_stm32_stop_block();
+  s_hcill = HcillCtrlWaking;
+  s_hcill_ctrl_wake_ticks = rtc_get_ticks();
+  s_hcill_ctrl_wakes++;
+  // Let the controller send its WAKE_UP_IND.
+  cc2564_hold_rts(false);
+  pbl_sem_give(&s_rx_ready);
+}
+
+static void prv_hcill_set_awake(void) {
+  s_hcill = HcillAwake;
+  pbl_sem_give(&s_hcill_awake);
+}
+
+//! In the HCI task, for an eHCILL message where a packet type would be.
+static void prv_hcill_rx(uint8_t msg) {
+  switch (msg) {
+    case HCILL_GO_TO_SLEEP_IND:
+      if (s_hcill != HcillAwake) {
+        // Waking up: one queued before our WAKE_UP_IND, to be ignored.
+        return;
+      }
+      pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
+      cc2564_hold_rts(true);
+      pbl_irq_lock();
+      s_hcill = HcillAsleep;
+      pbl_irq_unlock();
+      cc2564_cts_wake_enable(prv_hcill_cts_wake_isr);
+      prv_hcill_send(HCILL_GO_TO_SLEEP_ACK);
+      pbl_mutex_unlock(&s_tx_mutex);
+      s_hcill_sleeps++;
+      // A wake pulse may already have taken the block back.
+      soc_stm32_stop_release();
+      return;
+    case HCILL_WAKE_UP_IND:
+      if (s_hcill == HcillWaking) {
+        // Both sides woke at once: this is the acknowledgment.
+        prv_hcill_set_awake();
+        return;
+      }
+      pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
+      pbl_irq_lock();
+      if (s_hcill == HcillAsleep) {
+        // Missed the pulse.
+        cc2564_cts_wake_disable();
+        soc_stm32_stop_block();
+        cc2564_hold_rts(false);
+      }
+      pbl_irq_unlock();
+      prv_hcill_send(HCILL_WAKE_UP_ACK);
+      prv_hcill_set_awake();
+      pbl_mutex_unlock(&s_tx_mutex);
+      return;
+    case HCILL_WAKE_UP_ACK:
+      if (s_hcill == HcillWaking) {
+        prv_hcill_set_awake();
+      }
+      return;
+    default:
+      return;
+  }
+}
+
+//! In the HCI task: a CTS edge that no WAKE_UP_IND followed was not the
+//! controller waking us (e.g. its RTS settling as it went to sleep). Go back
+//! to sleep.
+static void prv_hcill_check_false_wake(void) {
+  if (s_hcill != HcillCtrlWaking || (rtc_get_ticks() - s_hcill_ctrl_wake_ticks) <
+                                        (HCILL_CTRL_WAKE_TIMEOUT_MS * RTC_TICKS_HZ) / 1000U) {
+    return;
+  }
+  pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
+  bool back_to_sleep = false;
+  pbl_irq_lock();
+  if (s_hcill == HcillCtrlWaking) {
+    cc2564_hold_rts(true);
+    s_hcill = HcillAsleep;
+    back_to_sleep = true;
+  }
+  pbl_irq_unlock();
+  if (back_to_sleep) {
+    s_hcill_false_wakes++;
+    cc2564_cts_wake_enable(prv_hcill_cts_wake_isr);
+    soc_stm32_stop_release();
+  }
+  pbl_mutex_unlock(&s_tx_mutex);
+}
+
+static bool prv_is_hcill(uint8_t c) {
+  return c >= HCILL_GO_TO_SLEEP_IND && c <= HCILL_WAKE_UP_ACK;
+}
+
+//! Take s_tx_mutex with the controller awake, waking it if needed.
+//! @return false if it would not wake; the mutex is then not held.
+static bool prv_hcill_lock_awake(void) {
+  for (int attempt = 0; attempt < HCILL_WAKE_ATTEMPTS; attempt++) {
+    pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
+    if (s_hcill == HcillAwake) {
+      return true;
+    }
+
+    // Whatever the state, send WAKE_UP_IND: if the controller is waking us
+    // at the same time, its WAKE_UP_IND then counts as the acknowledgment.
+    pbl_irq_lock();
+    if (s_hcill == HcillAsleep) {
+      cc2564_cts_wake_disable();
+      soc_stm32_stop_block();
+      s_hcill_host_wakes++;
+    } else {
+      s_hcill_wake_retries++;
+    }
+    s_hcill = HcillWaking;
+    pbl_irq_unlock();
+    (void)pbl_sem_take(&s_hcill_awake, PBL_NO_WAIT);
+    cc2564_hold_rts(false);
+    prv_hcill_send(HCILL_WAKE_UP_IND);
+    // The HCI task needs the mutex to answer the controller.
+    pbl_mutex_unlock(&s_tx_mutex);
+
+    (void)pbl_sem_take(&s_hcill_awake, PBL_MSEC(HCILL_WAKE_TIMEOUT_MS));
+  }
+  PBL_LOG_ERR("CC2564 did not wake up");
+  return false;
+}
+#endif
+
 static void prv_hci_task_main(void *unused) {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   // Loading the controller takes about a second, so it happens here rather
@@ -850,6 +1018,11 @@ static void prv_hci_task_main(void *unused) {
   // crashing, since a crash loop would end in the bootloader starting PRF.
   if (cc2564_boot()) {
     prv_uart_start();
+#ifdef CONFIG_BT_CC2564_SLEEP
+    if (cc2564_take_sleep_ind()) {
+      prv_hcill_rx(HCILL_GO_TO_SLEEP_IND);
+    }
+#endif
   } else {
     s_controller_state = ControllerStateFailed;
   }
@@ -866,6 +1039,11 @@ static void prv_hci_task_main(void *unused) {
     if (s_rx_tail != s_rx_head) {
       prv_wake();
     }
+#elifdef CONFIG_BT_CC2564_SLEEP
+    (void)pbl_sem_take(&s_rx_ready, (s_hcill == HcillCtrlWaking)
+                                        ? PBL_MSEC(HCILL_CTRL_WAKE_TIMEOUT_MS)
+                                        : PBL_FOREVER);
+    prv_hcill_check_false_wake();
 #else
     pbl_sem_take(&s_rx_ready, PBL_FOREVER);
 #endif
@@ -880,6 +1058,22 @@ static void prv_hci_task_main(void *unused) {
         prv_frame_byte(s_rx_ring[tail + i]);
       }
       int consumed = len;
+#elifdef CONFIG_BT_CC2564_SLEEP
+      // eHCILL messages come where a packet type would: pick them out.
+      int consumed = 0;
+      while ((uint32_t)consumed < len) {
+        const uint8_t c = s_rx_ring[tail + consumed];
+        if (s_hci_h4sm.state == H4_SM_IDLE && prv_is_hcill(c)) {
+          consumed++;
+          prv_hcill_rx(c);
+          continue;
+        }
+        const int n = hci_h4_sm_rx(&s_hci_h4sm, &s_rx_ring[tail + consumed], 1);
+        if (n <= 0) {
+          PBL_LOG_ERR("hci_h4_sm_rx returned %d", n);
+        }
+        consumed++;
+      }
 #else
       int consumed = hci_h4_sm_rx(&s_hci_h4sm, &s_rx_ring[tail], len);
       if (consumed <= 0) {
@@ -1051,7 +1245,14 @@ static void prv_write_mbuf(uint8_t type, struct os_mbuf *om) {
     }
 #endif
   }
+#ifdef CONFIG_BT_CC2564_SLEEP
+  if (!prv_hcill_lock_awake()) {
+    os_mbuf_free_chain(om);
+    return;
+  }
+#else
   pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
+#endif
   prv_write(&type, 1U);
   for (struct os_mbuf *x = om; x != NULL; x = SLIST_NEXT(x, om_next)) {
     prv_write(x->om_data, x->om_len);
@@ -1115,7 +1316,12 @@ uint32_t pbl_bt_hci_uart_acl_clamped(void) {
 }
 
 void pbl_bt_hci_uart_copy_rx_stats(char *buf, size_t len) {
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#ifdef CONFIG_BT_CC2564_SLEEP
+  static const char states[] = {'A', 'S', 'W', 'C'};
+  sniprintf(buf, len, "%c z%lu c%lu h%lu r%lu f%lu", states[s_hcill], (unsigned long)s_hcill_sleeps,
+            (unsigned long)s_hcill_ctrl_wakes, (unsigned long)s_hcill_host_wakes,
+            (unsigned long)s_hcill_wake_retries, (unsigned long)s_hcill_false_wakes);
+#elifdef CONFIG_BT_CONTROLLER_DA1468X
   sniprintf(buf, len, "%c%lu!%lu z%lu r%lu o%lu d%lu u%04x@%04x g%lu/%04x",
             s_flow_control ? 'F' : 'p', (unsigned long)s_tx_flow_waits,
             (unsigned long)s_tx_flow_forced, (unsigned long)s_sleeps, (unsigned long)s_rx_pauses,
@@ -1168,7 +1374,14 @@ int ble_transport_to_ll_cmd_impl(void *buf) {
   }
 #endif
 
+#ifdef CONFIG_BT_CC2564_SLEEP
+  if (!prv_hcill_lock_awake()) {
+    ble_transport_free(buf);
+    return 0;
+  }
+#else
   pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
+#endif
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   if (s_last_cmd == HCI_OP_LE_SET_RANDOM_ADDR && cmd->length == sizeof(s_local_rpa)) {
     if (s_local_rpa_set) {

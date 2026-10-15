@@ -49,3 +49,11 @@ config BT_CC2564_HCI_BAUD
     default 921600
     help
       Baud rate the controller is switched to after power up.
+
+config BT_CC2564_SLEEP
+    bool "CC2564 deep sleep (eHCILL)"
+    depends on BT_CONTROLLER_CC2564
+    help
+      Let the controller deep sleep with TI's eHCILL protocol (SWRA288)
+      and the host enter STOP mode meanwhile. Without it the controller
+      never sleeps and STOP is blocked while Bluetooth runs.
