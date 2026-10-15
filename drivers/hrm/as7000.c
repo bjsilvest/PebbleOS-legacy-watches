@@ -15,6 +15,7 @@
 #include <pbl/util/math.h>
 #include <pbl/util/size.h>
 
+#include <applib/app_logging.h>
 #include <board/board.h>
 #include <kernel/util/sleep.h>
 #include <mfg/mfg_info.h>
@@ -107,7 +108,34 @@ static const uint8_t s_probe_ranges[][2] = {{0x10, 4}, {0x20, 20}};
 
 static AS7000Probe s_probe;
 
-static void prv_probe_read(HRMDevice *dev, uint8_t bpm) {
+static void prv_hex(char *out, const uint8_t *data, size_t len) {
+  for (size_t i = 0; i < len; i++) {
+    sniprintf(&out[i * 2], 3, "%02x", data[i]);
+  }
+}
+
+// One reading as two app log lines, for `pebble logs` (app logging must be on)
+static void prv_probe_app_log(const uint8_t *regs, const uint8_t third[AS7000_PROBE_BLOCK_LEN],
+                              uint8_t status, uint8_t sqi) {
+  const AS7000ProbeSample *sample =
+      &s_probe.history[(s_probe.history_next + AS7000_PROBE_HISTORY - 1) % AS7000_PROBE_HISTORY];
+  char first[AS7000_PROBE_BLOCK_LEN * 2 + 1];
+  char second[AS7000_PROBE_BLOCK_LEN * 2 + 1];
+  char third_hex[AS7000_PROBE_BLOCK_LEN * 2 + 1];
+  char dump[20 * 2 + 1];
+
+  prv_hex(first, sample->first, AS7000_PROBE_BLOCK_LEN);
+  prv_hex(second, sample->second, AS7000_PROBE_BLOCK_LEN);
+  prv_hex(third_hex, third, AS7000_PROBE_BLOCK_LEN);
+  prv_hex(dump, &regs[4], 20);
+  app_log(APP_LOG_LEVEL_INFO, "as7000", 0, "PRV n%lu b%u s%02x q%u 12=%02x %s %s %s",
+          (unsigned long)s_probe.handshakes, s_probe.bpm, status, sqi, sample->reg12, first,
+          second, third_hex);
+  app_log(APP_LOG_LEVEL_INFO, "as7000", 0, "PRV n%lu 20-33 %s", (unsigned long)s_probe.handshakes,
+          dump);
+}
+
+static void prv_probe_read(HRMDevice *dev, uint8_t bpm, uint8_t status, uint8_t sqi) {
   uint8_t regs[AS7000_PROBE_NUM_REGS];
   uint8_t *pos = regs;
 
@@ -139,6 +167,14 @@ static void prv_probe_read(HRMDevice *dev, uint8_t bpm) {
   }
   s_probe.bpm = bpm;
   s_probe.handshakes++;
+
+  if (app_log_is_bt_enabled()) {
+    uint8_t third[AS7000_PROBE_BLOCK_LEN];
+    if (!prv_read(dev, 0x2c, third, sizeof(third))) {
+      memset(third, 0xff, sizeof(third));
+    }
+    prv_probe_app_log(regs, third, status, sqi);
+  }
 }
 #endif
 
@@ -224,7 +260,7 @@ static void prv_handle_handshake(void *context) {
 
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   if (read_ok) {
-    prv_probe_read(dev, regs.bpm);
+    prv_probe_read(dev, regs.bpm, regs.status, regs.sqi);
   }
 #endif
 
