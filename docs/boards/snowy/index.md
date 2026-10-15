@@ -164,11 +164,36 @@ heap's expense.
 
 Core features snowy could use, not yet looked into in detail:
 
-- **`DYNAMIC_BACKLIGHT`** (backlight follows ambient light). The light
-  service ramps by lux, but snowy's ALS is a raw 12-bit ADC reading with no
-  lux conversion (`ambient_light_level_to_lux()` is the identity without
-  coefficients). Needs calibration against a lux meter, Time and Steel
-  separately (their dark thresholds differ), before it can be turned on.
+- **`DYNAMIC_BACKLIGHT`** (backlight brightness follows ambient light: from
+  30/20/10% in the dark, for the Bright/Standard/Dim modes, up to the user's
+  maximum at 125/250/500 lux). It works in lux, and snowy's ALS is a raw
+  12-bit ADC level with no calibration (`ambient_light_lux_den` is 0, so
+  `ambient_light_level_to_lux()` returns the raw level). Readings in the
+  thousands are past every ramp point, so as is it would always give full
+  brightness.
+
+  Stock's dark threshold (3130 of 4096, with a ±96 band between "very
+  dark" and "very light") suggests the sensor packs most of its range near
+  the top, maybe saturating indoors. Only measurements will tell whether a
+  linear fit (`lux = (level - offset) * num / den`, as obelix and getafix
+  use) works over 0-500 lux.
+
+  Steps:
+  1. Measure: next to a phone lux meter, at about 6 levels (dark room, dim
+     lamp, room light, bright office, window, outdoor shade), read Settings >
+     Information > Light (Select reads it with the backlight off). Time and
+     Steel separately (their stock dark thresholds differ: 3130, 3220).
+  2. Fit offset/num/den per revision, or leave the option off if the range
+     is too compressed (or ramp in raw counts instead).
+  3. With a calibration, thresholds become lux: convert the board dark
+     threshold, `ambient_k_delta_threshold`, and the saved
+     `lightAmbientThreshold` pref (the current builds store 3130 counts,
+     which as lux would make nearly everything "dark"). Sleep tracking
+     records the same lux value each minute (`activity_algorithm_kraepelin.c`),
+     so check it still sees dark and light the same way.
+  4. Check the backlight still turns on at the same darkness as stock.
+
+  Planned once snowy is stable on hardware.
 - **`MMAP_RESOURCES`** (system bitmaps, vector icons and vector animations
   drawn straight from flash instead of copied into the heap). Worth it for
   the small kernel heap: notification and timeline icons and animations are
