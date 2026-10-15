@@ -1,8 +1,9 @@
 # Snowy (Pebble Time)
 
-Port of PebbleOS to the Pebble Time (`snowy_dvt`, board `snowy`). The Pebble
-Time Steel (`snowy_s3`, codename "bobby") is not targeted yet. The stock board file says all snowy
-boards are electrically identical apart from minor quirks. The hardware is an
+Port of PebbleOS to the Pebble Time (`snowy_dvt`, board `snowy@dvt`) and the
+Pebble Time Steel (`snowy_s3`, codename "bobby", board `snowy@s3`). The stock
+board file says all snowy boards are electrically identical apart from minor
+quirks. The hardware is an
 STM32F439 main MCU, a TI CC2564B Bluetooth controller, a MAX14690 PMIC, 16 MiB
 of parallel NOR flash, and a 144×168 64-color display driven through an
 iCE40LP FPGA. The port runs the `basalt` platform.
@@ -101,7 +102,9 @@ Same contract as silk (`platform/snowy/boot/src/main.c`):
 
 Steel (`snowy_s3`) differences: ALS dark threshold 3220 (3130 otherwise),
 `low_power_threshold` 2, a 204 h battery (144 h otherwise), its own battery
-curve, and platform ID `PebbleBobbyDVT` (`PebbleSnowyDVT` for the Time).
+curve, and platform ID `PebbleBobbyDVT` (`PebbleSnowyDVT` for the Time). All
+are in the `s3` revision (`CONFIG_BOARD_SNOWY_S3`). Stock booted the Steel with
+the `snowy_dvt` bootloader, so the canary covers both.
 
 ## Port status
 
@@ -122,6 +125,10 @@ curve, and platform ID `PebbleBobbyDVT` (`PebbleSnowyDVT` for the Time).
 | CC2564 deep sleep (eHCILL), STOP mode while BT runs | done behind `BT_CC2564_SLEEP` (off by default), untested on hardware |
 | Album art and notification pictures (`SERVICE_IMAGING_PICTURES`, one 4-bpp image of 6.5-9K at a time in the kernel heap) | on, untested on hardware |
 | Resources: silk's plus color-only ones, 105 color emoji | done (513,755 of 524,288 bytes) |
+| Pebble Time Steel (`snowy@s3`) | done, untested on hardware (QEMU same as the Time) |
+| Battery curves: stock snowy (Time) and bobby (Steel) | done, untested on hardware |
+| Motion sensitivity setting (`ACCEL_SENSITIVITY`; default "Medium" keeps the stock threshold) | on, untested on hardware |
+| Left-handed wear (`ORIENTATION_MANAGER`: display, buttons, BMI160, MAG3110 rotate 180°) | on; display checked in QEMU |
 
 QEMU emulates neither the PMIC nor the BMI160 (both log that and carry on),
 nor the IWDG.
@@ -129,7 +136,7 @@ nor the IWDG.
 ### Building and QEMU
 
 ```shell
-pbl configure -b build-snowy --board snowy@dvt
+pbl configure -b build-snowy --board snowy@dvt   # snowy@s3 for the Steel
 pbl build -b build-snowy
 python3 tools/qemu_silk_canary.py --board snowy --build-dir build-snowy \
     --machine pebble-snowy-bb --qemu $PEBBLEOS_SDK_ROOT/qemu/bin/qemu-pebble
@@ -152,6 +159,23 @@ The kernel heap is about 37K (about 56K on silk). In QEMU it peaks at about
 8K idling on the watchface. Kernel SRAM is 97% used, so new static buffers
 there (e.g. the Bluetooth UART's) may need something moved to CCM, at the
 heap's expense.
+
+### To research
+
+Core features snowy could use, not yet looked into in detail:
+
+- **`DYNAMIC_BACKLIGHT`** (backlight follows ambient light). The light
+  service ramps by lux, but snowy's ALS is a raw 12-bit ADC reading with no
+  lux conversion (`ambient_light_level_to_lux()` is the identity without
+  coefficients). Needs calibration against a lux meter, Time and Steel
+  separately (their dark thresholds differ), before it can be turned on.
+- **`MMAP_RESOURCES`** (zero-copy reads of system resources, mainly fonts
+  and images). Worth it for the small kernel heap. The S29VS is memory
+  mapped at `0x60000000` through the FMC, but
+  `resource_storage_flash.c` assumes the flash offset is the mapped address,
+  so it needs an offset-to-address translation. Also check that a mapped read
+  can't land in a bank that is being erased or programmed (the S29VS returns
+  status, not data, there), e.g. while the filesystem writes.
 
 ## Bluetooth
 
