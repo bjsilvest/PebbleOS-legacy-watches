@@ -28,6 +28,7 @@
 #include <stubs_accel_service.h>
 #include <stubs_analytics.h>
 #include <stubs_animation_service.h>
+#include <stubs_app_fetch_endpoint.h>
 #include <stubs_app_state.h>
 #include <stubs_applib_resource.h>
 #include <stubs_cache.h>

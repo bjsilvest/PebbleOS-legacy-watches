@@ -19,6 +19,7 @@
 #include <stubs_analytics.h>
 #include <stubs_animation_service.h>
 #include <stubs_app_cache.h>
+#include <stubs_app_fetch_endpoint.h>
 #include <stubs_app_manager.h>
 #include <stubs_app_state.h>
 #include <stubs_dls.h>

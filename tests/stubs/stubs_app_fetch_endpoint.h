@@ -12,3 +12,6 @@ bool PBL_WEAK app_fetch_in_progress(void) {
 
 void PBL_WEAK app_fetch_cancel_from_system_task(AppInstallId app_id) {
 }
+
+void PBL_WEAK app_fetch_trace_note(char c) {
+}

@@ -22,6 +22,7 @@
 #include <fake_session.h>
 #include <fake_spi_flash.h>
 #include <fake_system_task.h>
+#include <stubs_app_fetch_endpoint.h>
 #include <stubs_bt_lock.h>
 #include <stubs_hexdump.h>
 #include <stubs_irq.h>
