@@ -63,12 +63,6 @@ static void prv_enter_stop(void) {
   RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW) | RCC_CFGR_SW_PLL;
   while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_PLL) {
   }
-#if defined(CONFIG_HAL_STM32_STM32F439)
-  RCC->CR |= RCC_CR_PLLI2SON;
-  while ((RCC->CR & RCC_CR_PLLI2SRDY) == 0) {
-  }
-#endif
-
   flash_power_up_after_stop_mode();
 }
 

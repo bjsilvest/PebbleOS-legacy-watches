@@ -23,6 +23,7 @@
 #if defined(CONFIG_HAL_STM32_STM32F439)
 // I2S clock for the mic (the F439 has no DFSDM), as on stock snowy:
 //   PLLI2S = 16 MHz / M(16) * N(192) / R(5) = 38.4 MHz
+// The mic driver starts the PLL only while it records.
 #define PLLI2S_N 192
 #define PLLI2S_R 5
 // RM0090: 4 wait states up to 100 MHz at 1.8-2.1 V, as stock snowy used.
@@ -65,9 +66,6 @@ void SystemInit(void) {
 #if defined(CONFIG_HAL_STM32_STM32F439)
   RCC->CFGR &= ~RCC_CFGR_I2SSRC;
   RCC->PLLI2SCFGR = (PLLI2S_N << 6) | (PLLI2S_R << 28);
-  RCC->CR |= RCC_CR_PLLI2SON;
-  while ((RCC->CR & RCC_CR_PLLI2SRDY) == 0) {
-  }
 #endif
 
   SystemCoreClockUpdate();

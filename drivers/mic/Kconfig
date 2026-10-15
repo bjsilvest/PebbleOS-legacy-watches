@@ -31,6 +31,13 @@ config MIC_STM32_DFSDM
     help
       PDM microphone through the STM32F412 DFSDM (silk).
 
+config MIC_STM32_I2S_PDM
+    bool "STM32 I2S PDM"
+    depends on SOC_STM32F4
+    help
+      PDM microphone through an STM32F4 SPI in I2S mode, decimated by the
+      OpenPDMFilter (snowy).
+
 config MIC_QEMU
     bool "QEMU stub"
     default y if SOC_QEMU || SOC_POSIX
