@@ -76,3 +76,7 @@ CONFIG_MAG_MAG3110=y
 # Album art and notification pictures: one 4-bpp image (6.5-9K) at a time in
 # the kernel heap; one that does not fit is dropped.
 CONFIG_SERVICE_IMAGING_PICTURES=y
+
+# Settings: motion sensitivity and left-handed (rotated) wear
+CONFIG_ACCEL_SENSITIVITY=y
+CONFIG_ORIENTATION_MANAGER=y
