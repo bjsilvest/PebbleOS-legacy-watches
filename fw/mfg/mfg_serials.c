@@ -7,13 +7,17 @@
 
 #include <pbl/util/size.h>
 
-#ifdef CONFIG_BOARD_SILK
+#if defined(CONFIG_BOARD_SILK) || defined(CONFIG_BOARD_SNOWY)
 static const uint8_t OTP_SERIAL_SLOT_INDICES[] = {OTP_SERIAL1, OTP_SERIAL2, OTP_SERIAL3,
                                                   OTP_SERIAL4, OTP_SERIAL5};
 static const uint8_t OTP_PCBA_SLOT_INDICES[] = {OTP_PCBA_SERIAL1, OTP_PCBA_SERIAL2,
                                                 OTP_PCBA_SERIAL3};
+#ifdef CONFIG_BOARD_SNOWY
+static const uint8_t OTP_HWVER_SLOT_INDICES[] = {OTP_HWVER1};
+#else
 static const uint8_t OTP_HWVER_SLOT_INDICES[] = {OTP_HWVER1, OTP_HWVER2, OTP_HWVER3, OTP_HWVER4,
                                                  OTP_HWVER5};
+#endif
 #else
 static const uint8_t OTP_SERIAL_SLOT_INDICES[] = {
   OTP_SERIAL,

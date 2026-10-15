@@ -54,7 +54,7 @@ PBL_LOG_MODULE_DEFINE(service_app_cache, CONFIG_SERVICE_APP_CACHE_LOG_LEVEL);
 //! Silk's filesystem is only 5.25 MiB: with a 4 MiB buffer every newly cached
 //! app was evicted again right away, so a watchface fetched in a loop.
 #if defined(CONFIG_BOARD_ASTERIX) || defined(CONFIG_BOARD_OBELIX) || defined(CONFIG_BOARD_SILK) || \
-    defined(UNITTEST)
+    defined(CONFIG_BOARD_SNOWY) || defined(UNITTEST)
 #define APP_SPACE_BUFFER PBL_KIB(300)
 #else
 #define APP_SPACE_BUFFER PBL_MIB(4)

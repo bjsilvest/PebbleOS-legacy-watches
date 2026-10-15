@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 Brian Silvestri
+# SPDX-License-Identifier: Apache-2.0
+
+# 1 MiB of flash less the 16 KiB stock bootloader the image is linked past.
+config FW_FLASH_SIZE
+    default 0xfc000
+
+config QEMU_MACHINE
+    default "pebble-snowy-bb"

@@ -1,0 +1,122 @@
+/* SPDX-FileCopyrightText: 2024 Google LLC */
+/* SPDX-FileCopyrightText: 2026 Brian Silvestri */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+#pragma once
+
+// Pebble Time (snowy_dvt). Pins from the stock board_snowy.c/.h.
+
+#include <pbl/drivers/backlight/pwm.h>
+#include <pbl/services/imu/units.h>
+
+#define BT_VENDOR_ID   0x0154
+#define BT_VENDOR_NAME "Pebble Technology"
+
+static const BoardConfig BOARD_CONFIG = {
+  .ambient_light_dark_threshold = 3130,
+  .ambient_k_delta_threshold = 96,
+  .photo_en = PBL_GPIO(STM32_GPIOA, 3, 0),
+  .als_adc_channel = ADC_Channel_2,
+  .als_adc_pin = PBL_GPIO(STM32_GPIOC, 2, 0),
+  .backlight_on_percent = 45,
+};
+
+// Active low with pull-ups; Back has an external one.
+static const BoardConfigButton BOARD_CONFIG_BUTTON = {
+  .buttons = {
+    [BUTTON_ID_BACK] = {"Back", PBL_GPIO(STM32_GPIOG, 4, PBL_GPIO_ACTIVE_LOW), PBL_INPUT_KEY_BACK},
+    [BUTTON_ID_UP] =
+        {"Up", PBL_GPIO(STM32_GPIOG, 3, PBL_GPIO_ACTIVE_LOW | PBL_GPIO_PULL_UP), PBL_INPUT_KEY_UP},
+    [BUTTON_ID_SELECT] =
+        {"Select", PBL_GPIO(STM32_GPIOG, 1, PBL_GPIO_ACTIVE_LOW | PBL_GPIO_PULL_UP),
+         PBL_INPUT_KEY_SELECT},
+    [BUTTON_ID_DOWN] = {
+      "Down", PBL_GPIO(STM32_GPIOG, 2, PBL_GPIO_ACTIVE_LOW | PBL_GPIO_PULL_UP), PBL_INPUT_KEY_DOWN
+    },
+  },
+};
+
+static const BoardConfigPower BOARD_CONFIG_POWER = {
+  .low_power_threshold = 3,
+  .battery_capacity_hours = 144,
+};
+
+static const BoardConfigAccel BOARD_CONFIG_ACCEL = {
+  .accel_config =
+      {
+        .axes_offsets[AXIS_X] = 1,
+        .axes_offsets[AXIS_Y] = 0,
+        .axes_offsets[AXIS_Z] = 2,
+        .axes_inverts[AXIS_X] = false,
+        .axes_inverts[AXIS_Y] = false,
+        .axes_inverts[AXIS_Z] = false,
+        .shake_thresholds[AccelThresholdHigh] = 0x64,
+        .shake_thresholds[AccelThresholdLow] = 0xf,
+        .double_tap_threshold = 12500,
+      },
+  .accel_int_gpios = {
+    PBL_GPIO(STM32_GPIOG, 5, 0),
+    PBL_GPIO(STM32_GPIOG, 6, 0),
+  },
+};
+
+static const BoardConfigMag BOARD_CONFIG_MAG = {
+  .mag_config = {
+    .axes_offsets[AXIS_X] = 1,
+    .axes_offsets[AXIS_Y] = 0,
+    .axes_offsets[AXIS_Z] = 2,
+    .axes_inverts[AXIS_X] = true,
+    .axes_inverts[AXIS_Y] = true,
+    .axes_inverts[AXIS_Z] = false,
+  },
+};
+
+// Vibe: H-bridge driven by TIM10 CH1, enabled by PF4
+static const BoardConfigActuator BOARD_CONFIG_VIBE = {
+  .pwm =
+      {
+        .output = PBL_GPIO(STM32_GPIOB, 8, 0),
+        .timer = TIM10,
+        .rcc = RCC_APB2Periph_TIM10,
+        .apb2 = true,
+        .af = GPIO_AF_TIM10,
+        .channel = 1,
+      },
+  .ctl = PBL_GPIO(STM32_GPIOF, 4, 0),
+  .hbridge = true,
+};
+
+// Backlight: TIM12 CH1
+static const BacklightPwmConfig BACKLIGHT_PWM = {
+  .pwm =
+      {
+        .output = PBL_GPIO(STM32_GPIOB, 14, 0),
+        .timer = TIM12,
+        .rcc = RCC_APB1Periph_TIM12,
+        .af = GPIO_AF_TIM12,
+        .channel = 1,
+      },
+  .max_duty_cycle_percent = 100,
+};
+
+static const BoardConfigIce40Display BOARD_CONFIG_DISPLAY = {
+  .spi = SPI6,
+  .spi_rcc = RCC_APB2Periph_SPI6,
+  .spi_af = GPIO_AF_SPI6,
+  .sclk = PBL_GPIO(STM32_GPIOG, 13, 0),
+  .mosi = PBL_GPIO(STM32_GPIOG, 14, 0),
+  .scs = PBL_GPIO(STM32_GPIOG, 8, PBL_GPIO_ACTIVE_LOW),
+  .creset = PBL_GPIO(STM32_GPIOG, 15, PBL_GPIO_OPEN_DRAIN),
+  .cdone = PBL_GPIO(STM32_GPIOG, 9, 0),
+  .busy = PBL_GPIO(STM32_GPIOG, 10, 0),
+  .rail_6v6 = PBL_GPIO(STM32_GPIOF, 3, PBL_GPIO_OPEN_DRAIN),
+  .rail_4v5 = PBL_GPIO(STM32_GPIOF, 2, PBL_GPIO_OPEN_DRAIN),
+  .base_spi_frequency = 16000000,
+  .fast_spi_frequency = 32000000,
+};
+
+// MCO1 on PA8 outputs the LSE, the 32 kHz clock of the FPGA and the CC2564.
+static const struct pbl_gpio BOARD_MCO1 = PBL_GPIO(STM32_GPIOA, 8, 0);
+
+extern UARTDevice *const DBG_UART;
+extern MicDevice *const MIC;
