@@ -3,6 +3,10 @@
 
 #include <pbl/services/alarms/alarm.h>
 
+#ifdef CONFIG_SERVICE_HRM
+#include <pbl/drivers/hrm.h>
+#endif
+
 #include <syscall/syscall_internal.h>
 
 DEFINE_SYSCALL(bool, sys_alarm_get_next_enabled, time_t *timestamp_out) {
@@ -14,7 +18,7 @@ DEFINE_SYSCALL(bool, sys_alarm_get_next_enabled, time_t *timestamp_out) {
 
 DEFINE_SYSCALL(bool, sys_hrm_manager_is_hrm_present) {
 #ifdef CONFIG_SERVICE_HRM
-  return true;
+  return hrm_is_present(HRM);
 #else
   return false;
 #endif

@@ -15,6 +15,10 @@ void hrm_disable(HRMDevice *dev) {
   dev->state->enabled = false;
 }
 
+bool hrm_is_present(HRMDevice *dev) {
+  return true;
+}
+
 bool hrm_is_enabled(HRMDevice *dev) {
   return dev->state->enabled;
 }

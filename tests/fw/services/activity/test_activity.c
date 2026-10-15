@@ -156,6 +156,10 @@ bool sys_hrm_manager_set_features(HRMSessionRef session, HRMFeature features) {
   return true;
 }
 
+bool sys_hrm_manager_is_hrm_present(void) {
+  return true;
+}
+
 bool hrm_manager_has_continuous_green_subscriber(void) {
   return false;
 }

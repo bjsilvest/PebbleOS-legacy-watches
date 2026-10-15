@@ -56,7 +56,7 @@ bool activity_is_hrm_present(void) {
   if (!s_activity_initialized) {
     return false;
   }
-  return true;
+  return sys_hrm_manager_is_hrm_present();
 #else
   return false;
 #endif

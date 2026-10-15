@@ -35,6 +35,16 @@
 void hrm_init(HRMDevice *dev);
 
 /**
+ * @brief Check whether the HRM is fitted and usable.
+ *
+ * Valid after hrm_init(). Lets one firmware serve variants with and without the sensor.
+ *
+ * @param dev HRM device.
+ * @return True if present.
+ */
+bool hrm_is_present(HRMDevice *dev);
+
+/**
  * @brief Enable the HRM.
  *
  * Samples the PPG functions needed for the requested features.
