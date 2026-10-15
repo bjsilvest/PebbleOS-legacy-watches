@@ -14,6 +14,9 @@ file(GLOB micro_sources CONFIGURE_DEPENDS
 if(CONFIG_HAL_STM32_STM32F412)
   # The F412 has no FMC
   pbl_filter_sources(micro_sources EXCLUDE **/stm32f4xx_fmc.c)
+else()
+  # The F439 has the FMC instead of the FSMC
+  pbl_filter_sources(micro_sources EXCLUDE **/stm32f4xx_fsmc.c)
 endif()
 set(micro_includes
   stm32-sdk/Device/ST/STM32F4xx/Include
