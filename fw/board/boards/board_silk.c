@@ -6,6 +6,7 @@
 #include <pbl/drivers/i2c/stm32.h>
 #include <pbl/drivers/mic/stm32/dfsdm_definitions.h>
 #include <pbl/drivers/pmic/as3701b.h>
+#include <pbl/drivers/regulator/gpio.h>
 #include <pbl/drivers/uart/stm32.h>
 #include <pbl/kernel/irq.h>
 
@@ -115,6 +116,30 @@ PBL_IRQ_CONNECT(I2C3_EV, 12, pbl_i2c_stm32_ev_irq_handler, &s_i2c3, 0);
 PBL_IRQ_CONNECT(I2C3_ER, 12, pbl_i2c_stm32_er_irq_handler, &s_i2c3, 0);
 
 static const struct pbl_i2c_dev I2C_SLAVE_AS3701B = PBL_I2C_DEV(&s_i2c3.bus, 0x40);
+
+// LED boost, shared by the backlight and the HRM LEDs
+///////////////////////////////////////////////////////////////////////////////
+
+PBL_GPIO_REGULATOR_DEFINE(BOARD_LED_BOOST, "led_boost", STM32_GPIOB, 13, 0, false);
+
+#ifdef CONFIG_HRM
+// HRM: AS7000 (Pebble 2 HR only, probed at boot)
+///////////////////////////////////////////////////////////////////////////////
+
+static const struct pbl_i2c_dev I2C_SLAVE_AS7000 = PBL_I2C_DEV(&s_i2c3.bus, 0x30);
+
+static HRMDeviceState s_hrm_state;
+static HRMDevice HRM_DEVICE = {
+  .state = &s_hrm_state,
+  .i2c = &I2C_SLAVE_AS7000,
+  // Shared with JTDI
+  .int_exti = {EXTI_PortSourceGPIOA, 15},
+  .int_gpio = PBL_GPIO(STM32_GPIOA, 15, 0),
+  .enable = PBL_GPIO(STM32_GPIOC, 1, PBL_GPIO_ACTIVE_LOW),
+  .led_supply = &BOARD_LED_BOOST.reg,
+};
+HRMDevice *const HRM = &HRM_DEVICE;
+#endif
 
 // PMIC
 ///////////////////////////////////////////////////////////////////////////////

@@ -4,6 +4,10 @@
 #pragma once
 
 #include <pbl/drivers/backlight/pwm.h>
+#include <pbl/drivers/regulator/gpio.h>
+#ifdef CONFIG_HRM
+#include <pbl/drivers/hrm/as7000.h>
+#endif
 #include <pbl/services/imu/units.h>
 
 #define BT_VENDOR_ID   0x0154
@@ -71,9 +75,12 @@ static const BoardConfigActuator BOARD_CONFIG_VIBE = {
   .vsys_scale = 3300,
 };
 
-// Backlight: TIM3 CH1, enabled by PB13
+// 4.5 V LED boost (PB13), for the backlight and the HRM LEDs
+extern const struct pbl_gpio_regulator BOARD_LED_BOOST;
+
+// Backlight: TIM3 CH1, powered by the LED boost
 static const BacklightPwmConfig BACKLIGHT_PWM = {
-  .ctl = PBL_GPIO(STM32_GPIOB, 13, 0),
+  .supply = &BOARD_LED_BOOST.reg,
   .pwm =
       {
         .output = PBL_GPIO(STM32_GPIOC, 6, 0),
@@ -120,6 +127,9 @@ static const struct pbl_gpio BOARD_BT_CTS = PBL_GPIO(STM32_GPIOB, 1, PBL_GPIO_AC
 // wakes the host.
 #define BOARD_BT_HAS_WAKE 1
 static const struct pbl_gpio BOARD_BT_WAKE = PBL_GPIO(STM32_GPIOA, 10, PBL_GPIO_PULL_DOWN);
+#endif
+#ifdef CONFIG_HRM
+extern HRMDevice *const HRM;
 #endif
 extern QSPIPort *const QSPI;
 extern QSPIFlash *const QSPI_FLASH;
