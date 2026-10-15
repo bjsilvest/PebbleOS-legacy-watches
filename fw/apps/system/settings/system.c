@@ -78,10 +78,9 @@ enum {
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   SystemInformationItemHrmPrv,
-  SystemInformationItemHrmRegs1,
-  SystemInformationItemHrmRegs2,
-  SystemInformationItemHrmRegs3,
   SystemInformationItemHrmChanged,
+  SystemInformationItemHrmHistory,
+  SystemInformationItemHrmHistoryLast = SystemInformationItemHrmHistory + AS7000_PROBE_HISTORY - 1,
 #endif
   SystemInformationItemFirmware,
   SystemInformationItemLanguage,
@@ -170,9 +169,11 @@ typedef struct SystemInformationData {
   char app_fetch_string[21];
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
-  char hrm_prv_string[32];
-  char hrm_regs_string[3][17];
+  char hrm_prv_string[40];
   char hrm_changed_string[12];
+  // Per handshake: 0x12 and the first read of the 0x2c block as the title, the second read below
+  char hrm_history_title[AS7000_PROBE_HISTORY][16];
+  char hrm_history_string[AS7000_PROBE_HISTORY][12];
 #endif
   char const *subtitle_text[SystemInformationItem_Count];
   char language_string[16];
@@ -270,9 +271,6 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   [SystemInformationItemHrmPrv] = i18n_noop("HRM PRV"),
-  [SystemInformationItemHrmRegs1] = i18n_noop("HRM 10-13 20-23"),
-  [SystemInformationItemHrmRegs2] = i18n_noop("HRM 24-2B"),
-  [SystemInformationItemHrmRegs3] = i18n_noop("HRM 2C-33"),
   [SystemInformationItemHrmChanged] = i18n_noop("HRM changed"),
 #endif
   [SystemInformationItemFirmware] = i18n_noop("Firmware"),
@@ -303,7 +301,16 @@ static void prv_information_draw_row_callback(GContext *ctx, const Layer *cell_l
   SettingsSystemData *data = (SettingsSystemData *)context;
   SystemInformationData *info = &data->information_data;
 
-  const char *title = i18n_get(s_information_titles[cell_index->row], data);
+  const char *title;
+#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+  if (cell_index->row >= SystemInformationItemHrmHistory &&
+      cell_index->row <= SystemInformationItemHrmHistoryLast) {
+    title = info->hrm_history_title[cell_index->row - SystemInformationItemHrmHistory];
+  } else
+#endif
+  {
+    title = i18n_get(s_information_titles[cell_index->row], data);
+  }
   menu_cell_basic_draw(ctx, cell_layer, title, info->subtitle_text[cell_index->row], nullptr);
 }
 
@@ -426,16 +433,23 @@ static void prv_information_window_push(SettingsSystemData *data) {
     strncpy(info->hrm_prv_string, "no sensor", sizeof(info->hrm_prv_string) - 1);
   } else {
     sniprintf(info->hrm_prv_string, sizeof(info->hrm_prv_string),
-              "r%02x a%02x%s b%u n%lu %ubpm", probe.requested, probe.running,
+              "r%02x a%02x%s b%u n%lu %ubpm m%02x v%u", probe.requested, probe.running,
               probe.prv_failed ? " F" : "", probe.boots, (unsigned long)probe.handshakes,
-              probe.bpm);
+              probe.bpm, probe.max_2c, probe.advances);
   }
-  for (int row = 0; row < 3; row++) {
-    char *out = info->hrm_regs_string[row];
-    for (int i = 0; i < 8; i++) {
-      sniprintf(&out[i * 2], 3, "%02x", probe.regs[row * 8 + i]);
+  // Newest first
+  for (int row = 0; row < AS7000_PROBE_HISTORY; row++) {
+    const AS7000ProbeSample *sample =
+        &probe.history[(probe.history_next + AS7000_PROBE_HISTORY - 1 - row) %
+                       AS7000_PROBE_HISTORY];
+    char *title = info->hrm_history_title[row];
+    char *out = info->hrm_history_string[row];
+    sniprintf(title, 4, "%02x ", sample->reg12);
+    for (int i = 0; i < AS7000_PROBE_BLOCK_LEN; i++) {
+      sniprintf(&title[3 + i * 2], 3, "%02x", sample->first[i]);
+      sniprintf(&out[i * 2], 3, "%02x", sample->second[i]);
     }
-    info->subtitle_text[SystemInformationItemHrmRegs1 + row] = out;
+    info->subtitle_text[SystemInformationItemHrmHistory + row] = out;
   }
   sniprintf(info->hrm_changed_string, sizeof(info->hrm_changed_string), "%06lx",
             (unsigned long)probe.changed);

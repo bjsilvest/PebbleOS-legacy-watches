@@ -81,6 +81,20 @@ typedef const struct HRMDevice {
 /** @brief Registers dumped by the PRV probe: 0x10-0x13, then 0x20-0x33. */
 #define AS7000_PROBE_NUM_REGS 24
 
+/** @brief Handshakes kept in the PRV probe history. */
+#define AS7000_PROBE_HISTORY 8
+/** @brief Length of the block at 0x2c that changes with PRV running. */
+#define AS7000_PROBE_BLOCK_LEN 5
+
+/** @brief One handshake of the PRV probe history. */
+typedef struct {
+  /** Register 0x12. */
+  uint8_t reg12;
+  /** Block at 0x2c, read twice back to back. */
+  uint8_t first[AS7000_PROBE_BLOCK_LEN];
+  uint8_t second[AS7000_PROBE_BLOCK_LEN];
+} AS7000ProbeSample;
+
 /** @brief PRV probe snapshot, kept after the sensor turns off. */
 typedef struct {
   /** Application IDs written, and read back once the sensor was ready. */
@@ -98,6 +112,13 @@ typedef struct {
   uint8_t regs[AS7000_PROBE_NUM_REGS];
   /** Bit n set once register n changed between handshakes. */
   uint32_t changed;
+  /** Last handshakes, oldest first from @ref history_next. */
+  AS7000ProbeSample history[AS7000_PROBE_HISTORY];
+  uint8_t history_next;
+  /** Largest value seen at 0x2c. */
+  uint8_t max_2c;
+  /** Handshakes where the second read of the 0x2c block differed from the first. */
+  uint16_t advances;
 } AS7000Probe;
 
 /**

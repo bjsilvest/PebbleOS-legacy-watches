@@ -4,12 +4,15 @@
 //! ams AS7000 heart rate sensor on the Pebble 2 HR. Runs the HRM application already in the
 //! sensor's flash: the loader is never entered and nothing is ever written to the sensor flash.
 
+#include <string.h>
+
 #include <pbl/drivers/gpio/stm32.h>
 #include <pbl/drivers/hrm.h>
 #include <pbl/drivers/hrm/as7000.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/hrm/hrm_manager.h>
 #include <pbl/services/system_task.h>
+#include <pbl/util/math.h>
 #include <pbl/util/size.h>
 
 #include <board/board.h>
@@ -114,6 +117,19 @@ static void prv_probe_read(HRMDevice *dev, uint8_t bpm) {
     }
     pos += s_probe_ranges[i][1];
   }
+
+  // Read the 0x2c block again at once, to tell a queue from latched values
+  AS7000ProbeSample *sample = &s_probe.history[s_probe.history_next];
+  sample->reg12 = regs[2];
+  memcpy(sample->first, &regs[16], AS7000_PROBE_BLOCK_LEN);
+  if (!prv_read(dev, 0x2c, sample->second, AS7000_PROBE_BLOCK_LEN)) {
+    memset(sample->second, 0xff, AS7000_PROBE_BLOCK_LEN);
+  }
+  if (memcmp(sample->first, sample->second, AS7000_PROBE_BLOCK_LEN) != 0) {
+    s_probe.advances++;
+  }
+  s_probe.history_next = (s_probe.history_next + 1) % AS7000_PROBE_HISTORY;
+  s_probe.max_2c = MAX(s_probe.max_2c, regs[16]);
 
   for (int i = 0; i < AS7000_PROBE_NUM_REGS; i++) {
     if (s_probe.handshakes > 0 && regs[i] != s_probe.regs[i]) {
