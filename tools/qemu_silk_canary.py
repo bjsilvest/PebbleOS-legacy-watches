@@ -2,18 +2,20 @@
 # SPDX-FileCopyrightText: 2026 Brian Silvestri
 # SPDX-License-Identifier: Apache-2.0
 
-"""Boot a silk build in QEMU and check the stock-owned flash regions survive.
+"""Boot a silk or snowy build in QEMU and check the stock-owned flash regions survive.
 
-Fills PRF, stock shared PRF storage and MFG info in a copy of the SPI flash
-image with random bytes, boots the firmware for a while, then checks those
-regions are byte-for-byte unchanged. Exits non-zero if any changed or the
-firmware hit a flash guard assertion.
+Fills PRF, stock shared PRF storage and MFG info in a copy of the external
+flash image with random bytes, boots the firmware for a while, then checks
+those regions are byte-for-byte unchanged. Exits non-zero if any changed or
+the firmware hit a flash guard assertion.
 
-Two targets:
+Targets:
   qemu_silk (default): the flint emulator machine, firmware loaded as ELF.
   silk (--machine pebble-silk-bb): the emulated STM32F412, booted through
     the stock silk bootloader, which is taken from git history and only
     ever used here.
+  snowy (--board snowy --machine pebble-snowy-bb): the emulated STM32F439
+    with its parallel NOR, booted through the stock snowy bootloader.
 """
 
 import argparse
@@ -29,25 +31,40 @@ import time
 import zlib
 from pathlib import Path
 
-PROTECTED = (
-    ("PRF", 0x200000, 0x280000),
-    ("stock shared PRF storage", 0x7FE000, 0x7FF000),
-    ("MFG info", 0x7FF000, 0x800000),
-)
+BOARDS = {
+    "silk": {
+        "protected": (
+            ("PRF", 0x200000, 0x280000),
+            ("stock shared PRF storage", 0x7FE000, 0x7FF000),
+            ("MFG info", 0x7FF000, 0x800000),
+        ),
+        "bootloader": "85a10e0b5^:bin/boot/boot_silk@1478015115.hex",
+        "flash_size": 0x800000,
+        "resources_begin": 0x100000,
+        "flash_args": lambda path: ["-drive", f"if=mtd,format=raw,file={path}"],
+    },
+    "snowy": {
+        "protected": (
+            ("PRF", 0x200000, 0x300000),
+            ("stock shared PRF storage", 0x0C0000, 0x0E0000),
+            ("MFG info", 0x0E0000, 0x100000),
+        ),
+        "bootloader": "c6288702d^:bin/boot/boot_snowy_dvt@1478015115.hex",
+        "flash_size": 0x1000000,
+        "resources_begin": 0x300000,
+        "flash_args": lambda path: ["-drive", f"if=none,id=spi-flash,file={path},format=raw"],
+    },
+}
 GUARD_MESSAGE = b"protected flash"
 
-STOCK_BOOTLOADER = "85a10e0b5^:bin/boot/boot_silk@1478015115.hex"
-SILK_FLASH_SIZE = 0x800000
-SILK_RESOURCES_BEGIN = 0x100000
 
-
-def build_silk_images(build_dir, tmp):
-    """Stock bootloader + firmware, and an 8 MiB SPI flash with resources."""
+def build_stock_images(board, build_dir, tmp):
+    """Stock bootloader + firmware, and an external flash with resources."""
     from intelhex import IntelHex
 
     boot_hex = os.path.join(tmp, "boot.hex")
     with open(boot_hex, "wb") as f:
-        f.write(subprocess.check_output(["git", "show", STOCK_BOOTLOADER]))
+        f.write(subprocess.check_output(["git", "show", board["bootloader"]]))
 
     boot = IntelHex(boot_hex)
     fw = IntelHex(os.path.join(build_dir, "pebbleos.hex"))
@@ -63,9 +80,10 @@ def build_silk_images(build_dir, tmp):
     micro_bin = os.path.join(tmp, "micro.bin")
     micro.tobinfile(micro_bin, start=0x08000000, end=end - 1)
 
-    spi = bytearray(b"\xff" * SILK_FLASH_SIZE)
+    spi = bytearray(b"\xff" * board["flash_size"])
     res = Path(build_dir, "system_resources.pbpack").read_bytes()
-    spi[SILK_RESOURCES_BEGIN : SILK_RESOURCES_BEGIN + len(res)] = res
+    begin = board["resources_begin"]
+    spi[begin : begin + len(res)] = res
     return micro_bin, spi
 
 
@@ -94,6 +112,7 @@ def ppm_to_png(ppm_path, png_path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--board", choices=BOARDS, default="silk")
     parser.add_argument("--build-dir", default="build-silk")
     parser.add_argument("--qemu", required=True, help="path to qemu-pebble")
     parser.add_argument("--machine", default="pebble-flint")
@@ -102,19 +121,20 @@ def main():
     parser.add_argument("--console", help="copy the console log here")
     args = parser.parse_args()
 
-    silk_hw = args.machine == "pebble-silk-bb"
+    board = BOARDS[args.board]
+    stock_hw = args.machine in ("pebble-silk-bb", "pebble-snowy-bb")
 
     with tempfile.TemporaryDirectory() as tmp:
         spi = os.path.join(tmp, "spi.bin")
-        if silk_hw:
-            micro_bin, image = build_silk_images(args.build_dir, tmp)
+        if stock_hw:
+            micro_bin, image = build_stock_images(board, args.build_dir, tmp)
             boot_args = ["-cpu", "cortex-m4", "-kernel", micro_bin]
         else:
             shutil.copyfile(os.path.join(args.build_dir, "qemu_spi_flash.bin"), spi)
             image = bytearray(Path(spi).read_bytes())
             boot_args = ["-kernel", os.path.join(args.build_dir, "pebbleos.elf")]
         rng = random.Random(0x5111C)
-        for _name, lo, hi in PROTECTED:
+        for _name, lo, hi in board["protected"]:
             image[lo:hi] = rng.randbytes(hi - lo)
         Path(spi).write_bytes(image)
 
@@ -136,8 +156,7 @@ def main():
                 "-machine",
                 args.machine,
                 *boot_args,
-                "-drive",
-                f"if=mtd,format=raw,file={spi}",
+                *board["flash_args"](spi),
                 "-display",
                 "none",
             ]
@@ -159,7 +178,7 @@ def main():
 
         after = Path(spi).read_bytes()
         ok = True
-        for name, lo, hi in PROTECTED:
+        for name, lo, hi in board["protected"]:
             same = after[lo:hi] == image[lo:hi]
             ok &= same
             print(f"{name:26s} {'unchanged' if same else 'MODIFIED'}")
