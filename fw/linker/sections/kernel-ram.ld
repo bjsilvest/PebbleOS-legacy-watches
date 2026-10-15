@@ -14,6 +14,21 @@
     } >RAM AT>FLASH
     __data_load_start = LOADADDR(.kernel_data);
 
+#if CONFIG_CCM_SIZE
+    /* Zeroed data that is never a DMA target, moved out of the scarce SRAM.
+       Must come before the generic .bss rules below, which would take it. */
+    .ccm_bss (NOLOAD) : ALIGN(8) {
+        __ccm_bss_start = .;
+
+        EXCLUDE_FILE(*hci_uart.c.obj) *nimble.dir*(.bss .bss.* COMMON)
+        *task_timer.c.obj(.bss .bss.*)
+        *subsys__bluetooth.dir/init.c.obj(.bss.s_host_task_stack)
+
+        . = ALIGN(8);
+        __ccm_bss_end = .;
+    } >CCM
+#endif
+
     .kernel_ro_bss (NOLOAD) : {
         __bss_start = .; /* This is used by the startup in order to initialize the .bss section */
 
