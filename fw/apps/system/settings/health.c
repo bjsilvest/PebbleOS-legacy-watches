@@ -7,6 +7,7 @@
 #include "window.h"
 
 #include <pbl/services/activity/activity.h>
+#include <pbl/services/hrm/hrm_manager.h>
 #include <pbl/services/i18n/i18n.h>
 #include <pbl/util/size.h>
 
@@ -45,6 +46,7 @@ static int prv_hrm_interval_to_index(HRMonitoringInterval interval) {
   return prv_hrm_interval_to_index(HRMonitoringInterval_10Min);
 }
 
+#ifdef CONFIG_HRM_SPO2
 static const HRMonitoringInterval s_spo2_intervals[] = {
   HRMonitoringInterval_10Min,
   HRMonitoringInterval_30Min,
@@ -67,6 +69,7 @@ static int prv_spo2_interval_to_index(HRMonitoringInterval interval) {
   }
   return prv_spo2_interval_to_index(HRMonitoringInterval_10Min);
 }
+#endif // CONFIG_HRM_SPO2
 #endif
 
 enum SettingsHealthItem {
@@ -75,9 +78,11 @@ enum SettingsHealthItem {
 #ifdef CONFIG_HRM
   SettingsHealthHRMonitoringInterval,
   SettingsHealthHRActivityTracking,
+#ifdef CONFIG_HRM_SPO2
   SettingsHealthBloodOxygenEnabled,
   SettingsHealthSpO2MonitoringInterval,
   SettingsHealthBloodOxygenActivityTracking,
+#endif
 #endif
   NumSettingsHealthItems
 };
@@ -104,6 +109,7 @@ static void prv_hrm_interval_menu_push(SettingsHealthData *data) {
                             s_hrm_interval_labels, data);
 }
 
+#ifdef CONFIG_HRM_SPO2
 // SpO2 Interval option menu
 /////////////////////////////
 
@@ -124,6 +130,7 @@ static void prv_spo2_interval_menu_push(SettingsHealthData *data) {
                             ARRAY_LENGTH(s_spo2_interval_labels), true /* icons_enabled */,
                             s_spo2_interval_labels, data);
 }
+#endif // CONFIG_HRM_SPO2
 #endif
 
 // Menu Callbacks
@@ -173,6 +180,7 @@ static void prv_draw_row_cb(SettingsCallbacks *context, GContext *ctx, const Lay
           activity_prefs_hrm_activity_tracking_is_enabled() ? i18n_noop("On") : i18n_noop("Off");
       break;
     }
+#ifdef CONFIG_HRM_SPO2
     case SettingsHealthBloodOxygenEnabled: {
       title = i18n_noop("Blood Oxygen");
       subtitle = activity_prefs_blood_oxygen_is_enabled() ? i18n_noop("On") : i18n_noop("Off");
@@ -196,6 +204,7 @@ static void prv_draw_row_cb(SettingsCallbacks *context, GContext *ctx, const Lay
       }
       break;
     }
+#endif // CONFIG_HRM_SPO2
 #endif
     default:
       WTF;
@@ -228,12 +237,15 @@ static void prv_select_click_cb(SettingsCallbacks *context, uint16_t row) {
     case SettingsHealthHRActivityTracking: {
       bool new_value = !activity_prefs_hrm_activity_tracking_is_enabled();
       activity_prefs_set_hrm_activity_tracking_enabled(new_value);
+#ifdef CONFIG_HRM_SPO2
       if (!new_value) {
         // Blood O2 in activity depends on HR in activity; clear it when the parent goes off.
         activity_prefs_set_blood_oxygen_activity_tracking_enabled(false);
       }
+#endif
       break;
     }
+#ifdef CONFIG_HRM_SPO2
     case SettingsHealthBloodOxygenEnabled:
       activity_prefs_set_blood_oxygen_enabled(!activity_prefs_blood_oxygen_is_enabled());
       break;
@@ -247,6 +259,7 @@ static void prv_select_click_cb(SettingsCallbacks *context, uint16_t row) {
             !activity_prefs_blood_oxygen_activity_tracking_is_enabled());
       }
       break;
+#endif // CONFIG_HRM_SPO2
 #endif
     default:
       WTF;
@@ -259,6 +272,12 @@ static uint16_t prv_num_rows_cb(SettingsCallbacks *context) {
   if (!activity_prefs_tracking_is_enabled()) {
     return 1; // Only show the Health Tracking toggle
   }
+#ifdef CONFIG_HRM
+  if (!sys_hrm_manager_is_hrm_present()) {
+    // The heart rate rows come last
+    return SettingsHealthHRMonitoringInterval;
+  }
+#endif
   return NumSettingsHealthItems;
 }
 

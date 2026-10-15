@@ -22,6 +22,14 @@ config HRM_AS7000
       only. The sensor is probed at boot, so the Pebble 2 SE runs the same
       firmware.
 
+config HRM_SPO2
+    bool
+    default y if HRM_GH3X2X || HRM_QEMU
+    help
+      The sensor measures blood oxygen (SpO2). Without it the blood oxygen
+      settings are neither shown nor synced with the phone, and the HRM
+      manager never asks for SpO2.
+
 config HRM_HRV
     bool "HRV (RR interval) support"
     depends on HRM_GH3X2X

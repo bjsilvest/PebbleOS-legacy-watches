@@ -216,6 +216,9 @@ PBL_T_STATIC bool prv_can_turn_sensor_on(void) {
 // background SpO2 session) can't light its LED or turn the sensor on.
 static HRMFeature prv_prefs_allowed_features(void) {
   HRMFeature allowed = (HRMFeature)~0;
+#ifndef CONFIG_HRM_SPO2
+  allowed &= ~HRMFeature_SpO2;
+#endif
 #ifndef CONFIG_RECOVERY_FW
   // The recovery firmware doesn't gate the sensor on user prefs (see prv_can_turn_sensor_on()).
   //

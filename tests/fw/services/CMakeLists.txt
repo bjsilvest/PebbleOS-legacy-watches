@@ -502,6 +502,7 @@ pbl_clar_test(test_hrm_manager
     tests/fakes/fake_events.c
     tests/fakes/fake_rtc.c
     tests/fakes/fake_accel_service.c
+  DEFINES CONFIG_HRM_SPO2
   OVERRIDES dummy_board
 )
 
