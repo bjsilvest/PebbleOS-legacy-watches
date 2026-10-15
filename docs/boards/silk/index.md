@@ -132,7 +132,7 @@ STM32 drivers are rewritten against the current APIs, using the old drivers
 | Hardware platform ID (`PebbleSilk`), bundle `hwrev: silk` | done |
 | DMA for display, QSPI, UART RX | todo (polled for now) |
 | Bluetooth (DA14681, H4 over UART, NimBLE host) | done, untested on hardware; needs the Dialog SDK, see below |
-| Heart rate (AS7000 on I2C3, Pebble 2 HR only) | todo: port the old `as7000` driver, but use the ams firmware already in the sensor's flash, since the update image was not released; no SpO2/HRV |
+| Heart rate (AS7000 on I2C3, Pebble 2 HR only) | done, untested on hardware: probed at boot (the SE runs the same image), runs the ams application already in the sensor flash and never enters its loader or reflashes it (the update image was not released); BPM only, no SpO2/HRV; QEMU does not emulate it |
 
 The `silk` board boots in QEMU (`pebble-silk-bb`) through the **stock
 bootloader** to the watchface, with PRF, stock shared PRF storage and MFG
@@ -170,8 +170,9 @@ Pin map (from the stock board file):
 | QSPI flash | CS PB6, CLK PB2, D0 PC9, D1 PC10, D2 PC8, D3 PA1, 50 MHz |
 | Sharp display | SPI2, CLK PB10, MOSI PB15, CS PB9, ON PA0 |
 | I2C3 (PMIC, HRM) | SCL PA8, SDA PB8, 400 kHz; AS3701B at 0x80, INT PC7 |
+| HRM (AS7000) | I2C3 at 0x60 (8-bit), handshake PA15 (EXTI15, shared with JTDI), enable PC1 (active low), LEDs on the PB13 boost |
 | Vibe (DRV2603) | PWM TIM14 CH1 on PA7, 22 kHz, scaled by Vsys (3300 mV) |
-| Backlight | enable PB13, PWM TIM3 CH1 on PC6, 67% max duty |
+| Backlight | PWM TIM3 CH1 on PC6, 67% max duty; PB13 enables the 4.5 V LED boost shared with the HRM |
 | Accel ints | PA6, PA3 |
 | ADC1 | ALS ch13 (PC3, enable PC0), battery ch5 (PA5), temperature |
 | Mic | DFSDM1 ch2, CK PC2, SD PB14 |
