@@ -287,6 +287,21 @@ config SRAM_SIZE
       Size of the SRAM available to PebbleOS (kernel + worker + app).
       Defaulted per SoC in soc/*/Kconfig.defconfig.
 
+config CCM_BASE
+    hex
+    default 0
+    help
+      Base address of core-coupled RAM. Defaulted per SoC in
+      soc/*/Kconfig.defconfig.
+
+config CCM_SIZE
+    hex
+    default 0
+    help
+      Size of core-coupled RAM. When non-zero the kernel stacks and heap
+      live there instead of in SRAM. DMA cannot reach it, so DMA buffers
+      must not be on a kernel stack or the kernel heap.
+
 config FLASH_BASE
     hex
     help

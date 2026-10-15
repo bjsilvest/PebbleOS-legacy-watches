@@ -41,6 +41,10 @@ MEMORY
 
     RAM (xrw) : ORIGIN = CONFIG_SRAM_BASE,
                 LENGTH = PBL_RAM_SIZE
+
+#if CONFIG_CCM_SIZE
+    CCM (rw) : ORIGIN = CONFIG_CCM_BASE, LENGTH = CONFIG_CCM_SIZE
+#endif
 }
 
 __FLASH_start__ = CONFIG_FLASH_BASE;
@@ -60,8 +64,15 @@ __APP_RAM_size__ = PBL_APP_RAM_SIZE;
 __APP_RAM_end__ = __APP_RAM__ + __APP_RAM_size__;
 
 REGION_ALIAS("REGION_ISR_STACK", RAM);
+#if CONFIG_CCM_SIZE
+__CCM_start__ = ORIGIN(CCM);
+__CCM_size__ = LENGTH(CCM);
+REGION_ALIAS("REGION_KERNEL_STACKS", CCM);
+REGION_ALIAS("REGION_KERNEL_HEAP", CCM);
+#else
 REGION_ALIAS("REGION_KERNEL_STACKS", RAM);
 REGION_ALIAS("REGION_KERNEL_HEAP", RAM);
+#endif
 
 /* The process loader enforces eight-byte alignment on all segments. */
 ASSERT(CONFIG_APP_RAM_2X_SEGMENT_SIZE % 8 == 0,
