@@ -82,6 +82,9 @@ enum {
   SystemInformationItemHrmHistory,
   SystemInformationItemHrmHistoryLast = SystemInformationItemHrmHistory + AS7000_PROBE_HISTORY - 1,
 #endif
+#ifdef CONFIG_AMBIENT_LIGHT_STM32_ADC
+  SystemInformationItemLight,
+#endif
   SystemInformationItemFirmware,
   SystemInformationItemLanguage,
   SystemInformationItemRecovery,
@@ -174,6 +177,9 @@ typedef struct SystemInformationData {
   // Per handshake: 0x12 and the first read of the 0x2c block as the title, the second read below
   char hrm_history_title[AS7000_PROBE_HISTORY][16];
   char hrm_history_string[AS7000_PROBE_HISTORY][12];
+#endif
+#ifdef CONFIG_AMBIENT_LIGHT_STM32_ADC
+  char light_string[24];
 #endif
   char const *subtitle_text[SystemInformationItem_Count];
   char language_string[16];
@@ -273,6 +279,9 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemHrmPrv] = i18n_noop("HRM PRV"),
   [SystemInformationItemHrmChanged] = i18n_noop("HRM changed"),
 #endif
+#ifdef CONFIG_AMBIENT_LIGHT_STM32_ADC
+  [SystemInformationItemLight] = i18n_noop("Light"),
+#endif
   [SystemInformationItemFirmware] = i18n_noop("Firmware"),
   [SystemInformationItemLanguage] = i18n_noop("Language"),
   [SystemInformationItemRecovery] = i18n_noop("Recovery"),
@@ -327,6 +336,38 @@ static uint16_t prv_information_get_num_rows_callback(MenuLayer *menu_layer, uin
   return SystemInformationItem_Count;
 }
 
+#ifdef CONFIG_AMBIENT_LIGHT_STM32_ADC
+//! Time for the backlight to go dark before reading the light sensor.
+#define LIGHT_READ_SETTLE_MS (250)
+
+//! Read the light sensor with the backlight off, for calibrating it.
+static void prv_read_light(SystemInformationData *info) {
+  light_allow(false);
+  psleep(LIGHT_READ_SETTLE_MS);
+  const uint32_t raw = ambient_light_get_light_level();
+  light_allow(true);
+  light_enable_interaction();
+
+  if (ambient_light_lux_available()) {
+    sniprintf(info->light_string, sizeof(info->light_string), "%" PRIu32 " (%" PRIu32 " lux)", raw,
+              ambient_light_level_to_lux(raw));
+  } else {
+    sniprintf(info->light_string, sizeof(info->light_string), "%" PRIu32 " raw", raw);
+  }
+}
+#endif
+
+static void prv_information_select_callback(MenuLayer *menu_layer, MenuIndex *cell_index,
+                                            void *context) {
+#ifdef CONFIG_AMBIENT_LIGHT_STM32_ADC
+  if (cell_index->row == SystemInformationItemLight) {
+    SettingsSystemData *data = (SettingsSystemData *)context;
+    prv_read_light(&data->information_data);
+    menu_layer_reload_data(menu_layer);
+  }
+#endif
+}
+
 static void prv_information_window_load(Window *window) {
   SettingsSystemData *data = (SettingsSystemData *)window_get_user_data(window);
 
@@ -346,6 +387,7 @@ static void prv_information_window_load(Window *window) {
                              .get_num_rows = prv_information_get_num_rows_callback,
                              .get_cell_height = prv_information_get_cell_height_callback,
                              .draw_row = prv_information_draw_row_callback,
+                             .select_click = prv_information_select_callback,
                            });
   GColor highlight_bg = shell_prefs_get_theme_highlight_color();
   menu_layer_set_highlight_colors(menu_layer, highlight_bg, gcolor_legible_over(highlight_bg));
@@ -455,6 +497,10 @@ static void prv_information_window_push(SettingsSystemData *data) {
             (unsigned long)probe.changed);
   info->subtitle_text[SystemInformationItemHrmPrv] = info->hrm_prv_string;
   info->subtitle_text[SystemInformationItemHrmChanged] = info->hrm_changed_string;
+#endif
+#ifdef CONFIG_AMBIENT_LIGHT_STM32_ADC
+  strncpy(info->light_string, "Select to read", sizeof(info->light_string) - 1);
+  info->subtitle_text[SystemInformationItemLight] = info->light_string;
 #endif
   info->subtitle_text[SystemInformationItemFirmware] =
       (char *)(strlen(TINTIN_METADATA.version_tag) >= 2 ? TINTIN_METADATA.version_tag
