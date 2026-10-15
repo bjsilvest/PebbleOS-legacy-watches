@@ -7,6 +7,7 @@
 // Pebble Time (snowy_dvt). Pins from the stock board_snowy.c/.h.
 
 #include <pbl/drivers/backlight/pwm.h>
+#include <pbl/drivers/i2c.h>
 #include <pbl/services/imu/units.h>
 
 #define BT_VENDOR_ID   0x0154
@@ -98,6 +99,10 @@ static const BacklightPwmConfig BACKLIGHT_PWM = {
       },
   .max_duty_cycle_percent = 100,
 };
+
+// MAG3110 data ready, active high
+static const struct pbl_gpio BOARD_MAG_INT = PBL_GPIO(STM32_GPIOF, 14, 0);
+extern const struct pbl_i2c_dev *const I2C_MAG3110;
 
 static const BoardConfigIce40Display BOARD_CONFIG_DISPLAY = {
   .spi = SPI6,

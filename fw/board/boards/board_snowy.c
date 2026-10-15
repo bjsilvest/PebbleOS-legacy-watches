@@ -59,6 +59,8 @@ PBL_IRQ_CONNECT(I2C1_EV, 12, pbl_i2c_stm32_ev_irq_handler, &s_i2c1, 0);
 PBL_IRQ_CONNECT(I2C1_ER, 12, pbl_i2c_stm32_er_irq_handler, &s_i2c1, 0);
 
 static const struct pbl_i2c_dev I2C_SLAVE_MAX14690 = PBL_I2C_DEV(&s_i2c1.bus, 0x28);
+static const struct pbl_i2c_dev I2C_SLAVE_MAG3110 = PBL_I2C_DEV(&s_i2c1.bus, 0x0e);
+const struct pbl_i2c_dev *const I2C_MAG3110 = &I2C_SLAVE_MAG3110;
 
 // PMIC
 ///////////////////////////////////////////////////////////////////////////////

@@ -143,6 +143,12 @@ config MAG_MMC5603NJ
     help
       Support for the MEMSIC MMC5603NJ magnetometer.
 
+config MAG_MAG3110
+    bool "NXP MAG3110"
+    depends on I2C && SOC_STM32F4
+    help
+      Support for the NXP MAG3110 magnetometer (snowy).
+
 endchoice
 
 endif # MAG
