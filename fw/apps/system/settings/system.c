@@ -13,10 +13,20 @@
 #include <string.h>
 
 #include <pbl/drivers/ambient_light.h>
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#if defined(CONFIG_BT_CONTROLLER_DA1468X) || defined(CONFIG_BT_CONTROLLER_CC2564)
+// Bring-up diagnostics for boards with an HCI controller on a UART.
+#define BT_CONTROLLER_DIAGNOSTICS 1
 #include <pbl/bluetooth/advert.h>
 #include <pbl/bluetooth/hci_uart.h>
+#endif
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
 #include <pbl/drivers/bluetooth/da1468x.h>
+#define bt_controller_status  da1468x_status
+#define bt_controller_chip_id da1468x_chip_id
+#elifdef CONFIG_BT_CONTROLLER_CC2564
+#include <pbl/drivers/bluetooth/cc2564.h>
+#define bt_controller_status  cc2564_status
+#define bt_controller_chip_id cc2564_chip_id
 #endif
 #include <pbl/services/app_fetch_endpoint.h>
 #include <pbl/services/blob_db/api.h>
@@ -61,7 +71,7 @@
 
 enum {
   SystemInformationItemBtAddress = 0,
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#ifdef BT_CONTROLLER_DIAGNOSTICS
   SystemInformationItemBtRadio,
   SystemInformationItemBtHci,
   SystemInformationItemBtPair,
@@ -69,12 +79,16 @@ enum {
   SystemInformationItemBtSmp,
   SystemInformationItemBtSmp2,
   SystemInformationItemLastReboot,
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
   SystemInformationItemBtRx,
+#endif
   SystemInformationItemAppFetch,
   SystemInformationItemAppFetch2,
   SystemInformationItemBtChip,
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
   SystemInformationItemBtRxBoot,
   SystemInformationItemBtRxReset,
+#endif
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   SystemInformationItemHrmPrv,
@@ -158,7 +172,7 @@ typedef struct SystemInformationData {
   char serial_string[MFG_SERIAL_NUMBER_SIZE + 1];
   char hw_version_string[MFG_HW_VERSION_SIZE + 1];
   char uptime_string[16]; // "xxd xxh xxm xxs"
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#ifdef BT_CONTROLLER_DIAGNOSTICS
   char bt_radio_string[32];
   char bt_hci_string[32];
   char bt_pair_string[24];
@@ -254,7 +268,7 @@ static ConfirmationDialog *prv_settings_confirm(const char *title, const char *t
 
 static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemBtAddress] = i18n_noop("BT Address"),
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#ifdef BT_CONTROLLER_DIAGNOSTICS
   [SystemInformationItemBtRadio] = i18n_noop("BT Radio"),
   [SystemInformationItemBtHci] = i18n_noop("BT HCI"),
   [SystemInformationItemBtPair] = i18n_noop("BT Pair"),
@@ -262,12 +276,16 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemBtSmp] = i18n_noop("BT SMP"),
   [SystemInformationItemBtSmp2] = i18n_noop("BT SMP 2"),
   [SystemInformationItemLastReboot] = i18n_noop("Last reboot"),
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
   [SystemInformationItemBtRx] = i18n_noop("BT Rx"),
+#endif
   [SystemInformationItemAppFetch] = i18n_noop("App fetch"),
   [SystemInformationItemAppFetch2] = i18n_noop("App fetch 2"),
   [SystemInformationItemBtChip] = i18n_noop("BT Chip"),
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
   [SystemInformationItemBtRxBoot] = i18n_noop("BT Rx boot"),
   [SystemInformationItemBtRxReset] = i18n_noop("BT Rx reset"),
+#endif
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   [SystemInformationItemHrmPrv] = i18n_noop("HRM PRV"),
@@ -388,8 +406,8 @@ static void prv_information_window_push(SettingsSystemData *data) {
             i18n_get_version());
 
   info->subtitle_text[SystemInformationItemBtAddress] = info->bt_mac_addr;
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
-  strncpy(info->bt_radio_string, da1468x_status(), sizeof(info->bt_radio_string) - 1);
+#ifdef BT_CONTROLLER_DIAGNOSTICS
+  strncpy(info->bt_radio_string, bt_controller_status(), sizeof(info->bt_radio_string) - 1);
   pbl_bt_hci_uart_copy_status(info->bt_hci_string, sizeof(info->bt_hci_string));
   info->subtitle_text[SystemInformationItemBtRadio] = info->bt_radio_string;
   info->subtitle_text[SystemInformationItemBtHci] = info->bt_hci_string;
@@ -415,17 +433,21 @@ static void prv_information_window_push(SettingsSystemData *data) {
   sniprintf(info->last_reboot_string, sizeof(info->last_reboot_string), "%u %08lx %08lx",
             (unsigned)reason.code, (unsigned long)words[1], (unsigned long)words[2]);
   info->subtitle_text[SystemInformationItemLastReboot] = info->last_reboot_string;
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
   pbl_bt_hci_uart_copy_rx_stats(info->bt_rx_string, sizeof(info->bt_rx_string));
   info->subtitle_text[SystemInformationItemBtRx] = info->bt_rx_string;
+#endif
   const char *fetch = app_fetch_trace();
   const size_t fetch_split = MIN(strlen(fetch), sizeof(info->app_fetch_string) - 1);
   memcpy(info->app_fetch_string, fetch, fetch_split);
   info->app_fetch_string[fetch_split] = '\0';
   info->subtitle_text[SystemInformationItemAppFetch] = info->app_fetch_string;
   info->subtitle_text[SystemInformationItemAppFetch2] = &fetch[fetch_split];
-  info->subtitle_text[SystemInformationItemBtChip] = da1468x_chip_id();
+  info->subtitle_text[SystemInformationItemBtChip] = bt_controller_chip_id();
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
   info->subtitle_text[SystemInformationItemBtRxBoot] = da1468x_rx_after_markers();
   info->subtitle_text[SystemInformationItemBtRxReset] = da1468x_rx_after_reset();
+#endif
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   AS7000Probe probe = {};

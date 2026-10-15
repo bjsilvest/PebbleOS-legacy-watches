@@ -22,6 +22,9 @@
 #include <pbl/drivers/rtc.h>
 #include <pbl/soc/stm32/sleep.h>
 #endif
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+#include <pbl/drivers/bluetooth/cc2564.h>
+#endif
 #include <kernel/pebble_tasks.h>
 #include <kernel/util/delay.h>
 #include <system/passert.h>
@@ -46,7 +49,7 @@ PBL_LOG_MODULE_DECLARE(nimble, CONFIG_NIMBLE_LOG_LEVEL);
 #define EVT_POOL_POLL_MS 5U
 
 static struct pbl_thread *s_hci_task_handle;
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#if defined(CONFIG_BT_CONTROLLER_DA1468X) || defined(CONFIG_BT_CONTROLLER_CC2564)
 // Booting the controller also runs on this stack.
 PBL_THREAD_STACK_DEFINE(s_hci_task_stack, 2048);
 #else
@@ -470,7 +473,8 @@ static uint8_t s_rx_dma_buf[1024];
 #endif
 
 static void prv_uart_start(void) {
-#ifndef CONFIG_BT_CONTROLLER_DA1468X
+  // A controller driver that boots the controller has set the UART up already.
+#if !defined(CONFIG_BT_CONTROLLER_DA1468X) && !defined(CONFIG_BT_CONTROLLER_CC2564)
   if (BT_HCI_UART_TX != BT_HCI_UART) {
     uart_init_rx_only(BT_HCI_UART);
     uart_init_tx_only(BT_HCI_UART_TX);
@@ -697,6 +701,15 @@ static void prv_hci_task_main(void *unused) {
   // Waiting for events from the host to free buffers can deadlock against it:
   // turn a stuck thread into a reset that records where it was.
   PBL_ASSERTN(pbl_task_wdt_add(nullptr, CONFIG_TASK_WDT_TIMEOUT_MS, nullptr, nullptr) >= 0);
+#elifdef CONFIG_BT_CONTROLLER_CC2564
+  // Loading TI's init script takes a second or two, so it happens here rather
+  // than in ble_transport_ll_init(). A failure leaves Bluetooth off instead of
+  // crashing, since a crash loop would end in the bootloader starting PRF.
+  if (cc2564_boot()) {
+    prv_uart_start();
+  } else {
+    s_controller_state = ControllerStateFailed;
+  }
 #endif
 
   while (true) {
@@ -914,7 +927,7 @@ void ble_transport_ll_init(void) {
     .stack_size = sizeof(s_hci_task_stack),
   };
 
-#ifndef CONFIG_BT_CONTROLLER_DA1468X
+#if !defined(CONFIG_BT_CONTROLLER_DA1468X) && !defined(CONFIG_BT_CONTROLLER_CC2564)
   prv_uart_start();
 #endif
 

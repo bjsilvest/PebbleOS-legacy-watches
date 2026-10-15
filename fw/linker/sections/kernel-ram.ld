@@ -20,7 +20,12 @@
     .ccm_bss (NOLOAD) : ALIGN(8) {
         __ccm_bss_start = .;
 
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+        /* Its UART RX DMA buffer must stay in SRAM. */
         EXCLUDE_FILE(*hci_uart.c.obj) *nimble.dir*(.bss .bss.* COMMON)
+#else
+        *nimble.dir*(.bss .bss.* COMMON)
+#endif
         *task_timer.c.obj(.bss .bss.*)
 
         . = ALIGN(8);

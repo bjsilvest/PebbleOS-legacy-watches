@@ -119,4 +119,14 @@ static const BoardConfigIce40Display BOARD_CONFIG_DISPLAY = {
 static const struct pbl_gpio BOARD_MCO1 = PBL_GPIO(STM32_GPIOA, 8, 0);
 
 extern UARTDevice *const DBG_UART;
+
+#ifdef CONFIG_BT_HCI_UART
+// CC2564B HCI: USART1 with hardware flow control.
+extern UARTDevice *const BT_HCI_UART;
+
+// nSHUTDOWN: active (low) keeps the controller off.
+static const struct pbl_gpio BOARD_BT_SHUTDOWN = PBL_GPIO(STM32_GPIOB, 12, PBL_GPIO_ACTIVE_LOW);
+// The controller's RTS, our CTS: active (low) when it can take bytes.
+static const struct pbl_gpio BOARD_BT_CTS = PBL_GPIO(STM32_GPIOA, 11, PBL_GPIO_ACTIVE_LOW);
+#endif
 extern MicDevice *const MIC;

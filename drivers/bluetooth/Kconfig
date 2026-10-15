@@ -33,3 +33,19 @@ config BT_DA1468X_HCI_BAUD
       Baud rate of the controller image's H4 UART.
 
 endif
+
+config BT_CONTROLLER_CC2564
+    bool "TI CC2564 controller"
+    depends on SOC_STM32F4 && BT_HCI_UART
+    help
+      Power up a TI CC2564B as the H4 HCI controller and load TI's
+      initialization script (third_party/ti_bt_sp), which it needs at every
+      power up. The board provides BOARD_BT_SHUTDOWN, BOARD_BT_CTS and
+      BOARD_MCO1 for its 32 kHz slow clock.
+
+config BT_CC2564_HCI_BAUD
+    int "HCI baud rate"
+    depends on BT_CONTROLLER_CC2564
+    default 921600
+    help
+      Baud rate the controller is switched to after power up.

@@ -54,3 +54,6 @@ CONFIG_MIC_STM32_I2S_PDM=y
 
 # No LE Audio: drop the ISO buffer pool, kernel heap is scarce on the F439.
 CONFIG_NIMBLE_BLE_TRANSPORT_ISO_COUNT=0
+
+CONFIG_BT_HCI_UART=y
+CONFIG_BT_CONTROLLER_CC2564=y
