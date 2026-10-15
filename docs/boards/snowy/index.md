@@ -111,13 +111,13 @@ curve, and platform ID `PebbleBobbyDVT` (`PebbleSnowyDVT` for the Time).
 | SoC: STM32F439 IRQs, 192K SRAM + 64K CCM, 96 MHz (4 WS), STOP | done; STOP untested |
 | GPIO (ports A-H), EXTI, RTC (LSE bypass), IWDG, debug UART (USART3), buttons | done |
 | S29VS NOR (FMC), flash guard, PRF hardware lock | done (polled) |
-| iCE40LP display (SPI6, FPGA bitstream, MCO1 32 kHz) | done (polled; DMA todo) |
+| iCE40LP display (SPI6 TX DMA2 stream 5, BUSY on EXTI10, FPGA bitstream, MCO1 32 kHz) | done |
 | MAX14690 PMIC: charger, LDO2/LDO3, battery and Vsys via MON | done, untested on hardware |
 | BMI160 accel (SPI1) | done, untested on hardware |
 | Vibe (TIM10 H-bridge, PF4 enable), backlight (TIM12), ALS | done, untested on hardware |
 | I2S PDM mic (SPI2, DMA1 stream 3, OpenPDMFilter) | done, untested on hardware |
 | Factory data (stock OTP slots and MFG struct, read-only) | done |
-| MAG3110 compass | todo |
+| MAG3110 compass (I2C1 0x0E, data ready PF14) | done, untested on hardware |
 | Bluetooth (CC2564B, NimBLE over H4, TI init script) | done, untested on hardware |
 | CC2564 deep sleep (eHCILL), STOP mode while BT runs | done behind `BT_CC2564_SLEEP` (off by default), untested on hardware |
 | Resources: silk's plus color-only ones, 105 color emoji | done (513,755 of 524,288 bytes) |
@@ -186,6 +186,20 @@ Settings > System > Information shows "BT Radio" (boot progress, e.g.
 Chip", "BT HCI", "BT Pair", "BT Reset", "BT SMP" and "Last reboot", as on
 silk.
 
+### Stock pairing
+
+Stock snowy kept its shared PRF storage in the older v2 layout (silk's is
+v3): one struct at the start of `STOCK_SHARED_PRF_STORAGE` with the root
+keys, the local name and one BLE pairing from Bluetopia's legacy pairing,
+which kept only the DIV and EDIV it gave the phone. With
+`SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK_V2`, boot imports them when our
+identity root key differs from stock's, regenerating our LTK as
+d1(ER, DIV, 0) with Rand 0. When the phone asks for that key, the transport
+checks its EDIV against DIV ^ dm(DHK, Rand) and stands in Rand 0 for
+NimBLE; if the check fails, the phone simply pairs again. The stock region
+is only read (the canary's `--stock-sprf-v2` checks this with a synthetic
+entry). Stock snowy pinned no address, so neither does this port.
+
 ### Deep sleep (eHCILL)
 
 With `CONFIG_BT_CC2564_SLEEP=y` the controller deep sleeps using TI's eHCILL
@@ -209,8 +223,8 @@ Rx" then shows `<state A/S/W/C> z<sleeps> c<controller wakes> h<host
 wakes> r<wake retries> f<false wakes>`.
 
 Open items:
-- **Two bonds.** The stock PRF keeps its own pairing in stock shared PRF
-  storage; importing it (as silk does) is not done yet.
+- **Two bonds after re-pairing.** Pairing again here leaves the stock PRF
+  on its old pairing (as on silk).
 - Raise the baud rate towards the script's 3 Mbaud once the link is proven.
 
 ### Licensing
