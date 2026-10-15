@@ -169,6 +169,8 @@ static_assert(sizeof(struct FirmwareMetadata) ==
  */
 #ifdef CONFIG_BOARD_SILK
 #define FIRMWARE_METADATA_HW_PLATFORM (FirmwareMetadataPlatformPebbleSilk)
+#elifdef CONFIG_BOARD_SNOWY_S3
+#define FIRMWARE_METADATA_HW_PLATFORM (FirmwareMetadataPlatformPebbleBobbyDVT)
 #elifdef CONFIG_BOARD_SNOWY
 #define FIRMWARE_METADATA_HW_PLATFORM (FirmwareMetadataPlatformPebbleSnowyDVT)
 #elifdef CONFIG_BOARD_ASTERIX

@@ -4,7 +4,8 @@
 
 #pragma once
 
-// Pebble Time (snowy_dvt). Pins from the stock board_snowy.c/.h.
+// Pebble Time (snowy_dvt) and Pebble Time Steel (snowy_s3), electrically the
+// same. Pins from the stock board_snowy.c/.h.
 
 #include <pbl/drivers/backlight/pwm.h>
 #include <pbl/drivers/i2c.h>
@@ -14,7 +15,11 @@
 #define BT_VENDOR_NAME "Pebble Technology"
 
 static const BoardConfig BOARD_CONFIG = {
+#ifdef CONFIG_BOARD_SNOWY_S3
+  .ambient_light_dark_threshold = 3220,
+#else
   .ambient_light_dark_threshold = 3130,
+#endif
   .ambient_k_delta_threshold = 96,
   .photo_en = PBL_GPIO(STM32_GPIOA, 3, 0),
   .als_adc_channel = ADC_Channel_2,
@@ -38,8 +43,13 @@ static const BoardConfigButton BOARD_CONFIG_BUTTON = {
 };
 
 static const BoardConfigPower BOARD_CONFIG_POWER = {
+#ifdef CONFIG_BOARD_SNOWY_S3
+  .low_power_threshold = 2,
+  .battery_capacity_hours = 204,
+#else
   .low_power_threshold = 3,
   .battery_capacity_hours = 144,
+#endif
 };
 
 static const BoardConfigAccel BOARD_CONFIG_ACCEL = {
