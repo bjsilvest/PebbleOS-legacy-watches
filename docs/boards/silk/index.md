@@ -133,6 +133,8 @@ STM32 drivers are rewritten against the current APIs, using the old drivers
 | DMA for display, QSPI, UART RX | todo (polled for now) |
 | Bluetooth (DA14681, H4 over UART, NimBLE host) | done, untested on hardware; needs the Dialog SDK, see below |
 | Heart rate (AS7000 on I2C3, Pebble 2 HR only) | done, untested on hardware: probed at boot (the SE runs the same image), runs the ams application already in the sensor flash and never enters its loader or reflashes it (the update image was not released); BPM only, no SpO2/HRV; QEMU does not emulate it |
+| Motion sensitivity setting (`ACCEL_SENSITIVITY`; default "Medium" keeps the stock threshold) | on, untested on hardware |
+| Left-handed wear (`ORIENTATION_MANAGER`: display, buttons, BMA255 rotate 180°) | on; display checked in QEMU |
 
 The `silk` board boots in QEMU (`pebble-silk-bb`) through the **stock
 bootloader** to the watchface, with PRF, stock shared PRF storage and MFG
