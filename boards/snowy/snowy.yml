@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Brian Silvestri
+# SPDX-License-Identifier: Apache-2.0
+
+# dvt is the retail Pebble Time, as named by stock firmware bundles (hwrev).
+revisions:
+  - dvt

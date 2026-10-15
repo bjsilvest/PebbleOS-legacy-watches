@@ -126,7 +126,7 @@ nor the IWDG.
 ### Building and QEMU
 
 ```shell
-pbl configure -b build-snowy --board snowy
+pbl configure -b build-snowy --board snowy@dvt
 pbl build -b build-snowy
 python3 tools/qemu_silk_canary.py --board snowy --build-dir build-snowy \
     --machine pebble-snowy-bb --qemu $PEBBLEOS_SDK_ROOT/qemu/bin/qemu-pebble
