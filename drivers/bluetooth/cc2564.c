@@ -10,6 +10,10 @@
 //! rate, and its sleep mode setting with deep sleep off until the transport
 //! supports eHCILL. The H4 transport takes the UART over afterwards.
 //!
+//! STOP mode stops the UART while RTS still tells the controller it may
+//! send, so STOP is blocked while the controller runs, until the transport
+//! handles eHCILL.
+//!
 //! Every wait is bounded and a failure leaves Bluetooth off instead of
 //! crashing: a crash loop before the firmware is marked stable ends in the
 //! stock bootloader starting PRF.
@@ -24,6 +28,7 @@
 #include <pbl/kernel/sem.h>
 #include <pbl/kernel/thread.h>
 #include <pbl/logging/logging.h>
+#include <pbl/soc/stm32/sleep.h>
 #include <pbl/util/math.h>
 
 #include <board/board.h>
@@ -288,6 +293,7 @@ bool cc2564_boot(void) {
     }
 
     uart_set_rx_interrupt_enabled(BT_HCI_UART, false);
+    soc_stm32_stop_block();
     sniprintf(s_status, sizeof(s_status), "Running (try %d)", attempt);
     return true;
   }

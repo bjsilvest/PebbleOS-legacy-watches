@@ -7,3 +7,9 @@ config FW_FLASH_SIZE
 
 config QEMU_MACHINE
     default "pebble-snowy-bb"
+
+# Like the legacy firmware, derive the identity address (a random static
+# one) from the serial number, so the watch keeps its stock name and address.
+choice BT_ID_ADDR_SOURCE
+    default BT_ID_ADDR_SERIAL
+endchoice
