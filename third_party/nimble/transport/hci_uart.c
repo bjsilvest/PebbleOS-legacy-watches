@@ -286,8 +286,51 @@ static const struct hci_h4_allocators s_hci_h4_allocs_from_ll = {
   .evt = prv_alloc_evt,
 };
 
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+// Pinned resolvable private address the controller uses in place of the identity address.
+static uint8_t s_local_rpa[6];
+static volatile bool s_local_rpa_set;
+
+#define HCI_OP_LE_SET_RANDOM_ADDR BLE_HCI_OP(BLE_HCI_OGF_LE, BLE_HCI_OCF_LE_SET_RAND_ADDR)
+#define LE_CONN_COMPLETE_LEN      19U
+#define LE_ENH_CONN_COMPLETE_LEN  31U
+// Offset of the connection interval: the enhanced event inserts the local and peer RPAs here.
+#define LE_CONN_COMPLETE_ITVL_OFF 12U
+
+//! The 4.2 controller sends the legacy LE Connection Complete. Pass it on as the enhanced one
+//! carrying the pinned address as our local RPA, so NimBLE pairs with the address on the air
+//! while keeping the identity address.
+static void prv_conn_complete_add_local_rpa(struct ble_hci_ev *ev) {
+  if (!s_local_rpa_set || ev->opcode != BLE_HCI_EVCODE_LE_META ||
+      ev->length != LE_CONN_COMPLETE_LEN || ev->data[0] != BLE_HCI_LE_SUBEV_CONN_COMPLETE) {
+    return;
+  }
+  const size_t tail_len = LE_CONN_COMPLETE_LEN - LE_CONN_COMPLETE_ITVL_OFF;
+  uint8_t *rpas = &ev->data[LE_CONN_COMPLETE_ITVL_OFF];
+  memmove(rpas + 12U, rpas, tail_len);
+  memcpy(rpas, s_local_rpa, 6U);
+  memset(rpas + 6U, 0, 6U);
+  ev->data[0] = BLE_HCI_LE_SUBEV_ENH_CONN_COMPLETE;
+  ev->length = LE_ENH_CONN_COMPLETE_LEN;
+}
+#endif
+
+void pbl_bt_hci_uart_set_local_rpa(const uint8_t *addr) {
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
+  s_local_rpa_set = (addr != NULL);
+  if (addr != NULL) {
+    memcpy(s_local_rpa, addr, sizeof(s_local_rpa));
+  }
+  pbl_mutex_unlock(&s_tx_mutex);
+#endif
+}
+
 static void prv_note_evt(struct ble_hci_ev *ev) {
   s_num_evts++;
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  prv_conn_complete_add_local_rpa(ev);
+#endif
   if (ev->opcode == BLE_HCI_EVCODE_NUM_COMP_PKTS && ev->length >= 1U) {
     for (uint8_t i = 0; i < ev->data[0] && 1U + 4U * (i + 1U) <= ev->length; i++) {
       uint8_t *entry = &ev->data[1 + 4 * i];
@@ -919,6 +962,12 @@ int ble_transport_to_ll_cmd_impl(void *buf) {
 #endif
 
   pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  if (s_last_cmd == HCI_OP_LE_SET_RANDOM_ADDR && cmd->length == sizeof(s_local_rpa) &&
+      s_local_rpa_set) {
+    memcpy(cmd->data, s_local_rpa, sizeof(s_local_rpa));
+  }
+#endif
   prv_write(&type, 1U);
   prv_write(buf, sizeof(*cmd) + cmd->length);
   pbl_mutex_unlock(&s_tx_mutex);

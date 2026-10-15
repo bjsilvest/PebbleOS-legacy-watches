@@ -21,6 +21,18 @@
 bool pbl_bt_hci_uart_wait_ready(uint32_t timeout_ms);
 
 /**
+ * @brief Put a resolvable private address on the air in place of the identity address.
+ *
+ * NimBLE only takes a static random address as its own. The transport sends @p addr in every
+ * LE Set Random Address, and reports it as the local RPA of new connections, so NimBLE keeps
+ * the identity address for key distribution (DA1468x only; ignored otherwise).
+ *
+ * @param addr The address, or NULL to use the identity address again. Takes effect at the next
+ *             LE Set Random Address.
+ */
+void pbl_bt_hci_uart_set_local_rpa(const uint8_t *addr);
+
+/**
  * @brief Describe the last HCI exchange, for diagnostics.
  *
  * Formats "<last answered command>:<its status> !<last failed command>:<its status>",
