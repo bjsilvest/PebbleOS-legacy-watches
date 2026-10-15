@@ -1,0 +1,268 @@
+/* SPDX-FileCopyrightText: 2024 Google LLC */
+/* SPDX-FileCopyrightText: 2026 Brian Silvestri */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+//! Snowy display: an iCE40LP FPGA framebuffer on an STM32F4 SPI.
+//!
+//! The FPGA is programmed with its bitstream at init, then takes frames: SCS
+//! low, CMD_FRAME_BEGIN, then one line per panel column. BUSY is high while
+//! the FPGA cannot take more data. Transfers are polled for now; completion
+//! is still reported through a kernel event, as with a DMA transfer.
+//!
+//! Nothing here asserts on a misbehaving FPGA: a crash loop before the
+//! firmware is marked stable ends in the stock bootloader starting PRF.
+
+#include <stdint.h>
+#include <string.h>
+
+#include <pbl/drivers/display/display.h>
+#include <pbl/drivers/gpio/stm32.h>
+#include <pbl/logging/logging.h>
+
+#include <board/board.h>
+#include <kernel/events.h>
+#include <kernel/util/delay.h>
+#include <stm32f4xx.h>
+
+#define CMD_FRAME_BEGIN 0x5
+
+// The panel is scanned in columns: each line is one framebuffer column,
+// bottom to top.
+#define DISP_LINES  PBL_DISPLAY_WIDTH
+#define DISP_PIXELS PBL_DISPLAY_HEIGHT
+
+//! A full frame should take no longer than 33 ms.
+#define BUSY_TIMEOUT_US 40000
+//! Typical NVCM configuration time is 56 ms.
+#define CDONE_TIMEOUT_US 100000
+
+extern const uint8_t ice40lp_bitstream_start[];
+extern const uint8_t ice40lp_bitstream_end[];
+
+static uint8_t s_line[DISP_PIXELS];
+static bool s_updating;
+static bool s_programmed;
+static UpdateCompleteCallback s_uccb;
+
+static uint16_t prv_baud_prescaler(uint32_t hz) {
+  RCC_ClocksTypeDef clocks;
+  RCC_GetClocksFreq(&clocks);
+
+  // SPI6 is on APB2. Pick the smallest divider not above the target.
+  static const uint16_t prescalers[] = {
+    SPI_BaudRatePrescaler_2,   SPI_BaudRatePrescaler_4,   SPI_BaudRatePrescaler_8,
+    SPI_BaudRatePrescaler_16,  SPI_BaudRatePrescaler_32,  SPI_BaudRatePrescaler_64,
+    SPI_BaudRatePrescaler_128, SPI_BaudRatePrescaler_256,
+  };
+  for (unsigned i = 0; i < sizeof(prescalers) / sizeof(prescalers[0]); i++) {
+    if ((clocks.PCLK2_Frequency >> (i + 1)) <= hz) {
+      return prescalers[i];
+    }
+  }
+  return SPI_BaudRatePrescaler_256;
+}
+
+static void prv_spi_configure(uint32_t hz) {
+  SPI_TypeDef *spi = BOARD_CONFIG_DISPLAY.spi;
+  SPI_InitTypeDef spi_cfg;
+
+  SPI_Cmd(spi, DISABLE);
+  SPI_StructInit(&spi_cfg);
+  spi_cfg.SPI_Direction = SPI_Direction_1Line_Tx;
+  spi_cfg.SPI_Mode = SPI_Mode_Master;
+  spi_cfg.SPI_DataSize = SPI_DataSize_8b;
+  spi_cfg.SPI_CPOL = SPI_CPOL_High;
+  spi_cfg.SPI_CPHA = SPI_CPHA_2Edge;
+  spi_cfg.SPI_NSS = SPI_NSS_Soft;
+  spi_cfg.SPI_BaudRatePrescaler = prv_baud_prescaler(hz);
+  spi_cfg.SPI_FirstBit = SPI_FirstBit_MSB;
+  SPI_Init(spi, &spi_cfg);
+  SPI_Cmd(spi, ENABLE);
+}
+
+static void prv_spi_write(const uint8_t *buf, size_t len) {
+  SPI_TypeDef *spi = BOARD_CONFIG_DISPLAY.spi;
+
+  for (size_t i = 0; i < len; i++) {
+    while (!(spi->SR & SPI_SR_TXE)) {
+    }
+    spi->DR = buf[i];
+  }
+  while (!(spi->SR & SPI_SR_TXE)) {
+  }
+  while (spi->SR & SPI_SR_BSY) {
+  }
+}
+
+static bool prv_busy(void) {
+  return pbl_gpio_get(&BOARD_CONFIG_DISPLAY.busy) > 0;
+}
+
+//! @return false if BUSY did not clear in time.
+static bool prv_wait_not_busy(void) {
+  for (int us = 0; us < BUSY_TIMEOUT_US; us += 10) {
+    if (!prv_busy()) {
+      return true;
+    }
+    delay_us(10);
+  }
+  return false;
+}
+
+static bool prv_program(void) {
+  const struct pbl_gpio *creset = &BOARD_CONFIG_DISPLAY.creset;
+  const struct pbl_gpio *scs = &BOARD_CONFIG_DISPLAY.scs;
+
+  prv_spi_configure(BOARD_CONFIG_DISPLAY.base_spi_frequency);
+
+  // SCS low while CRESET rises selects SPI slave configuration.
+  pbl_gpio_set(scs, true);
+  pbl_gpio_set(creset, false);
+  // CRESET must stay low for 200 ns.
+  delay_us(10);
+  pbl_gpio_set(creset, true);
+  // The iCE40 needs 800 us of housekeeping after reset.
+  delay_us(1000);
+
+  prv_spi_write(ice40lp_bitstream_start, ice40lp_bitstream_end - ice40lp_bitstream_start);
+
+  // SCS high so these clocks are not taken as commands; 49+ clocks finish
+  // the configuration.
+  pbl_gpio_set(scs, false);
+  static const uint8_t zeros[9];
+  prv_spi_write(zeros, sizeof(zeros));
+
+  bool done = false;
+  for (int us = 0; us < CDONE_TIMEOUT_US; us += 100) {
+    if (pbl_gpio_get(&BOARD_CONFIG_DISPLAY.cdone) > 0) {
+      done = true;
+      break;
+    }
+    delay_us(100);
+  }
+  if (!done) {
+    PBL_LOG_ERR("FPGA CDONE not high after programming");
+  }
+
+  prv_spi_configure(BOARD_CONFIG_DISPLAY.fast_spi_frequency);
+  return done;
+}
+
+static void prv_power_enable(void) {
+  // 1 ms between rails; the PMIC brings up VLCD (3.2 V) first.
+  delay_us(2000);
+  pbl_gpio_set(&BOARD_CONFIG_DISPLAY.rail_6v6, true);
+  delay_us(2000);
+  pbl_gpio_set(&BOARD_CONFIG_DISPLAY.rail_4v5, true);
+}
+
+static void prv_mco1_enable(void) {
+  pbl_gpio_stm32_af(&BOARD_MCO1, GPIO_AF_MCO, 0, GPIO_Speed_2MHz);
+  RCC_MCO1Config(RCC_MCO1Source_LSE, RCC_MCO1Div_1);
+}
+
+void display_init(void) {
+  const BoardConfigIce40Display *cfg = &BOARD_CONFIG_DISPLAY;
+
+  prv_mco1_enable();
+
+  RCC_APB2PeriphClockCmd(cfg->spi_rcc, ENABLE);
+  pbl_gpio_stm32_af(&cfg->sclk, cfg->spi_af, 0, GPIO_Speed_50MHz);
+  pbl_gpio_stm32_af(&cfg->mosi, cfg->spi_af, 0, GPIO_Speed_50MHz);
+  pbl_gpio_configure(&cfg->scs, PBL_GPIO_OUTPUT_INACTIVE);
+  pbl_gpio_configure(&cfg->creset, PBL_GPIO_OUTPUT_ACTIVE);
+  pbl_gpio_configure(&cfg->cdone, PBL_GPIO_INPUT);
+  pbl_gpio_configure(&cfg->busy, PBL_GPIO_INPUT);
+  pbl_gpio_configure(&cfg->rail_6v6, PBL_GPIO_OUTPUT_INACTIVE);
+  pbl_gpio_configure(&cfg->rail_4v5, PBL_GPIO_OUTPUT_INACTIVE);
+
+  s_programmed = prv_program();
+  prv_power_enable();
+}
+
+//! One panel line: the MSBs of every pixel's color channels, then the LSBs.
+static void prv_get_line(const uint8_t *fb, int index, uint8_t *line) {
+  for (int src = 0; src < DISP_PIXELS; src += 2) {
+    const uint8_t even = fb[PBL_DISPLAY_WIDTH * (PBL_DISPLAY_HEIGHT - 2 - src) + index];
+    const uint8_t odd = fb[PBL_DISPLAY_WIDTH * (PBL_DISPLAY_HEIGHT - 1 - src) + index];
+    line[src / 2] = (odd & 0b00101010) | ((even & 0b00101010) >> 1);
+    line[src / 2 + DISP_PIXELS / 2] = ((odd & 0b00010101) << 1) | (even & 0b00010101);
+  }
+}
+
+static void prv_send_frame(const uint8_t *fb) {
+  const struct pbl_gpio *scs = &BOARD_CONFIG_DISPLAY.scs;
+
+  if (!prv_wait_not_busy()) {
+    // A new frame (SCS falling edge) resets the FPGA's frame logic.
+    PBL_LOG_WRN("Display busy before frame");
+  }
+
+  pbl_gpio_set(scs, true);
+  delay_us(5);
+  const uint8_t cmd = CMD_FRAME_BEGIN;
+  prv_spi_write(&cmd, 1);
+
+  for (int i = 0; i < DISP_LINES; i++) {
+    prv_get_line(fb, i, s_line);
+    if (!prv_wait_not_busy()) {
+      PBL_LOG_WRN("Display stuck busy at line %d", i);
+      break;
+    }
+    prv_spi_write(s_line, sizeof(s_line));
+  }
+
+  pbl_gpio_set(scs, false);
+}
+
+void display_clear(void) {
+}
+
+void display_set_enabled(bool enabled) {
+}
+
+void display_set_rotated(bool rotated) {
+}
+
+static void prv_terminate_transfer(void *data) {
+  s_updating = false;
+  s_uccb();
+}
+
+void display_update(NextRowCallback nrcb, UpdateCompleteCallback uccb) {
+  DisplayRow row;
+  const uint8_t *fb = nullptr;
+
+  // Rows are contiguous in the compositor's framebuffer; the panel takes
+  // whole frames, so only the first row is needed to find it.
+  while (nrcb(&row)) {
+    if (!fb) {
+      fb = row.data - (uintptr_t)row.address * PBL_DISPLAY_WIDTH;
+    }
+  }
+
+  s_uccb = uccb;
+  s_updating = true;
+
+  if (fb && s_programmed) {
+    prv_send_frame(fb);
+  }
+
+  PebbleEvent e = {
+    .type = PEBBLE_CALLBACK_EVENT,
+    .callback = {
+      .callback = prv_terminate_transfer,
+    },
+  };
+  event_put(&e);
+}
+
+bool display_update_in_progress(void) {
+  return s_updating;
+}
+
+void display_update_boot_frame(uint8_t *framebuffer) {
+  if (s_programmed) {
+    prv_send_frame(framebuffer);
+  }
+}

@@ -25,10 +25,18 @@ config DISPLAY_SHARP_LS013B7DH01_NRF5
 
 config DISPLAY_SHARP_LS013B7DH01_STM32
     bool "Sharp LS013B7DH01 (STM32)"
-    default y if SOC_STM32F4
-    select HAL_STM32
+    depends on SOC_STM32F4
+    default y if HAL_STM32_STM32F412
     help
       Support for the Sharp LS013B7DH01 display on an STM32F4 SPI.
+
+config DISPLAY_ICE40LP_STM32
+    bool "iCE40LP framebuffer FPGA (STM32)"
+    depends on SOC_STM32F4
+    default y if HAL_STM32_STM32F439
+    help
+      Support for the Pebble Time display, driven through an iCE40LP
+      framebuffer FPGA on an STM32F4 SPI.
 
 config DISPLAY_QEMU
     bool "QEMU Framebuffer Display"
