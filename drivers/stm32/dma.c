@@ -29,9 +29,12 @@ static void prv_start_circular(const struct pbl_dma_stm32_stream *dma, volatile 
   init.DMA_BufferSize = size_bytes / unit_bytes;
   init.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
   init.DMA_MemoryInc = DMA_MemoryInc_Enable;
-  init.DMA_PeripheralDataSize =
-      (unit_bytes == 4) ? DMA_PeripheralDataSize_Word : DMA_PeripheralDataSize_Byte;
-  init.DMA_MemoryDataSize = (unit_bytes == 4) ? DMA_MemoryDataSize_Word : DMA_MemoryDataSize_Byte;
+  init.DMA_PeripheralDataSize = (unit_bytes == 4)   ? DMA_PeripheralDataSize_Word
+                                : (unit_bytes == 2) ? DMA_PeripheralDataSize_HalfWord
+                                                    : DMA_PeripheralDataSize_Byte;
+  init.DMA_MemoryDataSize = (unit_bytes == 4)   ? DMA_MemoryDataSize_Word
+                            : (unit_bytes == 2) ? DMA_MemoryDataSize_HalfWord
+                                                : DMA_MemoryDataSize_Byte;
   init.DMA_Mode = DMA_Mode_Circular;
   init.DMA_Priority = priority;
   init.DMA_FIFOMode = DMA_FIFOMode_Disable;
@@ -53,6 +56,12 @@ void pbl_dma_stm32_start_circular_u8(const struct pbl_dma_stm32_stream *dma,
                                      volatile void *periph_addr, void *buffer, uint32_t size_bytes,
                                      uint32_t priority, PblDmaStm32Callback cb, void *context) {
   prv_start_circular(dma, periph_addr, buffer, size_bytes, 1, priority, cb, context);
+}
+
+void pbl_dma_stm32_start_circular_u16(const struct pbl_dma_stm32_stream *dma,
+                                      volatile void *periph_addr, void *buffer, uint32_t size_bytes,
+                                      uint32_t priority, PblDmaStm32Callback cb, void *context) {
+  prv_start_circular(dma, periph_addr, buffer, size_bytes, 2, priority, cb, context);
 }
 
 uint32_t pbl_dma_stm32_remaining(const struct pbl_dma_stm32_stream *dma) {

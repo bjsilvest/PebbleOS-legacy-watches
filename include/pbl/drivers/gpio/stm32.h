@@ -32,6 +32,9 @@ extern const struct pbl_gpio_stm32 pbl_gpio_stm32_a;
 extern const struct pbl_gpio_stm32 pbl_gpio_stm32_b;
 extern const struct pbl_gpio_stm32 pbl_gpio_stm32_c;
 extern const struct pbl_gpio_stm32 pbl_gpio_stm32_d;
+extern const struct pbl_gpio_stm32 pbl_gpio_stm32_e;
+extern const struct pbl_gpio_stm32 pbl_gpio_stm32_f;
+extern const struct pbl_gpio_stm32 pbl_gpio_stm32_g;
 extern const struct pbl_gpio_stm32 pbl_gpio_stm32_h;
 /** @endcond */
 
@@ -39,6 +42,9 @@ extern const struct pbl_gpio_stm32 pbl_gpio_stm32_h;
 #define STM32_GPIOB (&pbl_gpio_stm32_b.port)
 #define STM32_GPIOC (&pbl_gpio_stm32_c.port)
 #define STM32_GPIOD (&pbl_gpio_stm32_d.port)
+#define STM32_GPIOE (&pbl_gpio_stm32_e.port)
+#define STM32_GPIOF (&pbl_gpio_stm32_f.port)
+#define STM32_GPIOG (&pbl_gpio_stm32_g.port)
 #define STM32_GPIOH (&pbl_gpio_stm32_h.port)
 
 /** @brief Registers of the port a pin is on. */

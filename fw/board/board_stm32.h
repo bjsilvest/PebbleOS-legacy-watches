@@ -105,13 +105,18 @@ typedef struct {
 typedef struct {
   struct pbl_gpio output;
   TIM_TypeDef *timer;
-  uint32_t rcc;    ///< RCC_APB1Periph_TIMx (APB1 timers only)
+  uint32_t rcc;    ///< RCC_APB1Periph_TIMx, or RCC_APB2Periph_TIMx if apb2
+  bool apb2;       ///< The timer is on APB2 (TIM1, TIM8-11)
   uint8_t af;      ///< GPIO_AF_TIMx
   uint8_t channel; ///< 1-4
 } PwmConfig;
 
 typedef struct {
   const PwmConfig pwm;
+  //! Optional enable output, active while the motor runs.
+  const struct pbl_gpio ctl;
+  //! The PWM drives an H-bridge: 50% is stopped, below runs it in reverse.
+  bool hbridge;
   //! Supply voltage (mV) at which the duty cycle is not scaled; 0 to not scale.
   uint16_t vsys_scale;
 } BoardConfigActuator;
@@ -127,6 +132,29 @@ typedef struct {
 
   const struct pbl_gpio on_ctrl;
 } BoardConfigSharpDisplay;
+
+//! Display driven through an iCE40LP framebuffer FPGA on a write-only SPI.
+typedef struct {
+  SPI_TypeDef *spi;
+  uint32_t spi_rcc; ///< RCC_APB2Periph_SPIx
+  uint8_t spi_af;   ///< GPIO_AF_SPIx
+
+  const struct pbl_gpio sclk;
+  const struct pbl_gpio mosi;
+  const struct pbl_gpio scs; ///< Active low
+
+  const struct pbl_gpio creset; ///< Open drain, active high (released = run)
+  const struct pbl_gpio cdone;
+  const struct pbl_gpio busy;
+
+  //! Panel supplies, in power-up order.
+  const struct pbl_gpio rail_6v6; ///< VDDC
+  const struct pbl_gpio rail_4v5; ///< VDDP
+
+  //! SPI clock while programming the FPGA, then for frames.
+  uint32_t base_spi_frequency;
+  uint32_t fast_spi_frequency;
+} BoardConfigIce40Display;
 
 typedef const struct UARTDevice UARTDevice;
 typedef const struct HRMDevice HRMDevice;

@@ -1,9 +1,10 @@
 /* SPDX-FileCopyrightText: 2024 Google LLC */
 /* SPDX-License-Identifier: Apache-2.0 */
 
-//! Single-direction vibe motor driven by PWM (silk: TI DRV2603), as the
-//! stock firmware did it. The duty cycle is scaled by the supply voltage so
-//! the strength does not change as the battery discharges.
+//! Vibe motor driven by PWM, as the stock firmware did it. Single direction
+//! (silk: TI DRV2603): the duty cycle is scaled by the supply voltage so the
+//! strength does not change as the battery discharges. H-bridge (snowy): 50%
+//! is stopped and lower duty cycles run the motor in reverse, for braking.
 
 #include <pbl/drivers/pmic.h>
 #include <pbl/drivers/pwm.h>
@@ -23,7 +24,7 @@
 #define PWM_OUTPUT_FREQUENCY_HZ (22 * 1000)
 #define PWM_TIMER_FREQUENCY_HZ  (PWM_TIMER_UPDATE_PERIOD * PWM_OUTPUT_FREQUENCY_HZ)
 
-#define PWM_DUTY_CYCLE_OFF  (0)
+#define PWM_DUTY_CYCLE_OFF  (BOARD_CONFIG_VIBE.hbridge ? PWM_TIMER_UPDATE_PERIOD / 2 : 0)
 #define PWM_DUTY_CYCLE_FULL (PWM_TIMER_UPDATE_PERIOD)
 
 static uint8_t s_vibe_duty_cycle = PWM_DUTY_CYCLE_FULL;
@@ -34,6 +35,9 @@ void vibe_init(void) {
     return;
   }
 
+  if (BOARD_CONFIG_VIBE.ctl.port) {
+    pbl_gpio_configure(&BOARD_CONFIG_VIBE.ctl, PBL_GPIO_OUTPUT_INACTIVE);
+  }
   pwm_init(&BOARD_CONFIG_VIBE.pwm, PWM_TIMER_UPDATE_PERIOD, PWM_TIMER_FREQUENCY_HZ);
   s_initialized = true;
 }
@@ -47,6 +51,14 @@ static uint16_t prv_get_vsys_mv(void) {
 }
 
 void vibe_set_strength(int8_t strength) {
+  if (BOARD_CONFIG_VIBE.hbridge) {
+    // Scale -100..100 to 0..100.
+    s_vibe_duty_cycle =
+        ((PWM_DUTY_CYCLE_FULL - PWM_DUTY_CYCLE_OFF) * strength / VIBE_STRENGTH_MAX) +
+        PWM_DUTY_CYCLE_OFF;
+    return;
+  }
+
   // Treat "reverse" strength as forward strength.
   uint32_t duty_cycle = ABS(strength);
 
@@ -63,6 +75,9 @@ void vibe_set_strength(int8_t strength) {
 static void prv_vibe_raw_ctl(bool on) {
   pwm_enable(&BOARD_CONFIG_VIBE.pwm, on);
   pwm_set_duty_cycle(&BOARD_CONFIG_VIBE.pwm, on ? s_vibe_duty_cycle : PWM_DUTY_CYCLE_OFF);
+  if (BOARD_CONFIG_VIBE.ctl.port) {
+    pbl_gpio_set(&BOARD_CONFIG_VIBE.ctl, on);
+  }
 }
 
 void vibe_ctl(bool on) {
@@ -86,8 +101,8 @@ void vibe_force_off(void) {
 }
 
 int8_t vibe_get_braking_strength(void) {
-  // Single direction: braking is just turning it off.
-  return VIBE_STRENGTH_OFF;
+  // An H-bridge can run it backwards; single direction just turns it off.
+  return BOARD_CONFIG_VIBE.hbridge ? VIBE_STRENGTH_MIN : VIBE_STRENGTH_OFF;
 }
 
 status_t vibe_calibrate(void) {

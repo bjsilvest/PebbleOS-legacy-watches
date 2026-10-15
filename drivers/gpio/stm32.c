@@ -104,4 +104,9 @@ GPIO_STM32_DEFINE(pbl_gpio_stm32_a, "gpio_a", GPIOA, 0);
 GPIO_STM32_DEFINE(pbl_gpio_stm32_b, "gpio_b", GPIOB, 1);
 GPIO_STM32_DEFINE(pbl_gpio_stm32_c, "gpio_c", GPIOC, 2);
 GPIO_STM32_DEFINE(pbl_gpio_stm32_d, "gpio_d", GPIOD, 3);
+#ifdef CONFIG_HAL_STM32_STM32F439
+GPIO_STM32_DEFINE(pbl_gpio_stm32_e, "gpio_e", GPIOE, 4);
+GPIO_STM32_DEFINE(pbl_gpio_stm32_f, "gpio_f", GPIOF, 5);
+GPIO_STM32_DEFINE(pbl_gpio_stm32_g, "gpio_g", GPIOG, 6);
+#endif
 GPIO_STM32_DEFINE(pbl_gpio_stm32_h, "gpio_h", GPIOH, 7);
