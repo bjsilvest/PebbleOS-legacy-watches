@@ -81,6 +81,13 @@ void pmic_read_chip_info(uint8_t *chip_id, uint8_t *chip_revision, uint8_t *buck
  */
 uint16_t pmic_get_vsys(void);
 
+/**
+ * @brief Get the PMIC's record of why it last reset the board.
+ *
+ * @return PMIC-specific reset reason bits, or 0 if unknown.
+ */
+uint32_t pmic_get_last_reset_reason(void);
+
 /*
  * FIXME: The following functions are unrelated to the PMIC and should be moved to the
  * display/accessory connector drivers once we have them.
