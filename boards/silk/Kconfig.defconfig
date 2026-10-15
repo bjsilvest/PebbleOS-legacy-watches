@@ -17,6 +17,14 @@ choice BT_ID_ADDR_SOURCE
     default BT_ID_ADDR_SERIAL
 endchoice
 
+# The recovery firmware is the stock one, with its own shared PRF storage and
+# pinned address. Import both so phones see one watch in either firmware.
+config SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK
+    default y
+
+config SERVICE_BLUETOOTH_ALWAYS_PIN_ADDRESS
+    default y
+
 # The DA14681 completes each 27-byte ACL fragment with its own event, and the
 # HCI thread blocks when the pool runs out, so give it room.
 config NIMBLE_BLE_TRANSPORT_EVT_COUNT

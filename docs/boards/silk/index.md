@@ -300,16 +300,20 @@ manager) before its HCI transport starts, then the vendor event
 
 ### Known limitations
 
-- **TODO — revisit: two Android entries.** Android lists the watch twice
-  under the same name: stock and PRF advertise resolvable private addresses
-  (e.g. `7B:CA:D6:4E:13:9B`), so their bonding is keyed on one of those,
-  while this firmware advertises its serial-derived static identity address
-  (e.g. `FB:F2:D1:20:55:24`) and shares no identity key (IRK) when pairing
-  (`BLE_SM_OUR_KEY_DIST` is 1). Both firmwares derive the same identity
-  address, but each has its own bonding. Keep both for now: PRF updates use
-  the stock entry. Merging would mean reusing the stock bonding from shared
-  PRF storage. Distributing the IRK and advertising private addresses would
-  help privacy but would not merge the entries.
+- **Shared address and bonding with stock and PRF.** Stock and PRF connect
+  from a pinned resolvable private address (e.g. `7B:CA:D6:4E:13:9B`) kept in
+  the stock shared PRF storage (0x7FE000), next to their root keys and
+  bonding. When our identity root key differs from stock's, boot copies that
+  entry into ours (`SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK`; the stock
+  region is only read), and the watch always connects from the pinned
+  address (`SERVICE_BLUETOOTH_ALWAYS_PIN_ADDRESS`). NimBLE only takes static
+  random addresses as its own, so the DA1468x transport puts the pinned
+  address in every LE Set Random Address and reports it as the local RPA of
+  each connection; the serial-derived identity address
+  (e.g. `FB:F2:D1:20:55:24`, which "Pebble 5524" comes from) stays the
+  identity. Phones then see one watch in every firmware. Caveats: PRF only
+  knows the stock bonding, so pairing again here leaves PRF on the old one;
+  a factory reset here imports the stock bonding again.
 
 - **Power:** the host enters STOP mode with the controller running: after
   20 ms without HCI traffic it deasserts CTS so the controller holds its
