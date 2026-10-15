@@ -44,6 +44,9 @@ struct UARTDevice {
   struct pbl_gpio tx;
   /** RX pin, not connected if unused. */
   struct pbl_gpio rx;
+  /** CTS and RTS pins: hardware flow control when both are connected. */
+  struct pbl_gpio cts;
+  struct pbl_gpio rts;
   /** Alternate function of the pins (GPIO_AF_USARTx). */
   uint8_t af;
   /** Interrupt number. */

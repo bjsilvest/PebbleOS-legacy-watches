@@ -39,11 +39,16 @@ static void prv_init(UARTDevice *dev, bool is_open_drain, UARTCR1Flags cr1_flags
   if (pbl_gpio_is_connected(&dev->rx)) {
     pbl_gpio_stm32_af(&dev->rx, dev->af, flags, GPIO_Speed_50MHz);
   }
+  const bool flow_control = pbl_gpio_is_connected(&dev->cts) && pbl_gpio_is_connected(&dev->rts);
+  if (flow_control) {
+    pbl_gpio_stm32_af(&dev->cts, dev->af, 0, GPIO_Speed_50MHz);
+    pbl_gpio_stm32_af(&dev->rts, dev->af, 0, GPIO_Speed_50MHz);
+  }
 
-  // 8N1, no flow control
+  // 8N1, hardware flow control if wired
   dev->periph->CR1 = cr1_flags;
   dev->periph->CR2 = 0;
-  dev->periph->CR3 = 0;
+  dev->periph->CR3 = flow_control ? (USART_CR3_CTSE | USART_CR3_RTSE) : 0;
 
   // Clear stale errors: read SR then DR.
   (void)dev->periph->SR;
@@ -83,6 +88,12 @@ void uart_deinit(UARTDevice *dev) {
   }
   if (pbl_gpio_is_connected(&dev->rx)) {
     pbl_gpio_configure(&dev->rx, PBL_GPIO_INPUT);
+  }
+  if (pbl_gpio_is_connected(&dev->cts)) {
+    pbl_gpio_configure(&dev->cts, PBL_GPIO_INPUT);
+  }
+  if (pbl_gpio_is_connected(&dev->rts)) {
+    pbl_gpio_configure(&dev->rts, PBL_GPIO_INPUT);
   }
 }
 
