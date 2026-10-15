@@ -24,6 +24,9 @@
 #endif
 #ifdef CONFIG_BT_CONTROLLER_CC2564
 #include <pbl/drivers/bluetooth/cc2564.h>
+
+#include <host/ble_store.h>
+#include <mbedtls/aes.h>
 #endif
 #include <kernel/pebble_tasks.h>
 #include <kernel/util/delay.h>
@@ -343,6 +346,144 @@ static void prv_note_rnd_addr_reply(struct ble_hci_ev *ev) {
 }
 #endif
 
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+// The CC2564B is a Bluetooth 4.1 controller: no resolving list (LL privacy)
+// and no privacy modes. Answer those commands here instead, and resolve
+// peers' resolvable private addresses against the bonded IRKs, reporting a
+// resolved connection as the enhanced LE Connection Complete a 4.2
+// controller would send. NimBLE then finds the bond as usual.
+#define H4_SM_IDLE               0U // HCI_H4_SM_W4_PKT_TYPE in hci_h4.c
+#define FAKE_REPLIES_MAX         4U
+#define LE_CONN_COMPLETE_LEN     19U
+#define LE_ENH_CONN_COMPLETE_LEN 31U
+// Offset of the connection interval: the enhanced event inserts the local and peer RPAs here.
+#define LE_CONN_COMPLETE_ITVL_OFF 12U
+
+static uint16_t s_fake_replies[FAKE_REPLIES_MAX];
+static volatile uint32_t s_fake_head;
+static volatile uint32_t s_fake_tail;
+
+static bool prv_is_ll_privacy_cmd(uint16_t opcode) {
+  switch (opcode) {
+    case BLE_HCI_OP(BLE_HCI_OGF_LE, BLE_HCI_OCF_LE_ADD_RESOLV_LIST):
+    case BLE_HCI_OP(BLE_HCI_OGF_LE, BLE_HCI_OCF_LE_RMV_RESOLV_LIST):
+    case BLE_HCI_OP(BLE_HCI_OGF_LE, BLE_HCI_OCF_LE_CLR_RESOLV_LIST):
+    case BLE_HCI_OP(BLE_HCI_OGF_LE, BLE_HCI_OCF_LE_SET_ADDR_RES_EN):
+    case BLE_HCI_OP(BLE_HCI_OGF_LE, BLE_HCI_OCF_LE_SET_RPA_TMO):
+    case BLE_HCI_OP(BLE_HCI_OGF_LE, BLE_HCI_OCF_LE_SET_PRIVACY_MODE):
+      return true;
+    default:
+      return false;
+  }
+}
+
+//! Queue a successful Command Complete for @p opcode. The host waits for
+//! each reply before sending the next command, so the queue stays short.
+static bool prv_queue_fake_reply(uint16_t opcode) {
+  bool queued = false;
+  pbl_irq_lock();
+  if (s_fake_head - s_fake_tail < FAKE_REPLIES_MAX) {
+    s_fake_replies[s_fake_head % FAKE_REPLIES_MAX] = opcode;
+    s_fake_head++;
+    queued = true;
+  }
+  pbl_irq_unlock();
+  pbl_sem_give(&s_rx_ready);
+  return queued;
+}
+
+//! Only between packets, so a fake reply cannot split a real one.
+static void prv_send_fake_replies(void) {
+  while (s_fake_tail != s_fake_head && s_hci_h4sm.state == H4_SM_IDLE) {
+    const uint16_t opcode = s_fake_replies[s_fake_tail % FAKE_REPLIES_MAX];
+    s_fake_tail++;
+    const uint8_t reply[] = {
+      HCI_H4_EVT, BLE_HCI_EVCODE_COMMAND_COMPLETE, 4, 1, opcode & 0xffU, opcode >> 8U, 0,
+    };
+    hci_h4_sm_rx(&s_hci_h4sm, reply, sizeof(reply));
+  }
+}
+
+static bool prv_addr_is_rpa(const uint8_t *addr) {
+  return (addr[5] & 0xc0U) == 0x40U;
+}
+
+//! AES-128 on little-endian (HCI order) key, plain and cipher text, like LE Encrypt.
+static bool prv_aes_le(const uint8_t *key, const uint8_t *plain, uint8_t *cipher) {
+  uint8_t key_be[16];
+  uint8_t plain_be[16];
+  uint8_t cipher_be[16];
+  for (int i = 0; i < 16; i++) {
+    key_be[i] = key[15 - i];
+    plain_be[i] = plain[15 - i];
+  }
+
+  mbedtls_aes_context ctx;
+  mbedtls_aes_init(&ctx);
+  const bool ok = mbedtls_aes_setkey_enc(&ctx, key_be, 128) == 0 &&
+                  mbedtls_aes_crypt_ecb(&ctx, MBEDTLS_AES_ENCRYPT, plain_be, cipher_be) == 0;
+  mbedtls_aes_free(&ctx);
+
+  for (int i = 0; i < 16; i++) {
+    cipher[i] = cipher_be[15 - i];
+  }
+  return ok;
+}
+
+//! ah(IRK, prand) == hash, with the address in HCI (little endian) order.
+static bool prv_irk_resolves(const uint8_t *irk, const uint8_t *rpa) {
+  uint8_t plain[16] = {0};
+  uint8_t cipher[16];
+
+  memcpy(plain, &rpa[3], 3);
+  if (!prv_aes_le(irk, plain, cipher)) {
+    return false;
+  }
+  return memcmp(cipher, rpa, 3) == 0;
+}
+
+struct ResolveContext {
+  const uint8_t *rpa;
+  ble_addr_t identity;
+  bool found;
+};
+
+static int prv_resolve_cb(int obj_type, union ble_store_value *val, void *cookie) {
+  struct ResolveContext *ctx = cookie;
+  if (val->sec.irk_present && prv_irk_resolves(val->sec.irk, ctx->rpa)) {
+    ctx->identity = val->sec.peer_addr;
+    ctx->found = true;
+    return 1;
+  }
+  return 0;
+}
+
+static void prv_conn_complete_resolve_peer(struct ble_hci_ev *ev) {
+  if (ev->opcode != BLE_HCI_EVCODE_LE_META || ev->length != LE_CONN_COMPLETE_LEN ||
+      ev->data[0] != BLE_HCI_LE_SUBEV_CONN_COMPLETE || ev->data[1] != 0U ||
+      ev->data[5] != BLE_ADDR_RANDOM || !prv_addr_is_rpa(&ev->data[6])) {
+    return;
+  }
+
+  uint8_t rpa[6];
+  memcpy(rpa, &ev->data[6], sizeof(rpa));
+  struct ResolveContext ctx = {.rpa = rpa};
+  ble_store_iterate(BLE_STORE_OBJ_TYPE_PEER_SEC, prv_resolve_cb, &ctx);
+  if (!ctx.found) {
+    return;
+  }
+
+  uint8_t *rpas = &ev->data[LE_CONN_COMPLETE_ITVL_OFF];
+  memmove(rpas + 12U, rpas, LE_CONN_COMPLETE_LEN - LE_CONN_COMPLETE_ITVL_OFF);
+  memset(rpas, 0, 6U);
+  memcpy(rpas + 6U, rpa, sizeof(rpa));
+  memcpy(&ev->data[6], ctx.identity.val, sizeof(ctx.identity.val));
+  ev->data[5] = (ctx.identity.type == BLE_ADDR_PUBLIC) ? BLE_ADDR_PUBLIC_ID : BLE_ADDR_RANDOM_ID;
+  ev->data[0] = BLE_HCI_LE_SUBEV_ENH_CONN_COMPLETE;
+  ev->length = LE_ENH_CONN_COMPLETE_LEN;
+}
+#endif
+
 bool pbl_bt_hci_uart_local_addr_outdated(void) {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   if (!s_rnd_in_use_valid) {
@@ -373,6 +514,8 @@ static void prv_note_evt(struct ble_hci_ev *ev) {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   prv_conn_complete_add_local_rpa(ev);
   prv_note_rnd_addr_reply(ev);
+#elifdef CONFIG_BT_CONTROLLER_CC2564
+  prv_conn_complete_resolve_peer(ev);
 #endif
   if (ev->opcode == BLE_HCI_EVCODE_NUM_COMP_PKTS && ev->length >= 1U) {
     for (uint8_t i = 0; i < ev->data[0] && 1U + 4U * (i + 1U) <= ev->length; i++) {
@@ -755,6 +898,10 @@ static void prv_hci_task_main(void *unused) {
       }
     }
 
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+    prv_send_fake_replies();
+#endif
+
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
     // Only between packets, so the fake reply cannot split a real one.
     if (s_fake_privacy_mode_reply && s_frame.len == 0U) {
@@ -1010,6 +1157,13 @@ int ble_transport_to_ll_cmd_impl(void *buf) {
     ble_transport_free(buf);
     s_fake_privacy_mode_reply = true;
     pbl_sem_give(&s_rx_ready);
+    return 0;
+  }
+#endif
+
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+  if (prv_is_ll_privacy_cmd(s_last_cmd) && prv_queue_fake_reply(s_last_cmd)) {
+    ble_transport_free(buf);
     return 0;
   }
 #endif
