@@ -58,3 +58,7 @@ CONFIG_HRM=y
 CONFIG_HRM_AS7000=y
 # Diagnostic: probe the sensor's PRV application
 CONFIG_HRM_AS7000_PRV_PROBE=y
+
+# Settings: motion sensitivity and left-handed (rotated) wear
+CONFIG_ACCEL_SENSITIVITY=y
+CONFIG_ORIENTATION_MANAGER=y
