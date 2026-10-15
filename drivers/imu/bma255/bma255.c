@@ -48,6 +48,8 @@ static bool s_accel_outstanding_data_work = false;
 static bool s_fifo_overrun_detected = false;
 //! Watch worn rotated by 180 degrees: X and Y flip.
 static bool s_rotated_180 = false;
+//! Shake threshold from the sensitivity setting, 0 for the stock one.
+static uint8_t s_shake_threshold;
 
 // Forward declarations
 static void prv_configure_operating_mode(void);
@@ -672,30 +674,31 @@ void accel_enable_shake_detection(bool enable) {
 }
 
 void accel_set_shake_sensitivity_high(bool sensitivity_high) {
-  // Configure the threshold level at which the BMI160 will think shake has occurred
+  // Configure the threshold level at which the BMA255 will think shake has occurred
+  const AccelConfig *cfg = &BOARD_CONFIG_ACCEL.accel_config;
+  uint8_t threshold = s_shake_threshold ?: cfg->shake_thresholds[AccelThresholdHigh];
   if (sensitivity_high) {
-    bma255_write_register(BMA255Register_INT_6,
-                          BOARD_CONFIG_ACCEL.accel_config.shake_thresholds[AccelThresholdLow]);
-  } else {
-    bma255_write_register(BMA255Register_INT_6,
-                          BOARD_CONFIG_ACCEL.accel_config.shake_thresholds[AccelThresholdHigh]);
+    threshold = cfg->shake_thresholds[AccelThresholdLow];
   }
+  bma255_write_register(BMA255Register_INT_6, threshold);
 }
 
 void accel_set_shake_sensitivity_percent(uint8_t percent) {
-  // Map percent [0,100] to threshold [high, low]
-  const uint8_t high_threshold =
-      BOARD_CONFIG_ACCEL.accel_config.shake_thresholds[AccelThresholdHigh];
-  const uint8_t low_threshold = BOARD_CONFIG_ACCEL.accel_config.shake_thresholds[AccelThresholdLow];
+  // Higher is more sensitive. The settings default (55, "Medium") keeps the
+  // stock threshold, 100 is the stock high sensitivity one, 0 twice the stock.
+  const int medium = 55;
+  const int normal = BOARD_CONFIG_ACCEL.accel_config.shake_thresholds[AccelThresholdHigh];
+  const int sensitive = BOARD_CONFIG_ACCEL.accel_config.shake_thresholds[AccelThresholdLow];
+  const int p = MIN(percent, 100);
 
-  if (percent >= 100) {
-    accel_set_shake_sensitivity_high(false /* sensitivity_high */);
-    return;
+  int threshold;
+  if (p >= medium) {
+    threshold = normal - ((normal - sensitive) * (p - medium)) / (100 - medium);
+  } else {
+    threshold = normal + (normal * (medium - p)) / medium;
   }
-
-  const uint8_t threshold =
-      high_threshold + ((low_threshold - high_threshold) * (100 - percent)) / 100;
-  bma255_write_register(BMA255Register_INT_6, threshold);
+  s_shake_threshold = MIN(threshold, UINT8_MAX);
+  bma255_write_register(BMA255Register_INT_6, s_shake_threshold);
 }
 
 void accel_set_rotated(bool rotated) {
