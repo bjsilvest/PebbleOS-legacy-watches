@@ -7,8 +7,9 @@ STM32F439 main MCU, a TI CC2564B Bluetooth controller, a MAX14690 PMIC, 16 MiB
 of parallel NOR flash, and a 144×168 64-color display driven through an
 iCE40LP FPGA. The port runs the `basalt` platform.
 
-Status: boots in QEMU through the stock bootloader to the watchface. Not
-yet run on hardware, and no Bluetooth.
+Status: boots in QEMU through the stock bootloader to the watchface, with
+Bluetooth implemented but untested (QEMU has no CC2564, so there it stays
+off). Not yet run on hardware.
 
 ## Sources
 
@@ -117,7 +118,8 @@ curve, and platform ID `PebbleBobbyDVT` (`PebbleSnowyDVT` for the Time).
 | I2S PDM mic (SPI2, DMA1 stream 3, OpenPDMFilter) | done, untested on hardware |
 | Factory data (stock OTP slots and MFG struct, read-only) | done |
 | MAG3110 compass | todo |
-| Bluetooth (CC2564B, NimBLE over H4) | todo |
+| Bluetooth (CC2564B, NimBLE over H4, TI init script) | done, untested on hardware |
+| CC2564 deep sleep (eHCILL); STOP mode while BT runs | todo (STOP blocked for now) |
 | Resources: silk's plus color-only ones, 105 color emoji | done (513,755 of 524,288 bytes) |
 
 QEMU emulates neither the PMIC nor the BMI160 (both log that and carry on),
@@ -150,29 +152,47 @@ The kernel heap is about 37K (about 56K on silk). In QEMU it peaks at about
 there (e.g. the Bluetooth UART's) may need something moved to CCM, at the
 heap's expense.
 
-## Bluetooth plan
+## Bluetooth
 
-The CC2564B is a standard HCI controller in ROM. The host loads TI's patch
-at every power-up, then runs NimBLE over H4. The pebble-dev driver:
+The CC2564B is a standard HCI controller in ROM (Bluetooth 4.1). At every
+power up `drivers/bluetooth/cc2564.c`:
 
-1. Resets the chip through nSHUTD.
-2. Replays the HCI commands from `TIInit_6.7.16.bts` (the CC256xB patch,
-   stored as the `BT_PATCH` resource). It replaces the baud-rate command
-   with 921600 baud and switches the UART to match.
-3. **Skips `HCI_VS_SLEEP_MODE_CONFIG` (0xFD0C)**, so the controller never
-   enters deep sleep.
+1. Starts the 32 kHz slow clock (LSE on MCO1) and releases nSHUTDOWN (PB12).
+2. Waits for the chip to assert our CTS, then checks it answers Read Local
+   Version (shown as "BT Chip").
+3. Replays TI's `TIInit_6.7.16.bts`, embedded unmodified
+   (`third_party/ti_bt_sp`), one HCI command at a time, waiting for each
+   Command Complete. The script's baud rate change is sent with
+   `BT_CC2564_HCI_BAUD` (921600) and both sides switch; its sleep mode
+   command is sent with deep sleep off.
+
+Every wait is bounded; after three failed attempts the chip is left off and
+Bluetooth reported unavailable, rather than crashing (a crash loop before
+the firmware is marked stable ends in PRF). The NimBLE H4 transport then
+takes USART1 over, with hardware RTS/CTS and interrupt-driven RX. STOP mode
+is blocked while the controller runs, since STOP would stop the UART while
+RTS still lets the controller send.
+
+Bluetooth 4.1 has no resolving list or privacy modes. The transport answers
+those commands itself and resolves a peer's private address against the
+bonded IRKs on connection, reporting it as an enhanced LE Connection
+Complete (the pebble-dev firmware patched NimBLE's host for the same). Snowy
+also uses that firmware's pairing settings for this chip: legacy pairing
+allowed, no MITM, host flow control. The identity address is derived from
+the serial number, like the legacy firmware.
+
+Settings > System > Information shows "BT Radio" (boot progress, e.g.
+`Running (try 1)`, `No CTS (try 3)` or `Init <n> <opcode>:<status>`), "BT
+Chip", "BT HCI", "BT Pair", "BT Reset", "BT SMP" and "Last reboot", as on
+silk.
 
 Open items:
 
-- **Power.** Deep sleep (TI's eHCILL protocol on the UART lines) is needed
-  for usable battery life. Host wake on PA11 is already wired.
-- **Strict license wording.** TI's license allows unmodified binary
-  redistribution. Embed the `.bts` file unchanged and parse it on the watch,
-  instead of converting it at build time.
-- **Two bonds.** The stock PRF uses Bluetopia and keeps its own bonding, so
-  the silk work on shared address and bonding applies here too.
-- **Fixed sleeps.** The driver waits a fixed 500 ms after the patch instead
-  of checking each Command Complete.
+- **Power.** Deep sleep (eHCILL) in the transport, which would also let
+  STOP mode back in.
+- **Two bonds.** The stock PRF keeps its own pairing in stock shared PRF
+  storage; importing it (as silk does) is not done yet.
+- Raise the baud rate towards the script's 3 Mbaud once the link is proven.
 
 ### Licensing
 
@@ -180,6 +200,7 @@ Open items:
 as `coredevices/ti-bt-service-packs`) under the Texas Instruments Text File
 License. It allows royalty-free binary redistribution, including commercial
 use, only with TI devices, without modification and without reverse
-engineering, and the license must be reproduced. With that license included,
-snowy builds can be redistributed, unlike silk builds, which contain Dialog
-SDK code.
+engineering, and the license must be reproduced (it is in
+`third_party/ti_bt_sp/LICENSE`, and the file is embedded byte for byte).
+With that license included, snowy builds can be redistributed, unlike silk
+builds, which contain Dialog SDK code.
