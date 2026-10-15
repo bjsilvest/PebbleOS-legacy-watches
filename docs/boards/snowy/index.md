@@ -142,10 +142,13 @@ FPGA bitstream and falls back to the FPGA's NVCM, as expected.
 The F439 has only 192K of contiguous SRAM. Basalt apps take 96K and the
 worker 12K, which leaves 84K for the kernel. Like stock, the kernel stacks
 and heap live in the 64K CCM (`CONFIG_CCM_SIZE`), which DMA cannot reach.
-NimBLE's pools (not its UART DMA buffer), the task timer pool and the BLE
-host stack are also placed there (`.ccm_bss`). The kernel heap is about
-29K, against about 56K on silk: watch for heap exhaustion. Candidates to
-win RAM back include NimBLE's unused ISO buffer pool.
+NimBLE's pools (not its UART DMA buffer) and the task timer pool are also
+placed there (`.ccm_bss`), and NimBLE's ISO pool is off (no LE Audio).
+
+The kernel heap is about 37K (about 56K on silk). In QEMU it peaks at about
+8K idling on the watchface. Kernel SRAM is 97% used, so new static buffers
+there (e.g. the Bluetooth UART's) may need something moved to CCM, at the
+heap's expense.
 
 ## Bluetooth plan
 

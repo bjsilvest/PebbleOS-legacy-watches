@@ -22,7 +22,6 @@
 
         EXCLUDE_FILE(*hci_uart.c.obj) *nimble.dir*(.bss .bss.* COMMON)
         *task_timer.c.obj(.bss .bss.*)
-        *subsys__bluetooth.dir/init.c.obj(.bss.s_host_task_stack)
 
         . = ALIGN(8);
         __ccm_bss_end = .;

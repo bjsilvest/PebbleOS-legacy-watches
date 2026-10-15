@@ -51,3 +51,6 @@ CONFIG_ACCEL_BMI160=y
 
 CONFIG_MIC=y
 CONFIG_MIC_STM32_I2S_PDM=y
+
+# No LE Audio: drop the ISO buffer pool, kernel heap is scarce on the F439.
+CONFIG_NIMBLE_BLE_TRANSPORT_ISO_COUNT=0
