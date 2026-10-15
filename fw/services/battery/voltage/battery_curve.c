@@ -17,9 +17,75 @@ typedef struct VoltagePoint {
 // TODO: Move these curves somewhere else. Related: PBL-21049
 
 // TODO(ASTERIX,OBELIX): Needs customization for Asterix/Obelix
-#if defined(CONFIG_BOARD_ASTERIX) || defined(CONFIG_BOARD_OBELIX) || defined(CONFIG_BOARD_SILK) || \
-    defined(CONFIG_BOARD_SNOWY) || defined(CONFIG_BOARD_QEMU_EMERY) ||                             \
-    defined(CONFIG_BOARD_QEMU_FLINT) || defined(CONFIG_BOARD_QEMU_GABBRO) ||                       \
+#if defined(CONFIG_BOARD_SNOWY_S3)
+// When the voltage drops below these (mV), the watch will start heading for standby (after delay)
+#define BATTERY_CRITICAL_VOLTAGE_CHARGING    3700
+#define BATTERY_CRITICAL_VOLTAGE_DISCHARGING 3300
+// Battery Tables for Bobby (Pebble Time Steel), from the stock firmware
+static VoltagePoint discharge_curve[] = {
+  {0, BATTERY_CRITICAL_VOLTAGE_DISCHARGING},
+  {2, 3465},
+  {5, 3615},
+  {10, 3685},
+  {20, 3725},
+  {30, 3760},
+  {40, 3795},
+  {50, 3830},
+  {60, 3885},
+  {70, 3955},
+  {80, 4065},
+  {90, 4160},
+  {100, 4250}
+};
+
+static const VoltagePoint charge_curve[] = {
+  {0, BATTERY_CRITICAL_VOLTAGE_CHARGING},
+  {2, 3850},
+  {5, 3935},
+  {10, 4000},
+  {20, 4040},
+  {30, 4090},
+  {40, 4145},
+  {50, 4175},
+  {60, 4225},
+  {70, 4250}
+};
+
+#elif defined(CONFIG_BOARD_SNOWY)
+// When the voltage drops below these (mV), the watch will start heading for standby (after delay)
+#define BATTERY_CRITICAL_VOLTAGE_CHARGING    3500
+#define BATTERY_CRITICAL_VOLTAGE_DISCHARGING 3300
+// Battery Tables for Snowy (Pebble Time), from the stock firmware
+static VoltagePoint discharge_curve[] = {
+  {0, BATTERY_CRITICAL_VOLTAGE_DISCHARGING},
+  {2, 3500},
+  {5, 3600},
+  {10, 3640},
+  {20, 3690},
+  {30, 3730},
+  {40, 3750},
+  {50, 3790},
+  {60, 3840},
+  {70, 3910},
+  {80, 4000},
+  {90, 4120},
+  {100, 4250}
+};
+
+static const VoltagePoint charge_curve[] = {
+  {0, BATTERY_CRITICAL_VOLTAGE_CHARGING},
+  {10, 3970},
+  {20, 4020},
+  {30, 4060},
+  {40, 4090},
+  {50, 4130},
+  {60, 4190},
+  {70, 4250}
+};
+
+#elif defined(CONFIG_BOARD_ASTERIX) || defined(CONFIG_BOARD_OBELIX) ||       \
+    defined(CONFIG_BOARD_SILK) || defined(CONFIG_BOARD_QEMU_EMERY) ||        \
+    defined(CONFIG_BOARD_QEMU_FLINT) || defined(CONFIG_BOARD_QEMU_GABBRO) || \
     defined(CONFIG_BOARD_NATIVE_EMERY)
 // When the voltage drops below these (mV), the watch will start heading for standby (after delay)
 #define BATTERY_CRITICAL_VOLTAGE_CHARGING    3550
