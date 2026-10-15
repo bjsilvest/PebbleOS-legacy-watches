@@ -4,6 +4,8 @@
 set(sources)
 if(CONFIG_HRM_GH3X2X)
   list(APPEND sources gh3x2x.c)
+elseif(CONFIG_HRM_AS7000)
+  list(APPEND sources as7000.c)
 elseif(CONFIG_HRM_QEMU)
   list(APPEND sources qemu.c)
 endif()

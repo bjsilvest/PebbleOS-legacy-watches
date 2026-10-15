@@ -13,6 +13,15 @@ config HRM_GH3X2X
     help
       Support for the Goodix GH3X2X heart rate sensor.
 
+config HRM_AS7000
+    bool "ams AS7000"
+    depends on SOC_STM32F4
+    help
+      Support for the ams AS7000 heart rate sensor of the Pebble 2 HR. Uses
+      the application already in the sensor flash and reports heart rate
+      only. The sensor is probed at boot, so the Pebble 2 SE runs the same
+      firmware.
+
 config HRM_HRV
     bool "HRV (RR interval) support"
     depends on HRM_GH3X2X

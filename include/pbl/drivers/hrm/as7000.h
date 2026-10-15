@@ -1,0 +1,89 @@
+/* SPDX-FileCopyrightText: 2024 Google LLC */
+/* SPDX-License-Identifier: Apache-2.0 */
+
+#pragma once
+
+#include <pbl/drivers/exti.h>
+#include <pbl/drivers/gpio.h>
+#include <pbl/drivers/i2c.h>
+#include <pbl/drivers/regulator.h>
+#include <pbl/drivers/rtc.h>
+#include <pbl/kernel/compiler.h>
+#include <pbl/kernel/mutex.h>
+#include <pbl/services/new_timer/new_timer.h>
+#include <pbl/services/regular_timer.h>
+
+#include <kernel/util/interval_timer.h>
+
+/**
+ * @defgroup drivers_hrm_as7000 AS7000
+ * @ingroup drivers_hrm
+ * @brief @ref drivers_hrm implementation for the ams AS7000 (Pebble 2 HR).
+ *
+ * Runs the HRM application already in the sensor's flash; the driver never writes the sensor
+ * firmware. The sensor reports heart rate only. Whether it is fitted is probed at init.
+ * @{
+ */
+
+/** @brief Sensor information registers. */
+typedef struct PBL_PACKED {
+  uint8_t protocol_version_major;
+  uint8_t protocol_version_minor;
+  uint8_t sw_version_major;
+  uint8_t sw_version_minor;
+  uint8_t application_id;
+  uint8_t hw_revision;
+} AS7000InfoRecord;
+
+/** @cond INTERNAL_HIDDEN */
+typedef enum {
+  AS7000State_Uninitialized,
+  AS7000State_Absent,
+  AS7000State_Off,
+  AS7000State_Booting,
+  AS7000State_On,
+} AS7000State;
+
+typedef struct HRMDeviceState {
+  AS7000State state;
+  struct pbl_mutex lock;
+  TimerID boot_timer;
+  RtcTicks power_on_ticks;
+  uint32_t handshake_count;
+  uint8_t boot_failures;
+  uint8_t pres_detect_thrsh;
+  bool accel_skip_next;
+  volatile bool handshake_pending;
+  volatile uint8_t missed_seconds;
+  RegularTimerInfo watchdog;
+  IntervalTimer handshake_interval;
+  AS7000InfoRecord info;
+} HRMDeviceState;
+/** @endcond */
+
+/** @brief AS7000 device. */
+typedef const struct HRMDevice {
+  /** Driver runtime state. */
+  HRMDeviceState *state;
+  /** Sensor I2C device. */
+  const struct pbl_i2c_dev *i2c;
+  /** Handshake interrupt line. */
+  ExtiConfig int_exti;
+  /** Handshake line, as an input. */
+  struct pbl_gpio int_gpio;
+  /** Enable output, active while the sensor runs. */
+  struct pbl_gpio enable;
+  /** LED supply, optional. */
+  const struct pbl_regulator *led_supply;
+} HRMDevice;
+
+/**
+ * @brief Get the sensor information read at init.
+ *
+ * @param dev HRM device.
+ * @param[out] info Sensor information.
+ * @return True if the sensor is present.
+ */
+bool as7000_get_version_info(HRMDevice *dev, AS7000InfoRecord *info);
+
+/** @} */
