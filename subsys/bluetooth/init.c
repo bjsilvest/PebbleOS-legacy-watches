@@ -62,9 +62,18 @@ typedef enum {
 // with the vendor's ble_hs_enabled_state (Stopped<->OFF, Started<->ON).
 static DriverState s_driver_state = DriverStateStopped;
 
+static int prv_ensure_addr(void);
+
 static void prv_sync_cb(void) {
   PBL_LOG_DBG("NimBLE host synchronized");
   pbl_sem_give(&s_host_started);
+  // A host reset clears our identity address; pbl_bt_start() sets it on the first sync.
+  if (s_driver_state == DriverStateStarted) {
+    int rc = prv_ensure_addr();
+    if (rc != 0) {
+      PBL_LOG_ERR("Failed to restore address after host reset: 0x%04x", (uint16_t)rc);
+    }
+  }
   pbl_bt_handle_host_resynced();
 }
 
