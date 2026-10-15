@@ -287,33 +287,66 @@ static const struct hci_h4_allocators s_hci_h4_allocs_from_ll = {
 };
 
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
-// Pinned resolvable private address the controller uses in place of the identity address.
+// Pinned resolvable private address wanted on the air in place of the identity address.
 static uint8_t s_local_rpa[6];
 static volatile bool s_local_rpa_set;
+// Random address last sent, and the one the controller accepted (cleared by HCI Reset).
+static uint8_t s_rnd_sent[6];
+static uint8_t s_rnd_in_use[6];
+static volatile bool s_rnd_in_use_valid;
 
 #define HCI_OP_LE_SET_RANDOM_ADDR BLE_HCI_OP(BLE_HCI_OGF_LE, BLE_HCI_OCF_LE_SET_RAND_ADDR)
+#define HCI_OP_RESET              BLE_HCI_OP(BLE_HCI_OGF_CTLR_BASEBAND, BLE_HCI_OCF_CB_RESET)
 #define LE_CONN_COMPLETE_LEN      19U
 #define LE_ENH_CONN_COMPLETE_LEN  31U
 // Offset of the connection interval: the enhanced event inserts the local and peer RPAs here.
 #define LE_CONN_COMPLETE_ITVL_OFF 12U
 
-//! The 4.2 controller sends the legacy LE Connection Complete. Pass it on as the enhanced one
-//! carrying the pinned address as our local RPA, so NimBLE pairs with the address on the air
-//! while keeping the identity address.
+static bool prv_addr_is_rpa(const uint8_t *addr) {
+  return (addr[5] & 0xc0U) == 0x40U;
+}
+
+//! The 4.2 controller sends the legacy LE Connection Complete. When the controller uses a
+//! resolvable private address, pass it on as the enhanced one carrying that address as our local
+//! RPA, so NimBLE pairs with the address on the air while keeping the identity address.
 static void prv_conn_complete_add_local_rpa(struct ble_hci_ev *ev) {
-  if (!s_local_rpa_set || ev->opcode != BLE_HCI_EVCODE_LE_META ||
-      ev->length != LE_CONN_COMPLETE_LEN || ev->data[0] != BLE_HCI_LE_SUBEV_CONN_COMPLETE) {
+  if (!s_rnd_in_use_valid || !prv_addr_is_rpa(s_rnd_in_use) ||
+      ev->opcode != BLE_HCI_EVCODE_LE_META || ev->length != LE_CONN_COMPLETE_LEN ||
+      ev->data[0] != BLE_HCI_LE_SUBEV_CONN_COMPLETE) {
     return;
   }
   const size_t tail_len = LE_CONN_COMPLETE_LEN - LE_CONN_COMPLETE_ITVL_OFF;
   uint8_t *rpas = &ev->data[LE_CONN_COMPLETE_ITVL_OFF];
   memmove(rpas + 12U, rpas, tail_len);
-  memcpy(rpas, s_local_rpa, 6U);
+  memcpy(rpas, s_rnd_in_use, 6U);
   memset(rpas + 6U, 0, 6U);
   ev->data[0] = BLE_HCI_LE_SUBEV_ENH_CONN_COMPLETE;
   ev->length = LE_ENH_CONN_COMPLETE_LEN;
 }
+
+static void prv_note_rnd_addr_reply(struct ble_hci_ev *ev) {
+  if (ev->opcode != BLE_HCI_EVCODE_COMMAND_COMPLETE || ev->length < 4U ||
+      (ev->data[1] | (ev->data[2] << 8)) != HCI_OP_LE_SET_RANDOM_ADDR || ev->data[3] != 0U) {
+    return;
+  }
+  memcpy(s_rnd_in_use, s_rnd_sent, sizeof(s_rnd_in_use));
+  s_rnd_in_use_valid = true;
+}
 #endif
+
+bool pbl_bt_hci_uart_local_addr_outdated(void) {
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  if (!s_rnd_in_use_valid) {
+    return s_local_rpa_set;
+  }
+  if (s_local_rpa_set) {
+    return memcmp(s_rnd_in_use, s_local_rpa, sizeof(s_local_rpa)) != 0;
+  }
+  return prv_addr_is_rpa(s_rnd_in_use);
+#else
+  return false;
+#endif
+}
 
 void pbl_bt_hci_uart_set_local_rpa(const uint8_t *addr) {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
@@ -330,6 +363,7 @@ static void prv_note_evt(struct ble_hci_ev *ev) {
   s_num_evts++;
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   prv_conn_complete_add_local_rpa(ev);
+  prv_note_rnd_addr_reply(ev);
 #endif
   if (ev->opcode == BLE_HCI_EVCODE_NUM_COMP_PKTS && ev->length >= 1U) {
     for (uint8_t i = 0; i < ev->data[0] && 1U + 4U * (i + 1U) <= ev->length; i++) {
@@ -963,9 +997,13 @@ int ble_transport_to_ll_cmd_impl(void *buf) {
 
   pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
-  if (s_last_cmd == HCI_OP_LE_SET_RANDOM_ADDR && cmd->length == sizeof(s_local_rpa) &&
-      s_local_rpa_set) {
-    memcpy(cmd->data, s_local_rpa, sizeof(s_local_rpa));
+  if (s_last_cmd == HCI_OP_LE_SET_RANDOM_ADDR && cmd->length == sizeof(s_local_rpa)) {
+    if (s_local_rpa_set) {
+      memcpy(cmd->data, s_local_rpa, sizeof(s_local_rpa));
+    }
+    memcpy(s_rnd_sent, cmd->data, sizeof(s_rnd_sent));
+  } else if (s_last_cmd == HCI_OP_RESET) {
+    s_rnd_in_use_valid = false;
   }
 #endif
   prv_write(&type, 1U);

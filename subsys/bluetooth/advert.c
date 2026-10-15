@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: 2025 Google LLC */
 /* SPDX-License-Identifier: Apache-2.0 */
 
+#include "id_priv.h"
 #include "nimble_gattc_op_queue.h"
 #include "nimble_type_conversions.h"
 #include "pairability_priv.h"
@@ -491,6 +492,10 @@ bool pbl_bt_advert_advertising_enable(uint32_t min_interval_ms, uint32_t max_int
   if (rc != 0) {
     PBL_LOG_ERR("Failed to infer own address type (%d)", rc);
     return false;
+  }
+
+  if (!ble_gap_adv_active()) {
+    pbl_bt_id_sync_local_address();
   }
 
   rc = ble_gap_adv_start(own_addr_type, nullptr, BLE_HS_FOREVER, &advp, prv_handle_gap_event,

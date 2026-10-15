@@ -33,6 +33,14 @@ bool pbl_bt_hci_uart_wait_ready(uint32_t timeout_ms);
 void pbl_bt_hci_uart_set_local_rpa(const uint8_t *addr);
 
 /**
+ * @brief Whether the controller has yet to accept the address chosen with
+ *        pbl_bt_hci_uart_set_local_rpa() (DA1468x only; false otherwise).
+ *
+ * Connections are only reported with the local RPA the controller accepted.
+ */
+bool pbl_bt_hci_uart_local_addr_outdated(void);
+
+/**
  * @brief Describe the last HCI exchange, for diagnostics.
  *
  * Formats "<last answered command>:<its status> !<last failed command>:<its status>",

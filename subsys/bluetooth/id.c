@@ -1,6 +1,8 @@
 /* SPDX-FileCopyrightText: 2025 Google LLC */
 /* SPDX-License-Identifier: Apache-2.0 */
 
+#include "id_priv.h"
+
 #include <pbl/bluetooth/id.h>
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
 #include <pbl/bluetooth/hci_uart.h>
@@ -39,19 +41,31 @@ void pbl_bt_set_local_address(bool allow_cycling, const struct pbl_bt_addr *pinn
   const bool use_pinned =
       !allow_cycling && pinned_address != nullptr && (pinned_address->octets[5] & 0xc0U) == 0x40U;
   pbl_bt_hci_uart_set_local_rpa(use_pinned ? pinned_address->octets : nullptr);
+  if (pbl_bt_id_sync_local_address() && use_pinned) {
+    PBL_LOG_INFO("Using pinned address " PBL_BT_ADDR_FMT, PBL_BT_ADDR_XPLODE_PTR(pinned_address));
+  }
+#endif
+}
 
-  // Re-send the random address so the controller picks up the change.
+bool pbl_bt_id_sync_local_address(void) {
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  if (!pbl_bt_hci_uart_local_addr_outdated()) {
+    return true;
+  }
+
+  // Re-send the random address: the transport puts the chosen one in. The controller refuses
+  // it while advertising, so advertising retries this before it starts.
   uint8_t id_addr[6];
   int rc = ble_hs_id_copy_addr(BLE_ADDR_RANDOM, id_addr, nullptr);
   if (rc == 0) {
     rc = ble_hs_id_set_rnd(id_addr);
   }
   if (rc != 0) {
-    PBL_LOG_WRN("Could not apply the local address (%d)", rc);
-  } else if (use_pinned) {
-    PBL_LOG_INFO("Using pinned address " PBL_BT_ADDR_FMT, PBL_BT_ADDR_XPLODE_PTR(pinned_address));
+    PBL_LOG_WRN("Could not apply the local address (0x%x)", rc);
+    return false;
   }
 #endif
+  return true;
 }
 
 void pbl_bt_id_copy_chip_info_string(char *dest, size_t dest_size) {
