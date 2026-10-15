@@ -8,6 +8,16 @@ config SERVICE_SHARED_PRF_STORAGE
 
 if SERVICE_SHARED_PRF_STORAGE
 
+config SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK
+    bool "Import the stock firmware's shared PRF storage"
+    depends on RNG
+    help
+      On boards whose recovery firmware is the stock one, which keeps its own
+      shared PRF storage (FLASH_REGION_STOCK_SHARED_PRF_STORAGE), copy that
+      entry into ours when our identity root key differs from it. The phone
+      then sees one watch, with the same address and bonding, in both
+      firmwares. The stock region is only read.
+
 module = SERVICE_SHARED_PRF_STORAGE
 module-str = Shared PRF storage
 source "subsys/logging/Kconfig.template.log_level"

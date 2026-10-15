@@ -4,10 +4,12 @@
 #include <pbl/btutil/sm_util.h>
 #include <pbl/crc/crc.h>
 #include <pbl/drivers/flash.h>
+#include <pbl/drivers/rng.h>
 #include <pbl/kernel/mutex.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/shared_prf_storage/shared_prf_storage.h>
 #include <pbl/services/shared_prf_storage/v3_sprf/shared_prf_storage_private.h>
+#include <pbl/util/size.h>
 
 #include <flash_region/flash_region.h>
 #include <kernel/pbl_malloc.h>
@@ -275,6 +277,71 @@ static bool prv_fetch_field(uint8_t *field_out, size_t offset, size_t field_size
 #define SPRF_FETCH_FIELD(data, name) \
   prv_fetch_field((uint8_t *)&data, offsetof(SharedPRFData, name), sizeof(data))
 
+#ifdef CONFIG_SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK
+#define STOCK_SPRF_NUM_PAGES                                                                   \
+  ((FLASH_REGION_STOCK_SHARED_PRF_STORAGE_END - FLASH_REGION_STOCK_SHARED_PRF_STORAGE_BEGIN) / \
+   sizeof(SharedPRFData))
+
+static bool prv_key_is_nil(const struct pbl_bt_sm_key *key) {
+  const struct pbl_bt_sm_key nil_key = {};
+  return memcmp(key, &nil_key, sizeof(nil_key)) == 0;
+}
+
+//! Copies the stock firmware's entry over ours when its identity root key differs from ours, so
+//! both firmwares use the same IRK, pinned address and bonding. Never writes the stock region.
+static void prv_import_stock(void) {
+  SharedPRFData *stock = kernel_zalloc_check(sizeof(*stock));
+  bool found = false;
+
+  for (uint32_t i = 0; i < STOCK_SPRF_NUM_PAGES; i++) {
+    const uint32_t addr = FLASH_REGION_STOCK_SHARED_PRF_STORAGE_BEGIN + i * sizeof(*stock);
+    flash_read_bytes((uint8_t *)stock, addr, sizeof(*stock));
+    if (stock->magic == SprfMagic_ValidEntry && prv_valid_struct(stock)) {
+      found = true;
+      break;
+    }
+  }
+
+  struct pbl_bt_sm_key *stock_irk = &stock->root_keys.keys[PBL_BT_SM_ROOT_KEY_TYPE_IDENTITY];
+  if (!found || stock->root_keys.crc == SPRF_UNWRITTEN_CRC || prv_key_is_nil(stock_irk)) {
+    PBL_LOG_DBG("No stock root keys to import");
+    goto done;
+  }
+
+  SprfRootKeys ours;
+  flash_read_bytes((uint8_t *)&ours,
+                   prv_current_page_flash_addr() + offsetof(SharedPRFData, root_keys),
+                   sizeof(ours));
+  if (ours.crc != SPRF_UNWRITTEN_CRC &&
+      memcmp(&ours.keys[PBL_BT_SM_ROOT_KEY_TYPE_IDENTITY], stock_irk, sizeof(*stock_irk)) == 0) {
+    goto done;
+  }
+
+  // Normal firmware replaces root keys missing either key with its own, so fill in the
+  // encryption key if stock left it empty. NimBLE stores per-bonding LTKs and does not use it.
+  struct pbl_bt_sm_key *stock_er = &stock->root_keys.keys[PBL_BT_SM_ROOT_KEY_TYPE_ENCRYPTION];
+  if (prv_key_is_nil(stock_er)) {
+    uint32_t words[sizeof(*stock_er) / sizeof(uint32_t)];
+    static_assert(sizeof(words) == sizeof(*stock_er), "root key is not whole words");
+    for (size_t i = 0; i < ARRAY_LENGTH(words); i++) {
+      if (!rng_rand(&words[i])) {
+        PBL_LOG_ERR("No random encryption root key; not importing");
+        goto done;
+      }
+    }
+    memcpy(stock_er, words, sizeof(words));
+    stock->root_keys.crc = pbl_crc32(0, SPRF_FIELD_DATA(&stock->root_keys),
+                                     SPRF_FIELD_DATA_SIZE(sizeof(stock->root_keys)));
+  }
+
+  PBL_LOG_INFO("Importing the stock shared PRF storage");
+  prv_erase_region_and_save(stock);
+
+done:
+  kernel_free(stock);
+}
+#endif
+
 //!
 //! SharedPRFStorage API
 //!
@@ -309,6 +376,10 @@ void shared_prf_storage_init(void) {
     } else if (s_valid_page_idx > (SPRF_MAX_NUM_PAGES_MULT(SPRF_NUM_PAGES))) {
       prv_erase_region_and_save(&data);
     }
+
+#ifdef CONFIG_SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK
+    prv_import_stock();
+#endif
   }
   prv_unlock();
 }
