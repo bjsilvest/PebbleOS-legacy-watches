@@ -105,6 +105,9 @@ void bt_local_addr_init(void) {
 #ifdef CONFIG_RECOVERY_FW
     PBL_LOG_INFO("Pausing address cycling because PRF!");
     bt_local_addr_pause_cycling();
+#elif defined(CONFIG_SERVICE_BLUETOOTH_ALWAYS_PIN_ADDRESS)
+    PBL_LOG_INFO("Pausing address cycling: always pinned");
+    bt_local_addr_pause_cycling();
 #else
     PBL_LOG_INFO("No bondings found that require address pinning!");
     pbl_bt_set_local_address(true /* allow_cycling */, nullptr);

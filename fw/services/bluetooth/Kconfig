@@ -6,6 +6,14 @@ config SERVICE_BLUETOOTH
     help
       Core Bluetooth service (pairing, bonding, local id, ...).
 
+config SERVICE_BLUETOOTH_ALWAYS_PIN_ADDRESS
+    bool "Always use the pinned address"
+    help
+      Advertise and connect from the pinned address at all times, as the
+      recovery firmware does, instead of only while a bonding needs it. Use
+      when the recovery firmware is the stock one, so phones see the same
+      address in both.
+
 config BLE_GATT_NOTIF_WRITE_TIMEOUT_MS
     int "GATT notification handoff timeout (ms)"
     default 5 if SOC_SF32LB52
