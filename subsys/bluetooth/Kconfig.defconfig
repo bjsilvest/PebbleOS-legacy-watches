@@ -36,7 +36,11 @@ config NIMBLE_BLE_SM_MITM
 config NIMBLE_BLE_SM_LVL
     default 4
 
+# A pinned resolvable private address needs our identity key (IRK) and
+# identity address sent when pairing, so phones resolve it to the identity
+# address the watch reports.
 config NIMBLE_BLE_SM_OUR_KEY_DIST
+    default 3 if SERVICE_BLUETOOTH_ALWAYS_PIN_ADDRESS
     default 1
 
 config NIMBLE_BLE_SM_THEIR_KEY_DIST
