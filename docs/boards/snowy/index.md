@@ -169,13 +169,29 @@ Core features snowy could use, not yet looked into in detail:
   lux conversion (`ambient_light_level_to_lux()` is the identity without
   coefficients). Needs calibration against a lux meter, Time and Steel
   separately (their dark thresholds differ), before it can be turned on.
-- **`MMAP_RESOURCES`** (zero-copy reads of system resources, mainly fonts
-  and images). Worth it for the small kernel heap. The S29VS is memory
-  mapped at `0x60000000` through the FMC, but
-  `resource_storage_flash.c` assumes the flash offset is the mapped address,
-  so it needs an offset-to-address translation. Also check that a mapped read
-  can't land in a bank that is being erased or programmed (the S29VS returns
-  status, not data, there), e.g. while the filesystem writes.
+- **`MMAP_RESOURCES`** (system bitmaps, vector icons and vector animations
+  drawn straight from flash instead of copied into the heap). Worth it for
+  the small kernel heap: notification and timeline icons and animations are
+  drawn by the kernel. **Stock did this on snowy** (`HAS_MAPPABLE_FLASH`).
+  Core's version was written for the SF32LB52, whose flash is always mapped,
+  so snowy needs what stock had:
+  - the FMC base: stock returned `0x60000000 + bank + offset`
+    (`FLASH_MEMORY_MAPPABLE_ADDRESS`); Core returns the flash offset;
+  - the FMC clock on while anything is mapped: `s29vs.c` gates it with
+    `flash_impl_use()`/`release`, and stock refcounted mapped resources per
+    task (`resource_mapped.c`, released when a task exits). Leaving the
+    clock on is the simpler option.
+
+  Risk: mapped reads skip the flash lock and erase suspend that
+  `flash_read_bytes()` does, so a read during a program or erase in the same
+  S29VS bank returns status bits. Stock shipped without a guard, which
+  suggests read-while-write across banks covered it, but check the bank map
+  in the datasheet. Flash logs (`0x000000`), firmware scratch (`0x100000`),
+  the inactive resource bank and the filesystem are all written at runtime;
+  if the inactive resource bank shares a bank with the active one, stop
+  mapping while resources are written. Measure the kernel heap high-water
+  mark in QEMU with and without it. Planned once snowy is stable on
+  hardware.
 
 ## Bluetooth
 
