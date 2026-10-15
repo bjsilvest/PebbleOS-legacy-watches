@@ -126,8 +126,8 @@ static bool prv_set_pmic_gpio_outputs(PmicGpio set_mask, PmicGpio clear_mask) {
 static void prv_handle_charge_state_change(void *null) {
   const bool is_charging = pmic_is_charging();
   const bool is_connected = pmic_is_usb_connected();
-  PBL_LOG_DBG("AS3701b Interrupt: Charging? %s Plugged? %s", is_charging ? "YES" : "NO",
-              is_connected ? "YES" : "NO");
+  PBL_LOG_INFO("AS3701b Interrupt: Charging? %s Plugged? %s", is_charging ? "YES" : "NO",
+               is_connected ? "YES" : "NO");
 
   PebbleEvent event = {
     .type = PEBBLE_BATTERY_CONNECTION_EVENT,
