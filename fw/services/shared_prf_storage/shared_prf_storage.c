@@ -1,6 +1,9 @@
 /* SPDX-FileCopyrightText: 2024 Google LLC */
 /* SPDX-License-Identifier: Apache-2.0 */
 
+#ifdef CONFIG_SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK_V2
+#include <pbl/bluetooth/le_crypto.h>
+#endif
 #include <pbl/btutil/sm_util.h>
 #include <pbl/crc/crc.h>
 #include <pbl/drivers/flash.h>
@@ -342,6 +345,116 @@ done:
 }
 #endif
 
+#ifdef CONFIG_SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK_V2
+//! The stock snowy firmware's shared PRF storage (its "v2_sprf" code, struct
+//! version 3): one struct at the start of the region.
+#define STOCK_V2_VERSION   3
+#define STOCK_V2_NAME_SIZE 20
+
+typedef struct PBL_PACKED {
+  char name[STOCK_V2_NAME_SIZE];
+  uint16_t local_ediv;
+  uint16_t local_div;
+  struct pbl_bt_sm_key ltk;
+  uint64_t rand;
+  uint16_t ediv;
+  struct pbl_bt_sm_key irk;
+  struct pbl_bt_device_internal identity;
+  struct pbl_bt_sm_key csrk;
+  bool is_local_encryption_info_valid : 1;
+  bool is_remote_encryption_info_valid : 1;
+  bool is_remote_identity_info_valid : 1;
+  bool is_remote_signing_info_valid : 1;
+} StockV2BlePairing;
+
+typedef struct PBL_PACKED {
+  uint32_t version;
+  char local_device_name[STOCK_V2_NAME_SIZE];
+  struct pbl_bt_sm_key root_keys[PBL_BT_SM_ROOT_KEY_TYPE_NUM];
+  StockV2BlePairing ble_data;
+  uint8_t bt_classic_data[43];
+  bool getting_started_is_complete;
+} StockV2Data;
+
+static_assert(sizeof(StockV2BlePairing) == 91, "stock v2 BLE pairing layout");
+static_assert(sizeof(StockV2Data) == 191, "stock v2 shared PRF storage layout");
+
+static bool prv_key_is_nil_v2(const struct pbl_bt_sm_key *key) {
+  const struct pbl_bt_sm_key nil_key = {};
+  return memcmp(key, &nil_key, sizeof(nil_key)) == 0;
+}
+
+//! Imports the stock firmware's root keys, name and BLE pairing when our
+//! identity root key differs from its own. Stock (Bluetopia) did not store
+//! the LTK it gave the phone, only the DIV and EDIV: regenerate it as
+//! d1(ER, DIV, 0) and store it with the stock EDIV and a Rand of 0. The H4
+//! transport checks a reconnecting phone's EDIV against dm(DHK, Rand) and
+//! then stands in Rand 0, so NimBLE finds the key; if the check fails, the
+//! phone pairs again. Never writes the stock region.
+static void prv_import_stock_v2(void) {
+  StockV2Data *stock = kernel_zalloc_check(sizeof(*stock));
+  flash_read_bytes((uint8_t *)stock, FLASH_REGION_STOCK_SHARED_PRF_STORAGE_BEGIN, sizeof(*stock));
+
+  struct pbl_bt_sm_key *stock_er = &stock->root_keys[PBL_BT_SM_ROOT_KEY_TYPE_ENCRYPTION];
+  struct pbl_bt_sm_key *stock_ir = &stock->root_keys[PBL_BT_SM_ROOT_KEY_TYPE_IDENTITY];
+  if (stock->version != STOCK_V2_VERSION || prv_key_is_nil_v2(stock_ir) ||
+      prv_key_is_nil_v2(stock_er)) {
+    PBL_LOG_DBG("No stock v2 root keys to import");
+    goto done;
+  }
+
+  struct pbl_bt_sm_key ours;
+  if (shared_prf_storage_get_root_key(PBL_BT_SM_ROOT_KEY_TYPE_IDENTITY, &ours) &&
+      memcmp(&ours, stock_ir, sizeof(ours)) == 0) {
+    goto done;
+  }
+
+  PBL_LOG_INFO("Importing the stock (v2) shared PRF storage");
+  shared_prf_storage_set_root_keys(stock->root_keys);
+
+  stock->local_device_name[STOCK_V2_NAME_SIZE - 1] = '\0';
+  if (stock->local_device_name[0] != '\0') {
+    shared_prf_storage_set_local_device_name(stock->local_device_name);
+  }
+
+  const StockV2BlePairing *ble = &stock->ble_data;
+  struct pbl_bt_sm_pairing_info info = {
+    .irk = ble->irk,
+    .identity = ble->identity,
+    .csrk = ble->csrk,
+    .is_remote_identity_info_valid = ble->is_remote_identity_info_valid,
+    .is_remote_signing_info_valid = ble->is_remote_signing_info_valid,
+    .remote_encryption_info =
+        {
+          .ltk = ble->ltk,
+          .rand = ble->rand,
+          .ediv = ble->ediv,
+        },
+    .is_remote_encryption_info_valid = ble->is_remote_encryption_info_valid,
+  };
+  if (ble->is_local_encryption_info_valid &&
+      pbl_bt_le_d1(stock_er->data, ble->local_div, 0, info.local_encryption_info.ltk.data)) {
+    info.local_encryption_info.ediv = ble->local_ediv;
+    info.local_encryption_info.div = ble->local_div;
+    info.local_encryption_info.rand = 0;
+    info.is_local_encryption_info_valid = true;
+  }
+  if (info.is_local_encryption_info_valid || info.is_remote_encryption_info_valid) {
+    char name[STOCK_V2_NAME_SIZE];
+    memcpy(name, ble->name, sizeof(name));
+    name[sizeof(name) - 1] = '\0';
+    shared_prf_storage_store_ble_pairing_data(&info, name, false, 0);
+  }
+
+  if (stock->getting_started_is_complete) {
+    shared_prf_storage_set_getting_started_complete(true);
+  }
+
+done:
+  kernel_free(stock);
+}
+#endif
+
 //!
 //! SharedPRFStorage API
 //!
@@ -382,6 +495,11 @@ void shared_prf_storage_init(void) {
 #endif
   }
   prv_unlock();
+
+#ifdef CONFIG_SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK_V2
+  // Through the API, which takes the lock itself.
+  prv_import_stock_v2();
+#endif
 }
 
 void shared_prf_storage_wipe_all(void) {

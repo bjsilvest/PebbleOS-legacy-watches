@@ -18,6 +18,15 @@ config SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK
       then sees one watch, with the same address and bonding, in both
       firmwares. The stock region is only read.
 
+config SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK_V2
+    bool "Import the stock firmware's v2 shared PRF storage"
+    depends on BT
+    help
+      Like SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK, for stock firmwares that
+      used the older v2 layout (snowy): one struct at the start of
+      FLASH_REGION_STOCK_SHARED_PRF_STORAGE, with Bluetopia's legacy
+      pairing keys. The stock region is only read.
+
 module = SERVICE_SHARED_PRF_STORAGE
 module-str = Shared PRF storage
 source "subsys/logging/Kconfig.template.log_level"

@@ -23,12 +23,15 @@
 #include <pbl/soc/stm32/sleep.h>
 #endif
 #ifdef CONFIG_BT_CONTROLLER_CC2564
+#include <pbl/bluetooth/le_crypto.h>
 #include <pbl/drivers/bluetooth/cc2564.h>
 #include <pbl/drivers/rtc.h>
 #include <pbl/soc/stm32/sleep.h>
 
 #include <host/ble_store.h>
-#include <mbedtls/aes.h>
+#ifdef CONFIG_SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK_V2
+#include <pbl/services/shared_prf_storage/shared_prf_storage.h>
+#endif
 #endif
 #include <kernel/pebble_tasks.h>
 #include <kernel/util/delay.h>
@@ -44,6 +47,13 @@
 #include <os/endian.h>
 
 PBL_LOG_MODULE_DECLARE(nimble, CONFIG_NIMBLE_LOG_LEVEL);
+
+// Controllers that only take a static random address as their own (NimBLE
+// will not set a resolvable private one either): the transport puts the
+// pinned resolvable private address in instead.
+#if defined(CONFIG_BT_CONTROLLER_DA1468X) || defined(CONFIG_BT_CONTROLLER_CC2564)
+#define HCI_UART_PINNED_RPA 1
+#endif
 
 // Boards with split RX/TX UARTs define BT_HCI_UART_TX; BT_HCI_UART receives.
 #ifndef BT_HCI_UART_TX
@@ -294,7 +304,7 @@ static const struct hci_h4_allocators s_hci_h4_allocs_from_ll = {
   .evt = prv_alloc_evt,
 };
 
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#ifdef HCI_UART_PINNED_RPA
 // Pinned resolvable private address wanted on the air in place of the identity address.
 static uint8_t s_local_rpa[6];
 static volatile bool s_local_rpa_set;
@@ -356,10 +366,6 @@ static void prv_note_rnd_addr_reply(struct ble_hci_ev *ev) {
 // controller would send. NimBLE then finds the bond as usual.
 #define H4_SM_IDLE               0U // HCI_H4_SM_W4_PKT_TYPE in hci_h4.c
 #define FAKE_REPLIES_MAX         4U
-#define LE_CONN_COMPLETE_LEN     19U
-#define LE_ENH_CONN_COMPLETE_LEN 31U
-// Offset of the connection interval: the enhanced event inserts the local and peer RPAs here.
-#define LE_CONN_COMPLETE_ITVL_OFF 12U
 
 static uint16_t s_fake_replies[FAKE_REPLIES_MAX];
 static volatile uint32_t s_fake_head;
@@ -406,44 +412,6 @@ static void prv_send_fake_replies(void) {
   }
 }
 
-static bool prv_addr_is_rpa(const uint8_t *addr) {
-  return (addr[5] & 0xc0U) == 0x40U;
-}
-
-//! AES-128 on little-endian (HCI order) key, plain and cipher text, like LE Encrypt.
-static bool prv_aes_le(const uint8_t *key, const uint8_t *plain, uint8_t *cipher) {
-  uint8_t key_be[16];
-  uint8_t plain_be[16];
-  uint8_t cipher_be[16];
-  for (int i = 0; i < 16; i++) {
-    key_be[i] = key[15 - i];
-    plain_be[i] = plain[15 - i];
-  }
-
-  mbedtls_aes_context ctx;
-  mbedtls_aes_init(&ctx);
-  const bool ok = mbedtls_aes_setkey_enc(&ctx, key_be, 128) == 0 &&
-                  mbedtls_aes_crypt_ecb(&ctx, MBEDTLS_AES_ENCRYPT, plain_be, cipher_be) == 0;
-  mbedtls_aes_free(&ctx);
-
-  for (int i = 0; i < 16; i++) {
-    cipher[i] = cipher_be[15 - i];
-  }
-  return ok;
-}
-
-//! ah(IRK, prand) == hash, with the address in HCI (little endian) order.
-static bool prv_irk_resolves(const uint8_t *irk, const uint8_t *rpa) {
-  uint8_t plain[16] = {0};
-  uint8_t cipher[16];
-
-  memcpy(plain, &rpa[3], 3);
-  if (!prv_aes_le(irk, plain, cipher)) {
-    return false;
-  }
-  return memcmp(cipher, rpa, 3) == 0;
-}
-
 struct ResolveContext {
   const uint8_t *rpa;
   ble_addr_t identity;
@@ -452,13 +420,62 @@ struct ResolveContext {
 
 static int prv_resolve_cb(int obj_type, union ble_store_value *val, void *cookie) {
   struct ResolveContext *ctx = cookie;
-  if (val->sec.irk_present && prv_irk_resolves(val->sec.irk, ctx->rpa)) {
+  if (val->sec.irk_present && pbl_bt_le_irk_resolves(val->sec.irk, ctx->rpa)) {
     ctx->identity = val->sec.peer_addr;
     ctx->found = true;
     return 1;
   }
   return 0;
 }
+
+#ifdef CONFIG_SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK_V2
+#define LE_LTK_REQ_LEN 13U
+
+static volatile uint32_t s_legacy_ltk_used;
+static volatile uint32_t s_legacy_ltk_mismatch;
+
+//! A bond imported from the stock firmware has its LTK regenerated but not
+//! the Rand the phone holds (stock never stored it), so it is stored with
+//! Rand 0. When the phone asks for that key, check its EDIV is the stock
+//! one, DIV ^ dm(DHK, Rand) with DHK = d1(IR, 3, 0), and stand in Rand 0 so
+//! NimBLE finds the key. Otherwise leave the request alone: NimBLE declines
+//! and the phone pairs again.
+static void prv_ltk_req_imported_bond(struct ble_hci_ev *ev) {
+  if (ev->opcode != BLE_HCI_EVCODE_LE_META || ev->length != LE_LTK_REQ_LEN ||
+      ev->data[0] != BLE_HCI_LE_SUBEV_LT_KEY_REQ) {
+    return;
+  }
+  uint64_t rand = 0;
+  for (int i = 0; i < 8; i++) {
+    rand |= (uint64_t)ev->data[3 + i] << (8 * i);
+  }
+  const uint16_t ediv = ev->data[11] | (ev->data[12] << 8);
+  if (rand == 0U) {
+    return;
+  }
+
+  struct pbl_bt_sm_pairing_info info;
+  struct pbl_bt_sm_key ir;
+  if (!shared_prf_storage_get_ble_pairing_data(&info, nullptr, nullptr, nullptr) ||
+      !info.is_local_encryption_info_valid || info.local_encryption_info.rand != 0U ||
+      info.local_encryption_info.ediv != ediv ||
+      !shared_prf_storage_get_root_key(PBL_BT_SM_ROOT_KEY_TYPE_IDENTITY, &ir)) {
+    return;
+  }
+
+  uint8_t dhk[16];
+  uint16_t y;
+  if (!pbl_bt_le_d1(ir.data, 3U, 0U, dhk) || !pbl_bt_le_dm(dhk, rand, &y)) {
+    return;
+  }
+  if ((uint16_t)(ediv ^ y) != info.local_encryption_info.div) {
+    s_legacy_ltk_mismatch++;
+    return;
+  }
+  memset(&ev->data[3], 0, 8U);
+  s_legacy_ltk_used++;
+}
+#endif
 
 static void prv_conn_complete_resolve_peer(struct ble_hci_ev *ev) {
   if (ev->opcode != BLE_HCI_EVCODE_LE_META || ev->length != LE_CONN_COMPLETE_LEN ||
@@ -487,7 +504,7 @@ static void prv_conn_complete_resolve_peer(struct ble_hci_ev *ev) {
 #endif
 
 bool pbl_bt_hci_uart_local_addr_outdated(void) {
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#ifdef HCI_UART_PINNED_RPA
   if (!s_rnd_in_use_valid) {
     return s_local_rpa_set;
   }
@@ -501,7 +518,7 @@ bool pbl_bt_hci_uart_local_addr_outdated(void) {
 }
 
 void pbl_bt_hci_uart_set_local_rpa(const uint8_t *addr) {
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#ifdef HCI_UART_PINNED_RPA
   pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
   s_local_rpa_set = (addr != NULL);
   if (addr != NULL) {
@@ -513,11 +530,16 @@ void pbl_bt_hci_uart_set_local_rpa(const uint8_t *addr) {
 
 static void prv_note_evt(struct ble_hci_ev *ev) {
   s_num_evts++;
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+  // First, so the local RPA lands in the enhanced event it may make.
+  prv_conn_complete_resolve_peer(ev);
+#ifdef CONFIG_SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK_V2
+  prv_ltk_req_imported_bond(ev);
+#endif
+#endif
+#ifdef HCI_UART_PINNED_RPA
   prv_conn_complete_add_local_rpa(ev);
   prv_note_rnd_addr_reply(ev);
-#elifdef CONFIG_BT_CONTROLLER_CC2564
-  prv_conn_complete_resolve_peer(ev);
 #endif
   if (ev->opcode == BLE_HCI_EVCODE_NUM_COMP_PKTS && ev->length >= 1U) {
     for (uint8_t i = 0; i < ev->data[0] && 1U + 4U * (i + 1U) <= ev->length; i++) {
@@ -1382,7 +1404,7 @@ int ble_transport_to_ll_cmd_impl(void *buf) {
 #else
   pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
 #endif
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#ifdef HCI_UART_PINNED_RPA
   if (s_last_cmd == HCI_OP_LE_SET_RANDOM_ADDR && cmd->length == sizeof(s_local_rpa)) {
     if (s_local_rpa_set) {
       memcpy(cmd->data, s_local_rpa, sizeof(s_local_rpa));

@@ -58,6 +58,33 @@ BOARDS = {
 GUARD_MESSAGE = b"protected flash"
 
 
+def stock_v2_sprf(rng):
+    """A stock snowy (v2) shared PRF storage entry with a legacy BLE pairing.
+
+    Root keys and pairing values are random. The fields are as the stock
+    firmware laid them out; the firmware must import them without writing the
+    stock region.
+    """
+    er = rng.randbytes(16)
+    ir = rng.randbytes(16)
+    name = b"canary".ljust(20, b"\0")
+    ble = (
+        b"phone".ljust(20, b"\0")
+        + struct.pack("<HH", rng.getrandbits(16), rng.getrandbits(16))  # local EDIV, DIV
+        + rng.randbytes(16)  # remote LTK
+        + struct.pack("<QH", rng.getrandbits(64), rng.getrandbits(16))  # rand, EDIV
+        + rng.randbytes(16)  # IRK
+        + rng.randbytes(6)
+        + b"\x00\x00"  # identity: public LE address
+        + rng.randbytes(16)  # CSRK
+        + bytes([0b0111])  # local enc, remote enc, remote identity valid
+    )
+    assert len(ble) == 91
+    data = struct.pack("<I", 3) + name + er + ir + ble + bytes(43) + b"\x01"
+    assert len(data) == 191
+    return data
+
+
 def build_stock_images(board, build_dir, tmp):
     """Stock bootloader + firmware, and an external flash with resources."""
     from intelhex import IntelHex
@@ -119,6 +146,11 @@ def main():
     parser.add_argument("--seconds", type=int, default=40)
     parser.add_argument("--screenshot", help="write a PNG of the screen here")
     parser.add_argument("--console", help="copy the console log here")
+    parser.add_argument(
+        "--stock-sprf-v2",
+        action="store_true",
+        help="put a stock v2 shared PRF storage entry in place (snowy)",
+    )
     args = parser.parse_args()
 
     board = BOARDS[args.board]
@@ -136,6 +168,10 @@ def main():
         rng = random.Random(0x5111C)
         for _name, lo, hi in board["protected"]:
             image[lo:hi] = rng.randbytes(hi - lo)
+        if args.stock_sprf_v2:
+            sprf = stock_v2_sprf(rng)
+            lo = dict((name, lo) for name, lo, _hi in board["protected"])["stock shared PRF storage"]
+            image[lo : lo + len(sprf)] = sprf
         Path(spi).write_bytes(image)
 
         console = os.path.join(tmp, "console.log")

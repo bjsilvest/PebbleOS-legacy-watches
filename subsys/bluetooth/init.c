@@ -79,7 +79,7 @@ static void prv_sync_cb(void) {
 
 static void prv_reset_cb(int reason) {
   PBL_LOG_WRN("NimBLE host reset (reason: 0x%04x)", (uint16_t)reason);
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#if defined(CONFIG_BT_CONTROLLER_DA1468X) || defined(CONFIG_BT_CONTROLLER_CC2564)
   pbl_bt_hci_uart_snapshot();
 #endif
 #ifdef CONFIG_BT_HCI_SF32LB52
@@ -218,8 +218,8 @@ bool pbl_bt_start(struct pbl_bt_config *config) {
 #endif
 
   ble_hs_sched_start();
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
-  // The controller is built out of tree and still unproven: a host that cannot
+#if defined(CONFIG_BT_CONTROLLER_DA1468X) || defined(CONFIG_BT_CONTROLLER_CC2564)
+  // The controller is built out of tree or still unproven: a host that cannot
   // sync with it leaves Bluetooth off instead of crashing, since a crash loop
   // would end in the bootloader starting PRF. Feed the caller's task watchdog
   // meanwhile.

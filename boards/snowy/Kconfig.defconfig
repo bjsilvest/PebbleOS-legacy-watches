@@ -13,3 +13,9 @@ config QEMU_MACHINE
 choice BT_ID_ADDR_SOURCE
     default BT_ID_ADDR_SERIAL
 endchoice
+
+# The recovery firmware is the stock one, with its own (v2) shared PRF
+# storage. Import its keys and pairing so phones see one watch, already
+# paired, in either firmware. Stock snowy pinned no address.
+config SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK_V2
+    default y

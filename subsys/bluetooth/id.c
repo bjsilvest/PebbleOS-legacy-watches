@@ -4,7 +4,7 @@
 #include "id_priv.h"
 
 #include <pbl/bluetooth/id.h>
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#if defined(CONFIG_BT_CONTROLLER_DA1468X) || defined(CONFIG_BT_CONTROLLER_CC2564)
 #include <pbl/bluetooth/hci_uart.h>
 #include <pbl/bluetooth/types.h>
 #include <pbl/logging/logging.h>
@@ -14,7 +14,7 @@
 #include <services/gap/ble_svc_gap.h>
 #include <system/passert.h>
 
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#if defined(CONFIG_BT_CONTROLLER_DA1468X) || defined(CONFIG_BT_CONTROLLER_CC2564)
 PBL_LOG_MODULE_DECLARE(bt, CONFIG_BT_LOG_LEVEL);
 #endif
 
@@ -35,7 +35,7 @@ void pbl_bt_id_copy_local_identity_address(struct pbl_bt_addr *addr_out) {
 }
 
 void pbl_bt_set_local_address(bool allow_cycling, const struct pbl_bt_addr *pinned_address) {
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#if defined(CONFIG_BT_CONTROLLER_DA1468X) || defined(CONFIG_BT_CONTROLLER_CC2564)
   // Only the stock firmware's pinned address (imported from its shared PRF storage) is a
   // resolvable private one; the generated placeholder is all zeros.
   const bool use_pinned =
@@ -48,7 +48,7 @@ void pbl_bt_set_local_address(bool allow_cycling, const struct pbl_bt_addr *pinn
 }
 
 bool pbl_bt_id_sync_local_address(void) {
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#if defined(CONFIG_BT_CONTROLLER_DA1468X) || defined(CONFIG_BT_CONTROLLER_CC2564)
   if (!pbl_bt_hci_uart_local_addr_outdated()) {
     return true;
   }
