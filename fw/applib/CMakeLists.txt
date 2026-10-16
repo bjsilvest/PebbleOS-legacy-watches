@@ -37,6 +37,12 @@ else()
   list(APPEND excl compass_service.c)
 endif()
 
+if(CONFIG_SERVICE_ACTIVITY)
+  list(APPEND excl health_service_stub.c)
+else()
+  list(APPEND excl health_service.c)
+endif()
+
 if(CONFIG_TOUCH)
   list(APPEND excl touch_service_stub.c)
 else()
