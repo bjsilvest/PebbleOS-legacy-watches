@@ -27,7 +27,7 @@ PBL_LOG_MODULE_DECLARE(driver_flash, CONFIG_DRIVER_FLASH_LOG_LEVEL);
 #define CMD_READ_STATUS_REG       0x05
 #define CMD_READ_FLAG_STATUS_REG  0x70
 #define CMD_CLEAR_FLAG_STATUS_REG 0x50
-#define CMD_FAST_READ             0x0B
+#define CMD_READ                  0x03
 #define CMD_READ_ID               0x9F
 #define CMD_PAGE_PROGRAM          0x02
 #define CMD_ERASE_SUBSECTOR       0x20
@@ -285,9 +285,9 @@ status_t flash_impl_read_sync(void *buffer, FlashAddress addr, size_t len) {
   uint8_t *out = buffer;
   flash_impl_use();
   prv_select();
-  prv_xfer(CMD_FAST_READ);
+  // Plain read, as stock: no dummy cycles, fine at our SPI clock.
+  prv_xfer(CMD_READ);
   prv_send_addr(addr);
-  prv_xfer(0); // dummy cycles
   for (size_t i = 0; i < len; i++) {
     out[i] = prv_xfer(0);
   }
@@ -448,9 +448,8 @@ uint32_t flash_impl_get_typical_subsector_erase_duration_ms(void) {
 static status_t prv_blank_check(FlashAddress base, uint32_t size) {
   flash_impl_use();
   prv_select();
-  prv_xfer(CMD_FAST_READ);
+  prv_xfer(CMD_READ);
   prv_send_addr(base);
-  prv_xfer(0);
   status_t ret = S_TRUE;
   for (uint32_t i = 0; i < size; i++) {
     if (prv_xfer(0) != 0xff) {
