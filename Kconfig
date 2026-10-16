@@ -147,6 +147,13 @@ config RESOURCES_BOARD
       the firmware uses, for boards that share another board's. Empty to
       use the board's own.
 
+config BUNDLE_HWREV
+    string
+    help
+      Hardware revision firmware bundles name, for boards whose stock
+      bundles used a name other than the board's (the original Pebble's
+      ev2_4). Empty to use the board's.
+
 config QEMU_MACHINE
     string
     depends on QEMU

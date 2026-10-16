@@ -218,8 +218,13 @@ function(pbl_link_firmware)
 
   # --- Bundling -----------------------------------------------------------
 
+  if(CONFIG_BUNDLE_HWREV)
+    set(bundle_board ${CONFIG_BUNDLE_HWREV})
+  else()
+    set(bundle_board ${PBL_BOARD_NORMALIZED})
+  endif()
   set(bundle_args --config ${PBL_DOTCONFIG} --firmware ${bin}
-                  --board ${PBL_BOARD_NORMALIZED} --outdir ${PROJECT_BINARY_DIR}
+                  --board ${bundle_board} --outdir ${PROJECT_BINARY_DIR}
                   --slot ${PBL_SLOT})
   if(PBL_PBPACK)
     list(APPEND bundle_args --resources ${PBL_PBPACK} --layouts ${PBL_LAYOUTS})
