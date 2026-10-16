@@ -37,3 +37,7 @@ config FIRMWARE_LEGACY_CRC
 # HCI task then stops reading while the host waits on a write.
 config NIMBLE_BLE_TRANSPORT_EVT_COUNT
     default 16
+
+# Stable on hardware since -225: the chip sleeps and the host enters STOP.
+config BT_CC2564_SLEEP
+    default y

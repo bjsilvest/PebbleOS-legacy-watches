@@ -139,7 +139,7 @@ the `snowy_dvt` bootloader, so the canary covers both.
 | I2S PDM mic (SPI2, DMA1 stream 3, OpenPDMFilter) | not checked on hardware |
 | Factory data (stock OTP slots and MFG struct, read-only) | hardware |
 | Bluetooth (CC2564B, NimBLE over H4, TI init script) | hardware |
-| CC2564 deep sleep (eHCILL) with STOP | hardware (`BT_CC2564_SLEEP`, test bundles only so far) |
+| CC2564 deep sleep (eHCILL) with STOP | hardware (`BT_CC2564_SLEEP`, on by default) |
 | Album art and notification pictures (`SERVICE_IMAGING_PICTURES`) | hardware |
 | Firmware updates from the Core app | hardware |
 | Resources: silk's plus color-only ones, 105 color emoji | done (513,755 of 524,288 bytes) |
@@ -159,7 +159,8 @@ python3 tools/qemu_silk_canary.py --board snowy --build-dir build-snowy \
     --machine pebble-snowy-bb --qemu $PEBBLEOS_SDK_ROOT/qemu/bin/qemu-pebble
 ```
 
-Deep sleep builds add `-DCONFIG_BT_CC2564_SLEEP=y` to `pbl configure`.
+Deep sleep is on by default; add `-DCONFIG_BT_CC2564_SLEEP=n` to
+`pbl configure` to keep the chip awake.
 
 The canary boots through the **stock snowy bootloader** (from git history)
 with PRF, stock shared PRF storage and MFG info filled with random data, and
@@ -334,7 +335,7 @@ entry). Stock snowy pinned no address, so neither does this port.
 
 ### Deep sleep (eHCILL)
 
-With `CONFIG_BT_CC2564_SLEEP=y` the controller deep sleeps using TI's eHCILL
+With `CONFIG_BT_CC2564_SLEEP` (on by default) the controller deep sleeps using TI's eHCILL
 (SWRA288), as the init script configures it (20 ms inactivity timeout,
 100 ms WAKE_UP_IND retransmission, 150 us RTS pulse), and the host enters
 STOP meanwhile. The transport:
@@ -355,7 +356,7 @@ example "BT Rx" `S z249 c193 h55 r0 f0`: `<state A/S/W/C> z<sleeps>
 c<controller wakes> h<host wakes> r<wake retries> f<false wakes>`), so STOP
 does not take away the slow clock the sleeping chip runs on.
 `BT_CC2564_SLEEP_NO_STOP` keeps STOP off while the chip sleeps, for telling
-the two apart. The option is still off by default.
+the two apart.
 
 Open items:
 - **Two bonds after re-pairing.** Pairing again here leaves the stock PRF
