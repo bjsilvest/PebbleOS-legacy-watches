@@ -79,3 +79,8 @@ CONFIG_SERVICE_IMAGING_PICTURES=y
 # Settings: motion sensitivity and left-handed (rotated) wear
 CONFIG_ACCEL_SENSITIVITY=y
 CONFIG_ORIENTATION_MANAGER=y
+
+# System resources (fonts aside) drawn straight from the memory-mapped NOR,
+# as the stock firmware did: the kernel heap is too small to copy the larger
+# vector animations (the incoming call one is 13.6K).
+CONFIG_MMAP_RESOURCES=y
