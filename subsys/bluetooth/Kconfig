@@ -97,16 +97,6 @@ config BT_ID_ADDR
     help
       An identity address backend is selected (pbl/bluetooth/id_addr.h).
 
-config BT_SEC_REQ_ON_CONNECT
-    bool "Ask new phones to pair as soon as they connect"
-    help
-      Send an SMP Security Request when a phone without a bond connects.
-      The phone then pairs as it would on its own, with LE Secure
-      Connections, rather than in response to an encrypted attribute
-      access, which some phones do with legacy pairing (passkey typed in
-      instead of numeric comparison). For watches the phone app does not
-      trigger pairing for itself.
-
 config BT_ID_ADDR_PREFER_PUBLIC
     bool "Prefer the controller's public address"
     depends on BT_ID_ADDR

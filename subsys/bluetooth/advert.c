@@ -166,15 +166,6 @@ static void prv_handle_connection_event(struct ble_gap_event *event) {
     uint16_t *conn_handle = kernel_malloc_check(sizeof(*conn_handle));
     *conn_handle = event->connect.conn_handle;
     nimble_gattc_op_queue_push(prv_device_name_read_op_start, conn_handle);
-#ifdef CONFIG_BT_SEC_REQ_ON_CONNECT
-    // Ask the phone to pair before an app touches an encrypted attribute:
-    // pairing the phone starts for that is legacy (no LE Secure Connections),
-    // so the passkey must be typed instead of compared.
-    const int rc = ble_gap_security_initiate(event->connect.conn_handle);
-    if (rc != 0) {
-      PBL_LOG_WRN("Security request failed (0x%x)", rc);
-    }
-#endif
   }
 
   nimble_conn_params_to_pebble(&desc, &complete_event.conn_params);

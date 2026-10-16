@@ -37,9 +37,3 @@ config FIRMWARE_LEGACY_CRC
 # HCI task then stops reading while the host waits on a write.
 config NIMBLE_BLE_TRANSPORT_EVT_COUNT
     default 16
-
-# The Core app does not trigger pairing on basalt watches, so the phone
-# pairs on its own when the app first reads an encrypted attribute, with
-# legacy pairing (typed passkey). Ask for pairing at connection instead.
-config BT_SEC_REQ_ON_CONNECT
-    default y
