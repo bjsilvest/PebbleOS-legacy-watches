@@ -7,7 +7,6 @@ set(sources
   compositor_transitions.c
   screenshot_pp.c
   default/compositor_dot_transitions.c
-  default/compositor_launcher_app_transitions.c
   default/compositor_peek_transitions.c
   default/compositor_port_hole_transitions.c
   default/compositor_round_flip_transitions.c
@@ -19,6 +18,10 @@ if(CONFIG_SCREEN_COLOR_DEPTH_BITS EQUAL 1)
   list(APPEND sources legacy/compositor_modal_slide_transitions.c)
 else()
   list(APPEND sources default/compositor_modal_transitions.c)
+endif()
+if(NOT CONFIG_LAUNCHER_LEGACY)
+  # Reads the glance launcher's selection to animate from it
+  list(APPEND sources default/compositor_launcher_app_transitions.c)
 endif()
 pbl_library()
 pbl_library_sources(${sources})

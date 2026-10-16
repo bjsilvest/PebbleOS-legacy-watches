@@ -4,7 +4,6 @@
 set(sources
   api.c
   app_db.c
-  app_glance_db.c
   contacts_db.c
   endpoint.c
   endpoint2.c
@@ -24,4 +23,5 @@ set(sources
 pbl_library()
 pbl_library_sources(${sources})
 pbl_library_sources_ifdef(CONFIG_SERVICE_ACTIVITY health_db.c)
+pbl_library_sources_ifdef(CONFIG_SERVICE_APP_GLANCES app_glance_db.c)
 pbl_library_sources_ifdef(CONFIG_SERVICE_WEATHER weather_db.c)

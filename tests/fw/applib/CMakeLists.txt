@@ -150,6 +150,7 @@ pbl_clar_test(test_app_glance
     fw/services/timeline/attribute.c
     tests/fakes/fake_rtc.c
     tests/fakes/fake_settings_file.c
+  DEFINES CONFIG_SERVICE_APP_GLANCES=1
   OVERRIDES dummy_board
 )
 

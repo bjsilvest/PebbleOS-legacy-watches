@@ -331,7 +331,7 @@ PBL_NOINLINE void app_state_init(void) {
   unobstructed_area_service_init(app_state_get_unobstructed_area_state(),
                                  s_app_state_ptr->initial_obstruction_origin_y);
 
-#if !defined(CONFIG_RECOVERY_FW)
+#if !defined(CONFIG_RECOVERY_FW) && defined(CONFIG_SERVICE_APP_GLANCES)
   app_glance_service_init_glance(app_state_get_glance());
 #endif
 

@@ -3,6 +3,13 @@
 
 menu "Applications"
 
+config LAUNCHER_LEGACY
+    bool
+    default y if !SERVICE_APP_GLANCES
+    help
+      The plain app list of the original Pebble, used when there are no
+      app glances.
+
 rsource "demo/Kconfig"
 rsource "watch/Kconfig"
 

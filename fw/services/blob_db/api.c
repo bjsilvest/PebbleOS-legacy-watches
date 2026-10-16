@@ -165,6 +165,7 @@ static const BlobDB s_blob_dbs[NumBlobDBs] = {
 #else
   [BlobDBIdHealth] = {.disabled = true},
 #endif
+#ifdef CONFIG_SERVICE_APP_GLANCES
   [BlobDBIdAppGlance] =
       {
         .init = app_glance_db_init,
@@ -176,6 +177,9 @@ static const BlobDB s_blob_dbs[NumBlobDBs] = {
         .compact = app_glance_db_compact,
         .name = "app_glance_db",
       },
+#else
+  [BlobDBIdAppGlance] = {.disabled = true},
+#endif
   [BlobDBIdSettings] = {
     .init = settings_blob_db_init,
     .insert = settings_blob_db_insert,

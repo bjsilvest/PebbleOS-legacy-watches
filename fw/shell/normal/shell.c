@@ -2,6 +2,9 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 #include <pbl/services/compositor/compositor_transitions.h>
+#ifdef CONFIG_LAUNCHER_LEGACY
+#include <pbl/services/compositor/legacy/compositor_app_slide_transitions.h>
+#endif
 
 #include <apps/system_app_ids.h>
 #include <kernel/pbl_malloc.h>
@@ -69,7 +72,9 @@ const CompositorTransition *shell_get_watchface_compositor_animation(
 
 static const CompositorTransition *prv_app_launcher_transition_animation(
     CompositorTransitionDirection direction) {
-#if PBL_RECT
+#if defined(CONFIG_LAUNCHER_LEGACY)
+  return compositor_app_slide_transition_get(direction == CompositorTransitionDirectionRight);
+#elif PBL_RECT
   const bool app_is_destination = (direction == CompositorTransitionDirectionRight);
   return compositor_launcher_app_transition_get(app_is_destination);
 #else
