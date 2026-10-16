@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Brian Silvestri
+# SPDX-License-Identifier: Apache-2.0
+
+config BOARD_TINTIN_BB2
+    bool
+    default y
+    select IS_BIGBOARD

@@ -10,6 +10,8 @@
 #include <board/boards/board_silk.h>
 #elifdef CONFIG_BOARD_SNOWY
 #include <board/boards/board_snowy.h>
+#elifdef CONFIG_BOARD_TINTIN
+#include <board/boards/board_tintin.h>
 #elif defined(CONFIG_BOARD_OBELIX_DVT) || defined(CONFIG_BOARD_OBELIX_PVT) || \
     defined(CONFIG_BOARD_OBELIX_BB2)
 #include <board/boards/board_obelix.h>

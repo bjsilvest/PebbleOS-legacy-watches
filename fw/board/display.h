@@ -22,7 +22,7 @@ typedef struct {
 // used by tools/waf/pebble_test.py to define these includes per test
 #else
 
-#if defined(CONFIG_BOARD_ASTERIX) || defined(CONFIG_BOARD_SILK)
+#if defined(CONFIG_BOARD_ASTERIX) || defined(CONFIG_BOARD_SILK) || defined(CONFIG_BOARD_TINTIN)
 // Same Sharp 144x168 layout as silk
 #include <board/displays/display_asterix.h>
 #elifdef CONFIG_BOARD_SNOWY

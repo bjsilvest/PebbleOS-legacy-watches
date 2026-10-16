@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 Brian Silvestri
+# SPDX-License-Identifier: Apache-2.0
+
+# 512 KiB of flash less the 16 KiB stock bootloader the image is linked past.
+config FW_FLASH_SIZE
+    default 0x7c000
+
+config QEMU_MACHINE
+    default "pebble-bb2"
+
+# The stock bootloader checks staged firmware, and the stock PRF image was
+# written, with the legacy STM32 CRC.
+config FIRMWARE_LEGACY_CRC
+    default y
+
+# Show the same 1% charge percent as the phone app.
+config BATTERY_EXACT_PERCENT
+    default y

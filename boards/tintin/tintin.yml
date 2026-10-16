@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 Brian Silvestri
+# SPDX-License-Identifier: Apache-2.0
+
+# ev2_4 is the Kickstarter-era original Pebble, as stock firmware bundles name
+# it (hwrev). bb2 is the bigboard QEMU's pebble-bb2 machine emulates.
+revisions:
+  - bb2
+  - ev2_4
