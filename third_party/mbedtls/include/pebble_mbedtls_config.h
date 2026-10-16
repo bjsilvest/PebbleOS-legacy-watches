@@ -23,6 +23,9 @@ void kernel_free(void *ptr);
 
 #define MBEDTLS_AES_C
 #define MBEDTLS_AES_ROM_TABLES
+// Only a few blocks per pairing, and only ever encrypted
+#define MBEDTLS_AES_FEWER_TABLES
+#define MBEDTLS_BLOCK_CIPHER_NO_DECRYPT
 #define MBEDTLS_CIPHER_C
 #define MBEDTLS_CMAC_C
 
