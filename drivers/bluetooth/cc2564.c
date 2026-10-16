@@ -59,9 +59,9 @@ PBL_LOG_MODULE_DECLARE(nimble, CONFIG_NIMBLE_LOG_LEVEL);
 #define BTS_ACTION_SERIAL 3U
 #define BTS_ACTION_DELAY  4U
 
-//! nSHUTDOWN low time per attempt: 100 ms as the pebble-dev firmware holds
-//! it, then longer in case the chip needs more to reset.
-static const uint32_t SHUTDOWN_PULSE_MS[] = {100U, 1000U, 3000U};
+//! nSHUTDOWN low time per attempt. On hardware, after one of our resets the
+//! chip stayed silent after 100 ms and 1 s off but started after 3 s.
+static const uint32_t SHUTDOWN_PULSE_MS[] = {3000U, 5000U, 5000U};
 //! While shut down the chip does not drive our CTS, which can read as clear
 //! to send. Give it time to drive CTS high (busy) before waiting for low.
 #define POWER_UP_SETTLE_MS 20U
@@ -200,17 +200,6 @@ static void prv_power_cycle(int attempt) {
   s_cts_up = pbl_gpio_get(&BOARD_BT_CTS);
 }
 
-static bool prv_read_version(void);
-
-//! A chip that nSHUTDOWN did not reset still runs at the rate a previous
-//! start left it at. @return true if it answers there.
-static bool prv_read_version_at_run_baud(void) {
-  uart_set_baud_rate(BT_HCI_UART, CONFIG_BT_CC2564_HCI_BAUD);
-  s_evt_len = 0U;
-  s_rx_tail = s_rx_head;
-  return prv_read_version();
-}
-
 static void prv_uart_init(void) {
   uart_init(BT_HCI_UART);
   uart_set_baud_rate(BT_HCI_UART, BOOT_BAUD);
@@ -325,7 +314,6 @@ bool cc2564_boot(void) {
       sniprintf(s_status, sizeof(s_status), "No CTS (try %d)", attempt);
       continue;
     }
-    bool fast = false;
     if (!prv_read_version()) {
       // None received means the chip is silent, others a baud rate mismatch.
       s_rx_count[attempt - 1] = s_rx_head;
@@ -342,17 +330,14 @@ bool cc2564_boot(void) {
       for (uint32_t i = 0U; i < s_rx_first_len; i++) {
         p += sniprintf(p, end - p, "%02x", s_rx_first[i]);
       }
-      if (!prv_read_version_at_run_baud()) {
-        // Line levels (RX, TX, CTS, RTS on PA10, PA9, PA11, PA12) and the
-        // USART status: an idle RX is high if the chip drives its TX.
-        const uint32_t idr = GPIOA->IDR;
-        sniprintf(p, end - p, " L%lu%lu%lu%lu s%03lx", (unsigned long)((idr >> 10) & 1U),
-                  (unsigned long)((idr >> 9) & 1U), (unsigned long)((idr >> 11) & 1U),
-                  (unsigned long)((idr >> 12) & 1U),
-                  (unsigned long)(BOARD_BT_HCI_USART->SR & 0x3ffU));
-        continue;
-      }
-      fast = true;
+      // Line levels (RX, TX, CTS, RTS on PA10, PA9, PA11, PA12) and the
+      // USART status: an idle RX is high if the chip drives its TX.
+      const uint32_t idr = GPIOA->IDR;
+      sniprintf(p, end - p, " L%lu%lu%lu%lu s%03lx", (unsigned long)((idr >> 10) & 1U),
+                (unsigned long)((idr >> 9) & 1U), (unsigned long)((idr >> 11) & 1U),
+                (unsigned long)((idr >> 12) & 1U),
+                (unsigned long)(BOARD_BT_HCI_USART->SR & 0x3ffU));
+      continue;
     }
     if (!prv_run_bts()) {
       continue;
@@ -361,8 +346,8 @@ bool cc2564_boot(void) {
     uart_set_rx_interrupt_enabled(BT_HCI_UART, false);
     // Held while the controller is awake; the transport's eHCILL releases it.
     soc_stm32_stop_block();
-    sniprintf(s_status, sizeof(s_status), "Running (try %d%s) c%d%d", attempt,
-              fast ? ", not reset" : "", s_cts_shut, s_cts_up);
+    sniprintf(s_status, sizeof(s_status), "Running (try %d) c%d%d", attempt, s_cts_shut,
+              s_cts_up);
     return true;
   }
 

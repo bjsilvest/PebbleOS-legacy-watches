@@ -32,7 +32,12 @@ static const uint32_t s_bt_stack_start_stop_timeout_ms = 10000;
 #ifdef CONFIG_BT_HCI_UART
 // Long enough for the transport to retry booting its controller; the wait
 // feeds the caller's task watchdog.
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+// The CC2564 is held off for seconds before each of its start attempts.
+#define BT_HCI_UART_READY_TIMEOUT_MS 30000U
+#else
 #define BT_HCI_UART_READY_TIMEOUT_MS 8000U
+#endif
 #endif
 
 extern void pebble_pairing_service_init(void);
