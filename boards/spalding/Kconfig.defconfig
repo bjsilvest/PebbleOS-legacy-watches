@@ -8,10 +8,11 @@ config FW_FLASH_SIZE
 config QEMU_MACHINE
     default "pebble-s4-bb"
 
-# The round framebuffer is 1.7K larger than snowy's, which leaves the kernel
-# SRAM short: move the interrupt stack to CCM (1K less kernel heap).
+# The round framebuffer is 1.7K larger than snowy's: with PULSE's buffers,
+# the kernel SRAM is short, so the interrupt stack goes to CCM (1K less
+# kernel heap).
 config ISR_STACK_CCM
-    default y
+    default y if PULSE_EVERYWHERE
 
 # Like the stock firmware, use the CC2564's factory (public, TI) address, so
 # the watch keeps its stock name and address. Fall back to one derived from
