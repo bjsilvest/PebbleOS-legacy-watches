@@ -17,7 +17,9 @@ typedef enum PlatformType {
 // Therefore, we need to switch on the platform for the platform type.
 #if !defined(SDK)
 // Variant boards should go before their base platforms, as they define the base platform too.
-#ifdef CONFIG_PLATFORM_BASALT
+#ifdef CONFIG_PLATFORM_APLITE
+#define PBL_PLATFORM_TYPE_CURRENT PlatformTypeAplite
+#elifdef CONFIG_PLATFORM_BASALT
 #define PBL_PLATFORM_TYPE_CURRENT PlatformTypeBasalt
 #elifdef CONFIG_PLATFORM_EMERY
 #define PBL_PLATFORM_TYPE_CURRENT PlatformTypeEmery

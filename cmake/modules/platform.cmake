@@ -4,7 +4,10 @@
 # Board- and platform-level facts derived from the configuration: the SDK
 # platform the firmware exposes, and the JavaScript engine.
 
-if(CONFIG_PLATFORM_BASALT)
+if(CONFIG_PLATFORM_APLITE)
+  set(PBL_PLATFORM_NAME aplite)
+  set(PBL_MIN_SDK_VERSION 2)
+elseif(CONFIG_PLATFORM_BASALT)
   set(PBL_PLATFORM_NAME basalt)
   set(PBL_MIN_SDK_VERSION 2)
 elseif(CONFIG_PLATFORM_EMERY)
