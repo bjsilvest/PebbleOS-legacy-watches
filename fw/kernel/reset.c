@@ -23,6 +23,10 @@
 #include <bf0_hal.h>
 #endif
 
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+#include <pbl/drivers/bluetooth/cc2564.h>
+#endif
+
 void system_reset_prepare(void) {
   fw_prepare_for_reset();
   flash_stop();
@@ -60,6 +64,12 @@ void system_reset_callback(void *data) {
 [[noreturn]] void system_hard_reset(void) {
   // Don't do anything fancy here. We may be in a context where nothing works, not even
   // interrupts. Just reset us.
+
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+  // As the stock firmware did, leave the controller off rather than running
+  // through the reset.
+  cc2564_shutdown();
+#endif
 
 #ifdef CONFIG_SOC_SF32LB52
   HAL_PMU_Reboot();

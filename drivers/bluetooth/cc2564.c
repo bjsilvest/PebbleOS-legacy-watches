@@ -59,8 +59,9 @@ PBL_LOG_MODULE_DECLARE(nimble, CONFIG_NIMBLE_LOG_LEVEL);
 #define BTS_ACTION_SERIAL 3U
 #define BTS_ACTION_DELAY  4U
 
-//! nSHUTDOWN low time, as the pebble-dev firmware holds it.
-#define SHUTDOWN_PULSE_MS 100U
+//! nSHUTDOWN low time per attempt: 100 ms as the pebble-dev firmware holds
+//! it, then longer in case the chip needs more to reset.
+static const uint32_t SHUTDOWN_PULSE_MS[] = {100U, 1000U, 3000U};
 //! While shut down the chip does not drive our CTS, which can read as clear
 //! to send. Give it time to drive CTS high (busy) before waiting for low.
 #define POWER_UP_SETTLE_MS 20U
@@ -190,9 +191,9 @@ static int prv_command(const uint8_t *pkt, size_t len, uint8_t *ret, size_t ret_
   return prv_wait_complete(opcode, ret, ret_len);
 }
 
-static void prv_power_cycle(void) {
+static void prv_power_cycle(int attempt) {
   pbl_gpio_set(&BOARD_BT_SHUTDOWN, true);
-  pbl_thread_sleep(PBL_MSEC(SHUTDOWN_PULSE_MS));
+  pbl_thread_sleep(PBL_MSEC(SHUTDOWN_PULSE_MS[attempt - 1]));
   s_cts_shut = pbl_gpio_get(&BOARD_BT_CTS);
   pbl_gpio_set(&BOARD_BT_SHUTDOWN, false);
   pbl_thread_sleep(PBL_MSEC(POWER_UP_SETTLE_MS));
@@ -318,7 +319,7 @@ bool cc2564_boot(void) {
 
   for (int attempt = 1; attempt <= BOOT_ATTEMPTS; attempt++) {
     prv_uart_init();
-    prv_power_cycle();
+    prv_power_cycle(attempt);
 
     if (!prv_wait_cts(POWER_UP_TIMEOUT_MS)) {
       sniprintf(s_status, sizeof(s_status), "No CTS (try %d)", attempt);
@@ -342,7 +343,13 @@ bool cc2564_boot(void) {
         p += sniprintf(p, end - p, "%02x", s_rx_first[i]);
       }
       if (!prv_read_version_at_run_baud()) {
-        sniprintf(p, end - p, " no fast");
+        // Line levels (RX, TX, CTS, RTS on PA10, PA9, PA11, PA12) and the
+        // USART status: an idle RX is high if the chip drives its TX.
+        const uint32_t idr = GPIOA->IDR;
+        sniprintf(p, end - p, " L%lu%lu%lu%lu s%03lx", (unsigned long)((idr >> 10) & 1U),
+                  (unsigned long)((idr >> 9) & 1U), (unsigned long)((idr >> 11) & 1U),
+                  (unsigned long)((idr >> 12) & 1U),
+                  (unsigned long)(BOARD_BT_HCI_USART->SR & 0x3ffU));
         continue;
       }
       fast = true;
@@ -405,6 +412,11 @@ void cc2564_send_hcill(uint8_t msg) {
 
 void cc2564_cts_wake_disable(void) {
   exti_disable(pbl_exti_stm32_config(&BOARD_BT_CTS));
+}
+
+void cc2564_shutdown(void) {
+  // A plain write: the pin is an output once cc2564_boot() has run.
+  pbl_gpio_set(&BOARD_BT_SHUTDOWN, true);
 }
 
 const char *cc2564_status(void) {

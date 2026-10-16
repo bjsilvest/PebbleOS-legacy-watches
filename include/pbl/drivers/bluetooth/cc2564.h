@@ -25,6 +25,12 @@
 bool cc2564_boot(void);
 
 /**
+ * @brief Hold the controller in shutdown, as before a reset, so it starts
+ * from power-on reset next boot. Safe from any context.
+ */
+void cc2564_shutdown(void);
+
+/**
  * @brief Whether the controller sent HCILL_GO_TO_SLEEP_IND during boot,
  * clearing the flag. The transport must then answer it.
  */
