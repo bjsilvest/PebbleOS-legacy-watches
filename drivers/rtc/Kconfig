@@ -26,10 +26,18 @@ config RTC_SF32LB
 
 config RTC_STM32
     bool "ST STM32"
-    default y if SOC_STM32F4
+    default y if SOC_STM32F4 && !SOC_STM32F205
     select HAL_STM32
     help
       Support for the STM32F4 RTC.
+
+config RTC_STM32F2
+    bool "ST STM32F2"
+    default y if SOC_STM32F205
+    select HAL_STM32
+    help
+      Support for the STM32F2 RTC, run in the stock fast mode (the F2 has no
+      sub-second register).
 
 config RTC_QEMU
     bool "QEMU RTC"

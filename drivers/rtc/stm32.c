@@ -107,29 +107,6 @@ RtcTicks rtc_get_ticks(void) {
   return ret;
 }
 
-bool rtc_sanitize_struct_tm(struct tm *t) {
-  // The hardware only stores a two-digit year, so only 2000-2037 work (the
-  // upper bound is time_t's 2038 limit). tm_year is years since 1900.
-  if (t->tm_year < 100) {
-    t->tm_year = 100;
-    return true;
-  } else if (t->tm_year > 137) {
-    t->tm_year = 137;
-    return true;
-  }
-  return false;
-}
-
-bool rtc_sanitize_time_t(time_t *t) {
-  struct tm time_struct;
-  gmtime_r(t, &time_struct);
-
-  const bool result = rtc_sanitize_struct_tm(&time_struct);
-  *t = mktime(&time_struct);
-
-  return result;
-}
-
 void rtc_set_time(time_t time) {
   struct tm t;
   gmtime_r(&time, &t);
@@ -199,71 +176,6 @@ void rtc_get_time_ms(time_t *out_seconds, uint16_t *out_ms) {
   if (sanitized) {
     rtc_set_time(*out_seconds);
   }
-}
-
-time_t rtc_get_time(void) {
-  time_t seconds;
-  uint16_t ms;
-
-  rtc_get_time_ms(&seconds, &ms);
-  return seconds;
-}
-
-void rtc_get_time_tm(struct tm *time_tm) {
-  time_t t = rtc_get_time();
-  localtime_r(&t, time_tm);
-}
-
-const char *rtc_get_time_string(char *buffer) {
-  return time_t_to_string(buffer, rtc_get_time());
-}
-
-const char *time_t_to_string(char *buffer, time_t t) {
-  struct tm time;
-  localtime_r(&t, &time);
-  strftime(buffer, TIME_STRING_BUFFER_SIZE, "%c", &time);
-  return buffer;
-}
-
-// Timezone
-///////////////////////////////////////////////////////////////////////////////
-
-void rtc_set_timezone(TimezoneInfo *tzinfo) {
-  const uint32_t *raw = (const uint32_t *)tzinfo;
-  static_assert(sizeof(TimezoneInfo) <= 5 * sizeof(uint32_t), "RTC Set Timezone invalid data size");
-
-  RTC_WriteBackupRegister(RTC_TIMEZONE_ABBR_START, raw[0]);
-  RTC_WriteBackupRegister(RTC_TIMEZONE_ABBR_END_TZID_DSTID, raw[1]);
-  RTC_WriteBackupRegister(RTC_TIMEZONE_GMTOFFSET, raw[2]);
-  RTC_WriteBackupRegister(RTC_TIMEZONE_DST_START, raw[3]);
-  RTC_WriteBackupRegister(RTC_TIMEZONE_DST_END, raw[4]);
-}
-
-void rtc_get_timezone(TimezoneInfo *tzinfo) {
-  uint32_t *raw = (uint32_t *)tzinfo;
-
-  raw[0] = RTC_ReadBackupRegister(RTC_TIMEZONE_ABBR_START);
-  raw[1] = RTC_ReadBackupRegister(RTC_TIMEZONE_ABBR_END_TZID_DSTID);
-  raw[2] = RTC_ReadBackupRegister(RTC_TIMEZONE_GMTOFFSET);
-  raw[3] = RTC_ReadBackupRegister(RTC_TIMEZONE_DST_START);
-  raw[4] = RTC_ReadBackupRegister(RTC_TIMEZONE_DST_END);
-}
-
-void rtc_timezone_clear(void) {
-  RTC_WriteBackupRegister(RTC_TIMEZONE_ABBR_START, 0);
-  RTC_WriteBackupRegister(RTC_TIMEZONE_ABBR_END_TZID_DSTID, 0);
-  RTC_WriteBackupRegister(RTC_TIMEZONE_GMTOFFSET, 0);
-  RTC_WriteBackupRegister(RTC_TIMEZONE_DST_START, 0);
-  RTC_WriteBackupRegister(RTC_TIMEZONE_DST_END, 0);
-}
-
-uint16_t rtc_get_timezone_id(void) {
-  return ((RTC_ReadBackupRegister(RTC_TIMEZONE_ABBR_END_TZID_DSTID) >> 16) & 0xFFFF);
-}
-
-bool rtc_is_timezone_set(void) {
-  // True if the abbreviation has been set (including UNK for unknown)
-  return (RTC_ReadBackupRegister(RTC_TIMEZONE_ABBR_START) != 0);
 }
 
 // Wakeup alarm, to leave STOP mode
