@@ -147,6 +147,12 @@ def main():
     parser.add_argument("--screenshot", help="write a PNG of the screen here")
     parser.add_argument("--console", help="copy the console log here")
     parser.add_argument(
+        "--key",
+        action="append",
+        default=[],
+        help="press a key before the screenshot (left=back, up, right=select, down); repeatable",
+    )
+    parser.add_argument(
         "--stock-sprf-v2",
         action="store_true",
         help="put a stock v2 shared PRF storage entry in place (snowy)",
@@ -199,12 +205,17 @@ def main():
         )
         time.sleep(args.seconds)
 
-        if args.screenshot:
-            ppm = os.path.join(tmp, "screen.ppm")
+        if args.key or args.screenshot:
             s = socket.socket(socket.AF_UNIX)
             s.connect(mon)
+            for key in args.key:
+                s.sendall(f"sendkey {key}\n".encode())
+                time.sleep(2)
+        if args.screenshot:
+            ppm = os.path.join(tmp, "screen.ppm")
             s.sendall(f"screendump {ppm}\n".encode())
             time.sleep(1)
+        if args.key or args.screenshot:
             s.close()
             if os.path.exists(ppm):
                 ppm_to_png(ppm, args.screenshot)
