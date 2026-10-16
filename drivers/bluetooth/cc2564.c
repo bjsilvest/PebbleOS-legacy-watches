@@ -416,6 +416,12 @@ void cc2564_shutdown(void) {
   pbl_gpio_set(&BOARD_BT_SHUTDOWN, true);
 }
 
+void cc2564_report_stall(bool rx_paused, bool evt_waiting) {
+  sniprintf(s_status, sizeof(s_status), "Stalled cts%d rxp%d evw%d", pbl_gpio_get(&BOARD_BT_CTS),
+            rx_paused, evt_waiting);
+  PBL_LOG_ERR("CC2564 stalled: %s", s_status);
+}
+
 const char *cc2564_status(void) {
   return s_status;
 }

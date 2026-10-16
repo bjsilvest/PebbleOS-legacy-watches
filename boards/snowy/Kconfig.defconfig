@@ -32,3 +32,8 @@ config BATTERY_EXACT_PERCENT
 # written, with the legacy STM32 CRC.
 config FIRMWARE_LEGACY_CRC
     default y
+
+# As on silk: four event buffers run out under notification traffic, and the
+# HCI task then stops reading while the host waits on a write.
+config NIMBLE_BLE_TRANSPORT_EVT_COUNT
+    default 16

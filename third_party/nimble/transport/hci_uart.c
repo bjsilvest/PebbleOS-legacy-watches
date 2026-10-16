@@ -287,14 +287,19 @@ static os_error_t prv_acl_put_signal(struct os_mempool_ext *mpe, void *data, voi
   return err;
 }
 
+//! The HCI task is waiting for the host to free an event buffer.
+static volatile bool s_evt_waiting;
+
 static void *prv_alloc_evt(int discardable) {
   void *buf;
 
   // The H4 state machine drops a discardable event without a buffer, but takes
   // NULL for any other as a fatal framing error: wait for the host to free one.
   while ((buf = ble_transport_alloc_evt(discardable)) == NULL && !discardable) {
+    s_evt_waiting = true;
     pbl_thread_sleep(PBL_MSEC(EVT_POOL_POLL_MS));
   }
+  s_evt_waiting = false;
 
   return buf;
 }
@@ -1227,6 +1232,29 @@ static void prv_write_irq(const uint8_t *data, size_t len) {
 }
 #endif
 
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+//! Give up on a controller that holds CTS off this long: it would otherwise
+//! hang the writer until the watchdog resets the watch.
+#define TX_STALL_TIMEOUT_MS 2000U
+
+//! @return false if the controller did not take the byte in time.
+static bool prv_write_byte_bounded(uint8_t byte) {
+  for (uint32_t waited_ms = 0U; !uart_is_tx_ready(BT_HCI_UART_TX); waited_ms++) {
+    if (waited_ms >= TX_STALL_TIMEOUT_MS) {
+      return false;
+    }
+    pbl_thread_sleep(PBL_MSEC(1));
+  }
+  uart_write_byte(BT_HCI_UART_TX, byte);
+  return true;
+}
+
+static void prv_tx_stalled(void) {
+  s_controller_state = ControllerStateFailed;
+  cc2564_report_stall(s_rx_paused, s_evt_waiting);
+}
+#endif
+
 static void prv_write(const uint8_t *data, size_t len) {
   if (s_controller_state != ControllerStateReady) {
     return;
@@ -1250,6 +1278,13 @@ static void prv_write(const uint8_t *data, size_t len) {
   s_tx_busy--;
   s_last_activity = rtc_get_ticks();
   pbl_irq_unlock();
+#elifdef CONFIG_BT_CONTROLLER_CC2564
+  for (size_t i = 0U; i < len; i++) {
+    if (!prv_write_byte_bounded(data[i])) {
+      prv_tx_stalled();
+      return;
+    }
+  }
 #else
   for (size_t i = 0U; i < len; i++) {
     uart_write_byte(BT_HCI_UART_TX, data[i]);

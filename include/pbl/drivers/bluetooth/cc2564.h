@@ -25,6 +25,12 @@
 bool cc2564_boot(void);
 
 /**
+ * @brief Record that the controller stopped taking data (Bluetooth is then
+ * off until the next boot), with the transport's state at the time.
+ */
+void cc2564_report_stall(bool rx_paused, bool evt_waiting);
+
+/**
  * @brief Hold the controller in shutdown, as before a reset, so it starts
  * from power-on reset next boot. Safe from any context.
  */
