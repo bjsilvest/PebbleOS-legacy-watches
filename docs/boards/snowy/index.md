@@ -242,9 +242,10 @@ The CC2564B is a standard HCI controller in ROM (Bluetooth 4.1). At boot
    fails). STOP may stop MCO1, the chip's 32 kHz slow clock: while STOP was
    allowed during the start, the chip came up ready (CTS) but never answered,
    seemingly at random.
-2. Starts the slow clock (LSE on MCO1) and holds nSHUTDOWN (PB12) low, 3 s
-   on the first attempt and 5 s on the two retries: after one of our resets
-   the chip did not answer after 100 ms or 1 s off.
+2. Starts the slow clock (LSE on MCO1) and holds nSHUTDOWN (PB12) low,
+   100 ms on the first attempt, then 1 s and 3 s. Before STOP was blocked
+   the chip sometimes needed 3 s; since then it starts on the first attempt
+   (`Running (try 1)`).
 3. Waits for the chip to assert our CTS, then checks it answers Read Local
    Version (shown as "BT Chip").
 4. Replays TI's `TIInit_6.7.16.bts`, embedded unmodified
@@ -360,8 +361,6 @@ Open items:
 - **Two bonds after re-pairing.** Pairing again here leaves the stock PRF
   on its old pairing (as on silk).
 - Raise the baud rate towards the script's 3 Mbaud.
-- Find out whether the 3 s nSHUTDOWN time is still needed now that STOP is
-  blocked during the start.
 
 ### Debugging over the Core app
 
