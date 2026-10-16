@@ -2,7 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 set(sources battery_common.c)
-if(CONFIG_BATTERY_QEMU)
+if(CONFIG_BATTERY_GPIO_ADC)
+  list(APPEND sources gpio_adc.c)
+elseif(CONFIG_BATTERY_QEMU)
   list(APPEND sources qemu.c)
 elseif(CONFIG_BATTERY_POSIX)
   list(APPEND sources posix.c)
