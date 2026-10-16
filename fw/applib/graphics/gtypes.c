@@ -400,6 +400,20 @@ const GColor8Component g_color_luminance_lookup[RGB_LOOKUP_TABLE_SIZE] = {
   1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3,
 };
 
+#if CONFIG_SCREEN_COLOR_DEPTH_BITS == 1
+// 1-bit screens rarely blend; compute what the color table holds instead of storing 4 KB.
+// Per 2-bit channel (one + 2 * two + 1) / 3, opaque: exactly the table's values.
+static uint8_t prv_blend_one_third(uint8_t one, uint8_t two) {
+  uint8_t argb = 0xc0;
+  for (unsigned int shift = 0; shift < 6; shift += 2) {
+    const unsigned int a = (one >> shift) & 3;
+    const unsigned int b = (two >> shift) & 3;
+    argb |= (uint8_t)(((a + 2 * b + 1) / 3) << shift);
+  }
+  return argb;
+}
+#define BLEND_33(src, dest) prv_blend_one_third((src), (dest))
+#else
 // Table with blended colors rendered by Photoshop
 // 64 rows for 64 source colors and 64 columns for 64 destination colors
 // Values below were calculated for 33% blending
@@ -662,6 +676,8 @@ static const uint8_t s_blending_lookup_33_percent[RGB_LOOKUP_TABLE_SIZE * RGB_LO
   0xe5, 0xe6, 0xe6, 0xe7, 0xe9, 0xea, 0xea, 0xeb, 0xe9, 0xea, 0xea, 0xeb, 0xed, 0xee, 0xee, 0xef,
   0xf5, 0xf6, 0xf6, 0xf7, 0xf9, 0xfa, 0xfa, 0xfb, 0xf9, 0xfa, 0xfa, 0xfb, 0xfd, 0xfe, 0xfe, 0xff,
 };
+#define BLEND_33(src, dest) s_blending_lookup_33_percent[(dest) + RGB_LOOKUP_TABLE_SIZE * (src)]
+#endif
 
 GColor8 gcolor_blend(GColor8 src_color, GColor8 dest_color, uint8_t blending_factor) {
   // Mask for masking out alpha channel and retrieving number of the color
@@ -674,14 +690,12 @@ GColor8 gcolor_blend(GColor8 src_color, GColor8 dest_color, uint8_t blending_fac
     case 1:
       // Lookup: 33%
       return (GColor8){
-        .argb = s_blending_lookup_33_percent[(dest_color.argb & MASK_RGB) +
-                                             RGB_LOOKUP_TABLE_SIZE * (src_color.argb & MASK_RGB)],
+        .argb = BLEND_33(src_color.argb & MASK_RGB, dest_color.argb & MASK_RGB),
       };
     case 2:
       // Lookup: 66% - same as mirrored 33% results
       return (GColor8){
-        .argb = s_blending_lookup_33_percent[(src_color.argb & MASK_RGB) +
-                                             RGB_LOOKUP_TABLE_SIZE * (dest_color.argb & MASK_RGB)],
+        .argb = BLEND_33(dest_color.argb & MASK_RGB, src_color.argb & MASK_RGB),
       };
     case 3:
       // Fast path: 100%
