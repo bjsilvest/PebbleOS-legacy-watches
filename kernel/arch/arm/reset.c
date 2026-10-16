@@ -5,6 +5,9 @@
 
 #include <kernel.h>
 
+// LTO does not see the branch below; keep kernel_prep_c linked in.
+PBL_USED static void (*const s_kernel_prep_c_ref)(void) = kernel_prep_c;
+
 [[noreturn]] PBL_NAKED void Reset_Handler(void) {
   __asm volatile(
 #ifdef CONFIG_CPU_CORTEX_M_HAS_SPLIM
