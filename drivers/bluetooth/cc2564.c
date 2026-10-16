@@ -59,9 +59,10 @@ PBL_LOG_MODULE_DECLARE(nimble, CONFIG_NIMBLE_LOG_LEVEL);
 #define BTS_ACTION_SERIAL 3U
 #define BTS_ACTION_DELAY  4U
 
-//! nSHUTDOWN low time per attempt. On hardware, after one of our resets the
-//! chip stayed silent after 100 ms and 1 s off but started after 3 s.
-static const uint32_t SHUTDOWN_PULSE_MS[] = {3000U, 5000U, 5000U};
+//! nSHUTDOWN low time per attempt: 100 ms, as the pebble-dev firmware holds
+//! it, then longer. Before STOP was blocked during the start, the chip
+//! sometimes needed 3 s; the attempt that worked shows in BT Radio.
+static const uint32_t SHUTDOWN_PULSE_MS[] = {100U, 1000U, 3000U};
 //! While shut down the chip does not drive our CTS, which can read as clear
 //! to send. Give it time to drive CTS high (busy) before waiting for low.
 #define POWER_UP_SETTLE_MS 20U
