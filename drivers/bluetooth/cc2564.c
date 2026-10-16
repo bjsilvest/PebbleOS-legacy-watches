@@ -83,7 +83,7 @@ static char s_chip_id[32] = "?";
 static int s_cts_shut;
 static int s_cts_up;
 static uint32_t s_rx_count[BOOT_ATTEMPTS];
-static uint8_t s_rx_first[6];
+static uint8_t s_rx_first[4];
 static uint32_t s_rx_first_len;
 
 // Boot-time receive: the UART interrupt fills a ring, the boot thread
@@ -303,6 +303,11 @@ static bool prv_run_bts(void) {
 }
 
 bool cc2564_boot(void) {
+  // STOP mode may stop MCO1, the chip's slow clock, while it starts. Held
+  // while the controller is awake; the transport's eHCILL releases it.
+  soc_stm32_stop_block();
+  const uint32_t stops_before = soc_stm32_stop_entries();
+
   pbl_gpio_configure(&BOARD_BT_SHUTDOWN, PBL_GPIO_OUTPUT_ACTIVE);
   prv_slow_clock_enable();
 
@@ -337,6 +342,15 @@ bool cc2564_boot(void) {
                 (unsigned long)((idr >> 9) & 1U), (unsigned long)((idr >> 11) & 1U),
                 (unsigned long)((idr >> 12) & 1U),
                 (unsigned long)(BOARD_BT_HCI_USART->SR & 0x3ffU));
+      // Slow clock: LSE ready and bypass, MCO1 source (1 is LSE), PA8 in
+      // alternate function mode, and STOP entries during the start.
+      p += strlen(p);
+      sniprintf(p, end - p, " k%lu%lu%lu%lu %lu",
+                (unsigned long)((RCC->BDCR & RCC_BDCR_LSERDY) != 0U),
+                (unsigned long)((RCC->BDCR & RCC_BDCR_LSEBYP) != 0U),
+                (unsigned long)((RCC->CFGR >> 21) & 3U),
+                (unsigned long)(((GPIOA->MODER >> 16) & 3U) == 2U),
+                (unsigned long)(soc_stm32_stop_entries() - stops_before));
       continue;
     }
     if (!prv_run_bts()) {
@@ -344,14 +358,13 @@ bool cc2564_boot(void) {
     }
 
     uart_set_rx_interrupt_enabled(BT_HCI_UART, false);
-    // Held while the controller is awake; the transport's eHCILL releases it.
-    soc_stm32_stop_block();
     sniprintf(s_status, sizeof(s_status), "Running (try %d) c%d%d", attempt, s_cts_shut, s_cts_up);
     return true;
   }
 
   // Leave the chip off.
   uart_set_rx_interrupt_enabled(BT_HCI_UART, false);
+  soc_stm32_stop_release();
   pbl_gpio_set(&BOARD_BT_SHUTDOWN, true);
   PBL_LOG_ERR("CC2564 failed to start: %s", s_status);
   return false;

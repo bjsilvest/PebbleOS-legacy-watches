@@ -35,7 +35,14 @@ static PBL_NOINLINE PBL_NAKED void prv_do_wfi(void) {
       "nop      \n");
 }
 
+static volatile uint32_t s_stop_entries;
+
+uint32_t soc_stm32_stop_entries(void) {
+  return s_stop_entries;
+}
+
 static void prv_enter_stop(void) {
+  s_stop_entries++;
   flash_power_down_for_stop_mode();
 
   RCC->APB1ENR |= RCC_APB1ENR_PWREN;
