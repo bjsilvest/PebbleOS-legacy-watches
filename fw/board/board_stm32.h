@@ -71,6 +71,21 @@ typedef struct {
 
   //! Approximate hours of battery life
   const uint16_t battery_capacity_hours;
+
+  // Charger without a PMIC (BATTERY_GPIO_ADC): status inputs, optional
+  // control outputs, and the battery voltage through a divider on the ADC.
+  //! USB power present (charger input)
+  const struct pbl_gpio vusb_stat;
+  //! The charger is charging
+  const struct pbl_gpio chg_stat;
+  //! Optional: fast charge, active low
+  const struct pbl_gpio chg_fast;
+  //! Optional: charger enable
+  const struct pbl_gpio chg_en;
+  const uint8_t vbat_adc_channel;
+  const struct pbl_gpio vbat_adc_pin;
+  const uint32_t vbat_scale_numerator;
+  const uint32_t vbat_scale_denominator;
 } BoardConfigPower;
 
 typedef enum {
@@ -131,7 +146,25 @@ typedef struct {
   const struct pbl_gpio cs;
 
   const struct pbl_gpio on_ctrl;
+  //! Optional 5 V supply enable for the panel, turned on before on_ctrl
+  const struct pbl_gpio power_5v;
+  //! Optional EXTCOMIN, pulsed every second when the MCU drives the panel's VCOM.
+  const struct pbl_gpio extcomin;
+  //! The panel is mounted upside down compared to silk's.
+  const bool rotated_180;
 } BoardConfigSharpDisplay;
+
+//! SPI NOR flash on a plain SPI bus, chip select driven by software.
+typedef struct {
+  SPI_TypeDef *spi;
+  uint32_t spi_rcc; ///< RCC_APB2Periph_SPIx (APB2)
+  uint8_t spi_af;   ///< GPIO_AF_SPIx
+
+  const struct pbl_gpio sclk;
+  const struct pbl_gpio miso;
+  const struct pbl_gpio mosi;
+  const struct pbl_gpio scs;
+} BoardConfigNorSpi;
 
 struct pbl_dma_stm32_stream;
 
