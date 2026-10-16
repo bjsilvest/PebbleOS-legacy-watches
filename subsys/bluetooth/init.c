@@ -83,9 +83,21 @@ static void prv_sync_cb(void) {
 }
 
 static void prv_reset_cb(int reason) {
-  PBL_LOG_WRN("NimBLE host reset (reason: 0x%04x)", (uint16_t)reason);
+  // A host that cannot resync resets hundreds of times a second: log the
+  // first few and then a count, so the flash log keeps what led up to it.
+  static uint32_t s_resets;
+  s_resets++;
+  if (s_resets <= 3U || (s_resets % 256U) == 0U) {
+    PBL_LOG_WRN("NimBLE host reset %lu (reason: 0x%04x)", (unsigned long)s_resets,
+                (uint16_t)reason);
+  }
 #if defined(CONFIG_BT_CONTROLLER_DA1468X) || defined(CONFIG_BT_CONTROLLER_CC2564)
   pbl_bt_hci_uart_snapshot();
+  if (s_resets == 1U) {
+    char status[32];
+    pbl_bt_hci_uart_copy_status(status, sizeof(status));
+    PBL_LOG_WRN("First reset: %s, HCI %s", pbl_bt_hci_uart_reset_snapshot(), status);
+  }
 #endif
 #ifdef CONFIG_BT_HCI_SF32LB52
   // Controller stopped answering HCI. Crash so the coredump captures LCPU RAM
