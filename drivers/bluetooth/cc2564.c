@@ -358,6 +358,11 @@ bool cc2564_boot(void) {
     }
 
     uart_set_rx_interrupt_enabled(BT_HCI_UART, false);
+#ifdef CONFIG_BT_CC2564_SLEEP_NO_STOP
+    // Never released: STOP stays off however the transport's eHCILL blocks
+    // and releases it.
+    soc_stm32_stop_block();
+#endif
     sniprintf(s_status, sizeof(s_status), "Running (try %d) c%d%d", attempt, s_cts_shut, s_cts_up);
     return true;
   }
