@@ -346,8 +346,7 @@ bool cc2564_boot(void) {
     uart_set_rx_interrupt_enabled(BT_HCI_UART, false);
     // Held while the controller is awake; the transport's eHCILL releases it.
     soc_stm32_stop_block();
-    sniprintf(s_status, sizeof(s_status), "Running (try %d) c%d%d", attempt, s_cts_shut,
-              s_cts_up);
+    sniprintf(s_status, sizeof(s_status), "Running (try %d) c%d%d", attempt, s_cts_shut, s_cts_up);
     return true;
   }
 
