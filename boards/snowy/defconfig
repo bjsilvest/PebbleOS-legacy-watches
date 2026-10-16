@@ -60,15 +60,14 @@ CONFIG_BT_CONTROLLER_CC2564=y
 
 # The CC2564B (Bluetooth 4.1) as the pebble-dev firmware found it works:
 # legacy pairing allowed, no MITM (LE Secure Connections only with MITM
-# wedged phones there), and host flow control so notification floods
-# (ANCS) cannot overrun the host.
+# wedged phones there). No host flow control (the pebble-dev firmware had
+# it): the CC2564 sent more ACL packets than the host had buffers for, so
+# NimBLE reset itself as soon as an app download started. UART flow control
+# holds the controller off instead while the host is busy, as on silk.
 CONFIG_NIMBLE_BLE_SM_SC_ONLY=n
 CONFIG_NIMBLE_BLE_SM_LEGACY=y
 CONFIG_NIMBLE_BLE_SM_MITM=n
 CONFIG_NIMBLE_BLE_SM_LVL=0
-CONFIG_NIMBLE_BLE_HS_FLOW_CTRL=y
-CONFIG_NIMBLE_BLE_HS_FLOW_CTRL_THRESH=5
-CONFIG_NIMBLE_BLE_HS_FLOW_CTRL_TX_ON_DISCONNECT=y
 
 CONFIG_MAG=y
 CONFIG_MAG_MAG3110=y
