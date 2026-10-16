@@ -11,6 +11,7 @@
 #include <pbl/services/settings/settings_file.h>
 #include <pbl/services/vibes/vibe_intensity.h>
 #include <pbl/util/math.h>
+#include <pbl/util/size.h>
 
 #include <shell/prefs_private.h>
 #include <system/passert.h>
@@ -142,17 +143,82 @@ typedef struct DoNotDisturbScheduleConfigKeys {
 
 static DoNotDisturbScheduleConfig s_dnd_schedule[NumDNDSchedules];
 
+#define PREF_KEY_DND_WEEKDAY_SCHEDULE         "dndWeekdaySchedule"
+#define PREF_KEY_DND_WEEKDAY_SCHEDULE_ENABLED "dndWeekdayScheduleEnabled"
+#define PREF_KEY_DND_WEEKEND_SCHEDULE         "dndWeekendSchedule"
+#define PREF_KEY_DND_WEEKEND_SCHEDULE_ENABLED "dndWeekendScheduleEnabled"
+
 static const DoNotDisturbScheduleConfigKeys s_dnd_schedule_keys[NumDNDSchedules] = {
   [WeekdaySchedule] =
       {
-        .schedule_pref_key = "dndWeekdaySchedule",
-        .enabled_pref_key = "dndWeekdayScheduleEnabled",
+        .schedule_pref_key = PREF_KEY_DND_WEEKDAY_SCHEDULE,
+        .enabled_pref_key = PREF_KEY_DND_WEEKDAY_SCHEDULE_ENABLED,
       },
   [WeekendSchedule] = {
-    .schedule_pref_key = "dndWeekendSchedule",
-    .enabled_pref_key = "dndWeekendScheduleEnabled",
+    .schedule_pref_key = PREF_KEY_DND_WEEKEND_SCHEDULE,
+    .enabled_pref_key = PREF_KEY_DND_WEEKEND_SCHEDULE_ENABLED,
   }
 };
+
+//! A preference stored in the file under its key
+typedef struct PrefVar {
+  const char *key;
+  void *var;
+  uint8_t size;
+  //! Reloaded when the phone writes it through blob_db
+  bool synced;
+} PrefVar;
+
+#define PREF_VAR(_key, _var, _synced) \
+  {.key = (_key), .var = &(_var), .size = sizeof(_var), .synced = (_synced)}
+
+static const PrefVar s_pref_vars[] = {
+  PREF_VAR(PREF_KEY_MASK, s_mask, true),
+  PREF_VAR(PREF_KEY_VIBE, s_vibe_on_notification, false),
+  PREF_VAR(PREF_KEY_VIBE_INTENSITY, s_vibe_intensity, true),
+  PREF_VAR(PREF_KEY_VIBE_SCORE_NOTIFICATIONS, s_vibe_score_notifications, true),
+  PREF_VAR(PREF_KEY_VIBE_SCORE_INCOMING_CALLS, s_vibe_score_incoming_calls, true),
+  PREF_VAR(PREF_KEY_VIBE_SCORE_ALARMS, s_vibe_score_alarms, true),
+  PREF_VAR(PREF_KEY_VIBE_SCORE_HOURLY, s_vibe_score_hourly, false),
+  PREF_VAR(PREF_KEY_VIBE_SCORE_ON_DISCONNECT, s_vibe_score_on_disconnect, false),
+  PREF_VAR(PREF_KEY_DND_MANUALLY_ENABLED, s_do_not_disturb_manually_enabled, true),
+  PREF_VAR(PREF_KEY_DND_SMART_ENABLED, s_do_not_disturb_smart_dnd_enabled, true),
+  PREF_VAR(PREF_KEY_DND_INTERRUPTIONS_MASK, s_dnd_interruptions_mask, true),
+  PREF_VAR(PREF_KEY_DND_SHOW_NOTIFICATIONS, s_dnd_show_notifications, true),
+  PREF_VAR(PREF_KEY_DND_MOTION_BACKLIGHT, s_dnd_motion_backlight, true),
+  PREF_VAR(PREF_KEY_DND_TOUCH_BACKLIGHT, s_dnd_touch_backlight, true),
+  PREF_VAR(PREF_KEY_DND_NOTIFICATION_BACKLIGHT, s_dnd_notification_backlight, true),
+  PREF_VAR(PREF_KEY_DND_MUTE_SPEAKER, s_dnd_mute_speaker, true),
+  PREF_VAR(PREF_KEY_SPEAKER_MUTED, s_speaker_muted, true),
+  PREF_VAR(PREF_KEY_SPEAKER_VOLUME, s_speaker_volume, true),
+  PREF_VAR(PREF_KEY_LEGACY_DND_SCHEDULE, s_legacy_dnd_schedule, false),
+  PREF_VAR(PREF_KEY_LEGACY_DND_SCHEDULE_ENABLED, s_legacy_dnd_schedule_enabled, false),
+  PREF_VAR(PREF_KEY_DND_WEEKDAY_SCHEDULE, s_dnd_schedule[WeekdaySchedule].schedule, true),
+  PREF_VAR(PREF_KEY_DND_WEEKDAY_SCHEDULE_ENABLED, s_dnd_schedule[WeekdaySchedule].enabled, true),
+  PREF_VAR(PREF_KEY_DND_WEEKEND_SCHEDULE, s_dnd_schedule[WeekendSchedule].schedule, true),
+  PREF_VAR(PREF_KEY_DND_WEEKEND_SCHEDULE_ENABLED, s_dnd_schedule[WeekendSchedule].enabled, true),
+  PREF_VAR(PREF_KEY_FIRST_USE_COMPLETE, s_first_use_complete, false),
+  PREF_VAR(PREF_KEY_NOTIF_WINDOW_TIMEOUT, s_notif_window_timeout_ms, true),
+  PREF_VAR(PREF_KEY_NOTIF_DESIGN_STYLE, s_notification_alternative_design, true),
+  PREF_VAR(PREF_KEY_NOTIF_VIBE_DELAY, s_notification_vibe_delay, true),
+  PREF_VAR(PREF_KEY_NOTIF_BACKLIGHT, s_notification_backlight, true),
+  PREF_VAR(PREF_KEY_NOTIF_GROUPING_RANGE, s_notification_grouping_range, true),
+  PREF_VAR(PREF_KEY_NOTIF_STATUS_BAR_STYLE, s_notification_status_bar_style, true),
+  PREF_VAR(PREF_KEY_NOTIF_TEXT_SIZE, s_notification_content_size, true),
+  PREF_VAR(PREF_KEY_DND_AUTO_DISMISS, s_dnd_auto_dismiss, true),
+};
+
+//! Read a preference with the given key length; leaves it untouched if absent
+static bool prv_read_pref_var(SettingsFile *file, const PrefVar *pref, const void *key,
+                              int key_len) {
+  uint8_t buf[16];
+  PBL_ASSERTN(pref->size <= sizeof(buf));
+  if (settings_file_get(file, key, key_len, buf, pref->size) != S_SUCCESS) {
+    return false;
+  }
+  memcpy(pref->var, buf, pref->size);
+  return true;
+}
 
 // Notifications used to render with the legacy "textStyle" content size. Seed the dedicated
 // preference from it once so an existing choice survives. Shell prefs are not loaded yet
@@ -336,53 +402,13 @@ void alerts_preferences_init(void) {
   // canonicalised the key length). Settings file lookups match key_len exactly,
   // so probe both lengths to remain backwards compatible with records written
   // by older firmware.
-#define RESTORE_PREF(key, var)                                                              \
-  do {                                                                                      \
-    typeof(var) _tmp;                                                                       \
-    if (settings_file_get(&file, key, strlen(key), &_tmp, sizeof(_tmp)) == S_SUCCESS ||     \
-        settings_file_get(&file, key, strlen(key) + 1, &_tmp, sizeof(_tmp)) == S_SUCCESS) { \
-      var = _tmp;                                                                           \
-    }                                                                                       \
-  } while (0)
-
-  RESTORE_PREF(PREF_KEY_MASK, s_mask);
-  RESTORE_PREF(PREF_KEY_VIBE, s_vibe_on_notification);
-  RESTORE_PREF(PREF_KEY_VIBE_INTENSITY, s_vibe_intensity);
-  RESTORE_PREF(PREF_KEY_VIBE_SCORE_NOTIFICATIONS, s_vibe_score_notifications);
-  RESTORE_PREF(PREF_KEY_VIBE_SCORE_INCOMING_CALLS, s_vibe_score_incoming_calls);
-  RESTORE_PREF(PREF_KEY_VIBE_SCORE_ALARMS, s_vibe_score_alarms);
-  RESTORE_PREF(PREF_KEY_VIBE_SCORE_HOURLY, s_vibe_score_hourly);
-  RESTORE_PREF(PREF_KEY_VIBE_SCORE_ON_DISCONNECT, s_vibe_score_on_disconnect);
-  RESTORE_PREF(PREF_KEY_DND_MANUALLY_ENABLED, s_do_not_disturb_manually_enabled);
-  RESTORE_PREF(PREF_KEY_DND_SMART_ENABLED, s_do_not_disturb_smart_dnd_enabled);
-  RESTORE_PREF(PREF_KEY_DND_INTERRUPTIONS_MASK, s_dnd_interruptions_mask);
-  RESTORE_PREF(PREF_KEY_DND_SHOW_NOTIFICATIONS, s_dnd_show_notifications);
-  RESTORE_PREF(PREF_KEY_DND_MOTION_BACKLIGHT, s_dnd_motion_backlight);
-  RESTORE_PREF(PREF_KEY_DND_TOUCH_BACKLIGHT, s_dnd_touch_backlight);
-  RESTORE_PREF(PREF_KEY_DND_NOTIFICATION_BACKLIGHT, s_dnd_notification_backlight);
-  RESTORE_PREF(PREF_KEY_DND_MUTE_SPEAKER, s_dnd_mute_speaker);
-  RESTORE_PREF(PREF_KEY_SPEAKER_MUTED, s_speaker_muted);
-  RESTORE_PREF(PREF_KEY_SPEAKER_VOLUME, s_speaker_volume);
-  RESTORE_PREF(PREF_KEY_LEGACY_DND_SCHEDULE, s_legacy_dnd_schedule);
-  RESTORE_PREF(PREF_KEY_LEGACY_DND_SCHEDULE_ENABLED, s_legacy_dnd_schedule_enabled);
-  RESTORE_PREF(s_dnd_schedule_keys[WeekdaySchedule].schedule_pref_key,
-               s_dnd_schedule[WeekdaySchedule].schedule);
-  RESTORE_PREF(s_dnd_schedule_keys[WeekdaySchedule].enabled_pref_key,
-               s_dnd_schedule[WeekdaySchedule].enabled);
-  RESTORE_PREF(s_dnd_schedule_keys[WeekendSchedule].schedule_pref_key,
-               s_dnd_schedule[WeekendSchedule].schedule);
-  RESTORE_PREF(s_dnd_schedule_keys[WeekendSchedule].enabled_pref_key,
-               s_dnd_schedule[WeekendSchedule].enabled);
-  RESTORE_PREF(PREF_KEY_FIRST_USE_COMPLETE, s_first_use_complete);
-  RESTORE_PREF(PREF_KEY_NOTIF_WINDOW_TIMEOUT, s_notif_window_timeout_ms);
-  RESTORE_PREF(PREF_KEY_NOTIF_DESIGN_STYLE, s_notification_alternative_design);
-  RESTORE_PREF(PREF_KEY_NOTIF_VIBE_DELAY, s_notification_vibe_delay);
-  RESTORE_PREF(PREF_KEY_NOTIF_BACKLIGHT, s_notification_backlight);
-  RESTORE_PREF(PREF_KEY_NOTIF_GROUPING_RANGE, s_notification_grouping_range);
-  RESTORE_PREF(PREF_KEY_NOTIF_STATUS_BAR_STYLE, s_notification_status_bar_style);
-  RESTORE_PREF(PREF_KEY_NOTIF_TEXT_SIZE, s_notification_content_size);
-  RESTORE_PREF(PREF_KEY_DND_AUTO_DISMISS, s_dnd_auto_dismiss);
-#undef RESTORE_PREF
+  for (size_t i = 0; i < ARRAY_LENGTH(s_pref_vars); i++) {
+    const PrefVar *pref = &s_pref_vars[i];
+    const int len = (int)strlen(pref->key);
+    if (!prv_read_pref_var(&file, pref, pref->key, len)) {
+      prv_read_pref_var(&file, pref, pref->key, len + 1);
+    }
+  }
 
   prv_migrate_legacy_dnd_schedule(&file);
   prv_migrate_notification_content_size(&file);
@@ -754,59 +780,21 @@ void alerts_preferences_handle_blob_db_event(PebbleBlobDBEvent *event) {
     return;
   }
 
-  // Helper macro to reload a single preference from file if key matches
-  // key_len may or may not include the null terminator depending on BlobDB protocol
-  // IMPORTANT: settings_file_get uses exact key_len matching, so we must use the same
-  // key_len that was used when writing the record (i.e., key_len from the event)
-#define RELOAD_IF_MATCH(pref_key, var)                                                \
-  do {                                                                                \
-    size_t _pref_strlen = strlen(pref_key);                                           \
-    if ((key_len == (int)_pref_strlen || key_len == (int)(_pref_strlen + 1)) &&       \
-        memcmp(key, pref_key, _pref_strlen) == 0) {                                   \
-      typeof(var) _tmp;                                                               \
-      if (settings_file_get(&file, key, key_len, &_tmp, sizeof(_tmp)) == S_SUCCESS) { \
-        var = _tmp;                                                                   \
-        matched_key = pref_key;                                                       \
-      }                                                                               \
-      goto done;                                                                      \
-    }                                                                                 \
-  } while (0)
+  // key_len may or may not include the null terminator depending on BlobDB protocol.
+  // settings_file_get matches key_len exactly, so read back with the event's key_len,
+  // which is what the record was written with.
+  for (size_t i = 0; i < ARRAY_LENGTH(s_pref_vars); i++) {
+    const PrefVar *pref = &s_pref_vars[i];
+    const int len = (int)strlen(pref->key);
+    if (pref->synced && (key_len == len || key_len == len + 1) &&
+        memcmp(key, pref->key, len) == 0) {
+      if (prv_read_pref_var(&file, pref, key, key_len)) {
+        matched_key = pref->key;
+      }
+      break;
+    }
+  }
 
-  RELOAD_IF_MATCH(PREF_KEY_MASK, s_mask);
-  RELOAD_IF_MATCH(PREF_KEY_DND_INTERRUPTIONS_MASK, s_dnd_interruptions_mask);
-  RELOAD_IF_MATCH(PREF_KEY_DND_SHOW_NOTIFICATIONS, s_dnd_show_notifications);
-  RELOAD_IF_MATCH(PREF_KEY_VIBE_INTENSITY, s_vibe_intensity);
-  RELOAD_IF_MATCH(PREF_KEY_VIBE_SCORE_NOTIFICATIONS, s_vibe_score_notifications);
-  RELOAD_IF_MATCH(PREF_KEY_VIBE_SCORE_INCOMING_CALLS, s_vibe_score_incoming_calls);
-  RELOAD_IF_MATCH(PREF_KEY_VIBE_SCORE_ALARMS, s_vibe_score_alarms);
-  RELOAD_IF_MATCH(PREF_KEY_DND_MANUALLY_ENABLED, s_do_not_disturb_manually_enabled);
-  RELOAD_IF_MATCH(PREF_KEY_DND_SMART_ENABLED, s_do_not_disturb_smart_dnd_enabled);
-  RELOAD_IF_MATCH(s_dnd_schedule_keys[WeekdaySchedule].schedule_pref_key,
-                  s_dnd_schedule[WeekdaySchedule].schedule);
-  RELOAD_IF_MATCH(s_dnd_schedule_keys[WeekdaySchedule].enabled_pref_key,
-                  s_dnd_schedule[WeekdaySchedule].enabled);
-  RELOAD_IF_MATCH(s_dnd_schedule_keys[WeekendSchedule].schedule_pref_key,
-                  s_dnd_schedule[WeekendSchedule].schedule);
-  RELOAD_IF_MATCH(s_dnd_schedule_keys[WeekendSchedule].enabled_pref_key,
-                  s_dnd_schedule[WeekendSchedule].enabled);
-  RELOAD_IF_MATCH(PREF_KEY_NOTIF_WINDOW_TIMEOUT, s_notif_window_timeout_ms);
-  RELOAD_IF_MATCH(PREF_KEY_NOTIF_DESIGN_STYLE, s_notification_alternative_design);
-  RELOAD_IF_MATCH(PREF_KEY_NOTIF_VIBE_DELAY, s_notification_vibe_delay);
-  RELOAD_IF_MATCH(PREF_KEY_NOTIF_BACKLIGHT, s_notification_backlight);
-  RELOAD_IF_MATCH(PREF_KEY_NOTIF_GROUPING_RANGE, s_notification_grouping_range);
-  RELOAD_IF_MATCH(PREF_KEY_NOTIF_STATUS_BAR_STYLE, s_notification_status_bar_style);
-  RELOAD_IF_MATCH(PREF_KEY_NOTIF_TEXT_SIZE, s_notification_content_size);
-  RELOAD_IF_MATCH(PREF_KEY_DND_MOTION_BACKLIGHT, s_dnd_motion_backlight);
-  RELOAD_IF_MATCH(PREF_KEY_DND_TOUCH_BACKLIGHT, s_dnd_touch_backlight);
-  RELOAD_IF_MATCH(PREF_KEY_DND_NOTIFICATION_BACKLIGHT, s_dnd_notification_backlight);
-  RELOAD_IF_MATCH(PREF_KEY_DND_MUTE_SPEAKER, s_dnd_mute_speaker);
-  RELOAD_IF_MATCH(PREF_KEY_SPEAKER_MUTED, s_speaker_muted);
-  RELOAD_IF_MATCH(PREF_KEY_DND_AUTO_DISMISS, s_dnd_auto_dismiss);
-  RELOAD_IF_MATCH(PREF_KEY_SPEAKER_VOLUME, s_speaker_volume);
-
-#undef RELOAD_IF_MATCH
-
-done:
   settings_file_close(&file);
   pbl_mutex_unlock(&s_mutex);
 
