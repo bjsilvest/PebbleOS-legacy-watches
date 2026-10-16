@@ -5,7 +5,9 @@
 
 #include <applib/applib_malloc.auto.h>
 #include <board/board.h>
+#include <kernel/pebble_tasks.h>
 #include <process_state/app_state/app_state.h>
+#include <resource/resource_mapped.h>
 #include <resource/resource_storage_builtin.h>
 #include <resource/resource_storage_flash.h>
 #include <syscall/syscall.h>
@@ -76,8 +78,14 @@ static bool prv_resource_is_mmapped(const void *bytes) {
          resource_storage_flash_bytes_are_readonly(bytes);
 }
 
+// Only privileged callers get pointers into the flash banks, so they may call
+// into the kernel directly.
 bool applib_resource_track_mmapped(const void *bytes) {
-  return prv_resource_is_mmapped(bytes);
+  if (resource_storage_flash_bytes_are_readonly(bytes)) {
+    resource_mapped_use(pebble_task_get_current());
+    return true;
+  }
+  return resource_storage_builtin_bytes_are_readonly(bytes);
 }
 
 bool applib_resource_is_mmapped(const void *bytes) {
@@ -85,5 +93,9 @@ bool applib_resource_is_mmapped(const void *bytes) {
 }
 
 bool applib_resource_munmap(const void *bytes) {
-  return prv_resource_is_mmapped(bytes);
+  if (resource_storage_flash_bytes_are_readonly(bytes)) {
+    resource_mapped_release(pebble_task_get_current());
+    return true;
+  }
+  return resource_storage_builtin_bytes_are_readonly(bytes);
 }

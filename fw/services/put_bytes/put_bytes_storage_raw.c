@@ -107,10 +107,18 @@ cleanup:
   return success;
 }
 
+//! Memory-mapped resource reads are paused while system resources are written.
+static bool s_mmap_paused;
+
 bool pb_storage_raw_init(PutBytesStorage *storage, PutBytesObjectType object_type,
                          uint32_t total_size, PutBytesStorageInfo *info, uint32_t append_offset) {
   const MemoryLayout *layout = prv_get_layout_for_type(object_type);
   storage->impl_data = (void *)layout;
+
+  if (object_type == ObjectSysResources && !s_mmap_paused) {
+    resource_storage_flash_pause_mmap(true);
+    s_mmap_paused = true;
+  }
 
   storage->current_offset = layout->start_offset;
 
@@ -166,6 +174,11 @@ uint32_t pb_storage_raw_calculate_crc(PutBytesStorage *storage, PutBytesCrcType 
 }
 
 void pb_storage_raw_deinit(PutBytesStorage *storage, bool is_success) {
+  if (s_mmap_paused) {
+    resource_storage_flash_pause_mmap(false);
+    s_mmap_paused = false;
+  }
+
   // Restore normal BLE responsiveness that was reduced in pb_storage_raw_init
   comm_session_set_responsiveness(comm_session_get_system_session(), PBL_BT_CONSUMER_PP_PUT_BYTES,
                                   PBL_BT_RESPONSE_TIME_MIN,

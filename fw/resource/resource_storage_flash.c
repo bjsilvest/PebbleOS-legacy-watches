@@ -12,6 +12,7 @@
 #include <pbl/services/process_management/app_storage.h>
 #include <pbl/util/size.h>
 
+#include <flash_region/flash_region.h>
 #include <resource/resource_version.auto.h>
 #include <system/bootbits.h>
 
@@ -99,12 +100,31 @@ static uint32_t resource_storage_system_bank_read(ResourceStoreEntry *entry, uin
   return num_bytes;
 }
 
+#ifndef FLASH_MEMORY_MAPPABLE_ADDRESS
+// XIP flash: flash addresses are already memory addresses.
+#define FLASH_MEMORY_MAPPABLE_ADDRESS 0U
+#endif
+
+#ifdef CONFIG_MMAP_RESOURCES
+//! While system resources are being written, hand out copies instead of
+//! pointers: on the S29VS a read of a bank that is being programmed or erased
+//! returns status, and both resource banks share one.
+static volatile int s_mmap_paused;
+#endif
+
+void resource_storage_flash_pause_mmap(bool pause) {
+#ifdef CONFIG_MMAP_RESOURCES
+  s_mmap_paused += pause ? 1 : -1;
+#endif
+}
+
 bool resource_storage_flash_bytes_are_readonly(const void *bytes) {
 #ifdef CONFIG_MMAP_RESOURCES
-  // Pointers inside the banks are in the always-mapped XIP window.
+  // Pointers inside the banks are in the memory-mapped flash window.
   for (unsigned int i = 0; i < ARRAY_LENGTH(s_resource_banks); i++) {
-    if ((bytes >= (const void *)(uintptr_t)s_resource_banks[i].begin) &&
-        (bytes < (const void *)(uintptr_t)s_resource_banks[i].end)) {
+    const uintptr_t begin = FLASH_MEMORY_MAPPABLE_ADDRESS + s_resource_banks[i].begin;
+    const uintptr_t end = FLASH_MEMORY_MAPPABLE_ADDRESS + s_resource_banks[i].end;
+    if (((uintptr_t)bytes >= begin) && ((uintptr_t)bytes < end)) {
       return true;
     }
   }
@@ -115,12 +135,12 @@ bool resource_storage_flash_bytes_are_readonly(const void *bytes) {
 static const uint8_t *resource_storage_system_bank_readonly_bytes(ResourceStoreEntry *entry,
                                                                   bool has_privileged_access) {
 #ifdef CONFIG_MMAP_RESOURCES
-  // Bank is XIP-mapped, so data is addressable at BANK.begin + offset. Only
+  // Bank is memory mapped, so data is addressable at BANK.begin + offset. Only
   // privileged callers get the raw pointer; unprivileged apps use the copy path.
-  if (!has_privileged_access) {
+  if (!has_privileged_access || s_mmap_paused > 0) {
     return nullptr;
   }
-  return (const uint8_t *)(uintptr_t)(BANK.begin + entry->offset);
+  return (const uint8_t *)(FLASH_MEMORY_MAPPABLE_ADDRESS + BANK.begin + entry->offset);
 #else
   return nullptr;
 #endif

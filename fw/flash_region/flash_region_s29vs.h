@@ -37,6 +37,10 @@
 
 #include "flash_region_def_helper.h"
 
+//! The NOR is memory mapped through the FMC (bank 1) at this address. Reading
+//! it needs the flash in use (flash_use()): idle, its clock and pins are off.
+#define FLASH_MEMORY_MAPPABLE_ADDRESS 0x60000000U
+
 // Flash region _BEGIN and _END addresses
 //////////////////////////////////////////////////////////////////////////////
 

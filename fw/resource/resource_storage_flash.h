@@ -20,3 +20,7 @@ typedef struct SystemResourceBank {
 const SystemResourceBank *resource_storage_flash_get_unused_bank(void);
 
 bool resource_storage_flash_bytes_are_readonly(const void *bytes);
+
+//! Stop (or resume) handing out memory-mapped pointers into the system
+//! resource banks, around writes to them. Calls nest.
+void resource_storage_flash_pause_mmap(bool pause);

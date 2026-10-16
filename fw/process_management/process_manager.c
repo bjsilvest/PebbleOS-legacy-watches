@@ -37,6 +37,7 @@
 #include <process_state/app_state/app_state.h>
 #include <process_state/worker_state/worker_state.h>
 #include <resource/resource_ids.auto.h>
+#include <resource/resource_mapped.h>
 #include <shell/normal/watchface.h>
 #include <syscall/syscall.h>
 #include <syscall/syscall_internal.h>
@@ -557,6 +558,7 @@ void process_manager_process_cleanup(PebbleTask task) {
   event_reset_from_process_queue(task);
   evented_timer_clear_process_timers(task);
   event_service_clear_process_subscriptions(task);
+  resource_mapped_release_all(task);
 
 #ifdef CONFIG_HRM
   hrm_manager_process_cleanup(task, context->install_id);

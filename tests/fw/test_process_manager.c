@@ -35,6 +35,7 @@
 #include <stubs_pbl_malloc.h>
 #include <stubs_pebble_process_md.h>
 #include <stubs_persist.h>
+#include <stubs_resource_mapped.h>
 #include <stubs_resources.h>
 #include <stubs_syscalls.h>
 #include <stubs_thread.h>

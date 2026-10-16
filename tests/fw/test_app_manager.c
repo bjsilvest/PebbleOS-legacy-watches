@@ -46,6 +46,7 @@
 #include <stubs_persist.h>
 #include <stubs_print.h>
 #include <stubs_rand_ptr.h>
+#include <stubs_resource_mapped.h>
 #include <stubs_resources.h>
 #include <stubs_serial.h>
 #include <stubs_simple_dialog.h>
