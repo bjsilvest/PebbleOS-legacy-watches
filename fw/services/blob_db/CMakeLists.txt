@@ -9,7 +9,6 @@ set(sources
   endpoint.c
   endpoint2.c
   endpoint_private.c
-  health_db.c
   ios_notif_pref_db.c
   notif_db.c
   pin_db.c
@@ -24,4 +23,5 @@ set(sources
 )
 pbl_library()
 pbl_library_sources(${sources})
+pbl_library_sources_ifdef(CONFIG_SERVICE_ACTIVITY health_db.c)
 pbl_library_sources_ifdef(CONFIG_SERVICE_WEATHER weather_db.c)

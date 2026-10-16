@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 pbl_add_subdirectory_ifdef(CONFIG_SERVICE_ACCEL_MANAGER accel_manager)
-pbl_add_subdirectory_ifdef(CONFIG_SERVICE_ACTIVITY activity)
+add_subdirectory(activity)
 pbl_add_subdirectory_ifdef(CONFIG_SERVICE_ALARMS alarms)
 pbl_add_subdirectory_ifdef(CONFIG_SERVICE_ANALYTICS analytics)
 pbl_add_subdirectory_ifdef(CONFIG_SERVICE_ANIMATION_SERVICE animation_service)

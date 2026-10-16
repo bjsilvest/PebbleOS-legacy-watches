@@ -1,6 +1,12 @@
 # SPDX-FileCopyrightText: 2026 Core Devices LLC
 # SPDX-License-Identifier: Apache-2.0
 
+if(NOT CONFIG_SERVICE_ACTIVITY)
+  pbl_library()
+  pbl_library_sources(activity_stub.c health_util.c hr_util.c)
+  return()
+endif()
+
 set(sources
   activity.c
   activity_calculators.c

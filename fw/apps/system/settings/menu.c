@@ -27,7 +27,9 @@ static const SettingsModuleGetMetadata s_submodule_registry[] = {
   [SettingsMenuItemVibrations] = settings_vibe_patterns_get_info,
   [SettingsMenuItemQuietTime] = settings_quiet_time_get_info,
   [SettingsMenuItemTimeline] = settings_timeline_get_info,
+#ifdef CONFIG_SERVICE_ACTIVITY
   [SettingsMenuItemHealth] = settings_health_get_info,
+#endif
   [SettingsMenuItemActivity] = settings_activity_tracker_get_info,
   [SettingsMenuItemQuickLaunch] = settings_quick_launch_get_info,
   [SettingsMenuItemDateTime] = settings_time_get_info,

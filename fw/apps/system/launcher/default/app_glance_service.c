@@ -248,6 +248,7 @@ static LauncherAppGlance *prv_load_glance_for_node(const AppMenuNode *node,
            0x55},
       .constructor = launcher_app_glance_watchfaces_create,
     },
+#ifdef CONFIG_SERVICE_ACTIVITY
     {
       // Workout
       .uuid =
@@ -255,6 +256,7 @@ static LauncherAppGlance *prv_load_glance_for_node(const AppMenuNode *node,
            0x3f},
       .constructor = launcher_app_glance_workout_create,
     },
+#endif
   };
 
   LauncherAppGlance *glance = nullptr;

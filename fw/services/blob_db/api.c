@@ -102,7 +102,7 @@ static const BlobDB s_blob_dbs[NumBlobDBs] = {
         .name = "weather_db",
       },
 #else
-  [BlobDBIdWeather] = { .disabled = true },
+  [BlobDBIdWeather] = {.disabled = true},
 #endif
   [BlobDBIdiOSNotifPref] =
       {
@@ -150,6 +150,7 @@ static const BlobDB s_blob_dbs[NumBlobDBs] = {
         .compact = watch_app_prefs_db_compact,
         .name = "watch_app_prefs_db",
       },
+#ifdef CONFIG_SERVICE_ACTIVITY
   [BlobDBIdHealth] =
       {
         .init = health_db_init,
@@ -161,6 +162,9 @@ static const BlobDB s_blob_dbs[NumBlobDBs] = {
         .compact = health_db_compact,
         .name = "health_db",
       },
+#else
+  [BlobDBIdHealth] = {.disabled = true},
+#endif
   [BlobDBIdAppGlance] =
       {
         .init = app_glance_db_init,

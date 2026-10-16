@@ -643,7 +643,10 @@ static void prv_end_workout_up_click_handler(ClickRecognizerRef recognizer, void
     active_window->workout_controller->stop();
   }
 
+#ifdef CONFIG_SERVICE_ACTIVITY
+  // Without activity only the Sports app uses this window, and it has no summary
   workout_push_summary_window();
+#endif
 
   workout_dialog_pop(&active_window->end_workout_dialog);
   app_window_stack_remove(&active_window->window, false);

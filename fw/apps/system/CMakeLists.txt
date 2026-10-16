@@ -11,6 +11,12 @@ if(CONFIG_SHELL_SDK)
 else()
   file(GLOB_RECURSE source CONFIGURE_DEPENDS *.c)
 endif()
+if(NOT CONFIG_SERVICE_ACTIVITY)
+  # The Sports app (PebbleKit Sports) stays; it shares the workout screens
+  list(FILTER source EXCLUDE REGEX "/health/[^/]*\\.c$")
+  list(FILTER source EXCLUDE REGEX "/workout/(countdown|data|selection|workout)\\.c$")
+  list(FILTER source EXCLUDE REGEX "/(launcher/default/app_glance_workout|settings/health)\\.c$")
+endif()
 # Reminders are created by dictation
 if(NOT CONFIG_SERVICE_VOICE)
   list(FILTER source EXCLUDE REGEX "/reminders/[^/]*\\.c$")
