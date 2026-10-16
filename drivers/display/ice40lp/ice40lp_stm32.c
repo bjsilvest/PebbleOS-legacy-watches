@@ -2,10 +2,12 @@
 /* SPDX-FileCopyrightText: 2026 Brian Silvestri */
 /* SPDX-License-Identifier: Apache-2.0 */
 
-//! Snowy display: an iCE40LP FPGA framebuffer on an STM32F4 SPI.
+//! Snowy and spalding display: an iCE40 FPGA framebuffer on an STM32F4 SPI.
 //!
 //! The FPGA is programmed with its bitstream at init, then takes frames: SCS
-//! low, CMD_FRAME_BEGIN, then one line per panel column. BUSY is high while
+//! low, CMD_FRAME_BEGIN, then one line per panel line: a framebuffer column on
+//! snowy, a row of the circular framebuffer on spalding (shifted by the
+//! factory display offsets). BUSY is high while
 //! the FPGA cannot take more data. Lines go out by DMA from two line buffers:
 //! when one is done the next starts, from the DMA interrupt or, if BUSY is
 //! high, from BUSY's falling edge, and the line after it is prepared in the
@@ -31,13 +33,22 @@
 #include <kernel/events.h>
 #include <kernel/util/delay.h>
 #include <stm32f4xx.h>
+#if PBL_ROUND
+#include <mfg/mfg_info.h>
+#endif
 
 #define CMD_FRAME_BEGIN 0x5
 
+#if PBL_ROUND
+// The panel is scanned in rows, top to bottom.
+#define DISP_LINES  PBL_DISPLAY_HEIGHT
+#define DISP_PIXELS PBL_DISPLAY_WIDTH
+#else
 // The panel is scanned in columns: each line is one framebuffer column,
 // bottom to top.
 #define DISP_LINES  PBL_DISPLAY_WIDTH
 #define DISP_PIXELS PBL_DISPLAY_HEIGHT
+#endif
 
 //! A full frame should take no longer than 33 ms.
 #define BUSY_TIMEOUT_US 40000
@@ -49,12 +60,15 @@
 extern const uint8_t ice40lp_bitstream_start[];
 extern const uint8_t ice40lp_bitstream_end[];
 
-static uint8_t s_line[DISP_PIXELS];
 static volatile bool s_updating;
 static bool s_programmed;
 //! Watch worn rotated by 180 degrees: frames go out flipped both ways.
 static bool s_rotated_180;
 static UpdateCompleteCallback s_uccb;
+#if PBL_ROUND
+//! Factory measured offset of the panel, in pixels.
+static GPoint s_offset;
+#endif
 
 // DMA frame state. Line n is prepared in s_lines[n & 1].
 static uint8_t s_lines[2][DISP_PIXELS];
@@ -202,10 +216,48 @@ void display_init(void) {
 
   s_programmed = prv_program();
   prv_power_enable();
+
+#if PBL_ROUND
+  s_offset = mfg_info_get_disp_offsets();
+  PBL_LOG_INFO("MFG display offsets (%d,%d)", s_offset.x, s_offset.y);
+#endif
 }
+
+#if PBL_ROUND
+static const GBitmapDataRowInfoInternal *prv_row_info(int y) {
+  return &((const GBitmapDataRowInfoInternal *)g_gbitmap_data_row_infos)[y];
+}
+
+//! Pixel x of a circular framebuffer row; black outside the circle.
+static uint8_t prv_round_pixel(const uint8_t *row, const GBitmapDataRowInfoInternal *info, int x) {
+  if (s_rotated_180) {
+    x = PBL_DISPLAY_WIDTH - 1 - x;
+  }
+  return (x >= info->min_x && x <= info->max_x) ? row[x] : 0;
+}
+#endif
 
 //! One panel line: the MSBs of every pixel's color channels, then the LSBs.
 static void prv_get_line(const uint8_t *fb, int index, uint8_t *line) {
+#if PBL_ROUND
+  int y = index - s_offset.y;
+  if (y < 0 || y >= PBL_DISPLAY_HEIGHT) {
+    memset(line, 0, DISP_PIXELS);
+    return;
+  }
+  if (s_rotated_180) {
+    y = PBL_DISPLAY_HEIGHT - 1 - y;
+  }
+  const GBitmapDataRowInfoInternal *info = prv_row_info(y);
+  const uint8_t *row = fb + info->offset;
+  for (int dst = 0; dst < DISP_PIXELS; dst += 2) {
+    const int x = dst - s_offset.x;
+    const uint8_t odd = prv_round_pixel(row, info, x);
+    const uint8_t even = prv_round_pixel(row, info, x + 1);
+    line[dst / 2] = (odd & 0b00101010) | ((even & 0b00101010) >> 1);
+    line[dst / 2 + DISP_PIXELS / 2] = ((odd & 0b00010101) << 1) | (even & 0b00010101);
+  }
+#else
   for (int src = 0; src < DISP_PIXELS; src += 2) {
     uint8_t even;
     uint8_t odd;
@@ -220,6 +272,7 @@ static void prv_get_line(const uint8_t *fb, int index, uint8_t *line) {
     line[src / 2] = (odd & 0b00101010) | ((even & 0b00101010) >> 1);
     line[src / 2 + DISP_PIXELS / 2] = ((odd & 0b00010101) << 1) | (even & 0b00010101);
   }
+#endif
 }
 
 static void prv_send_frame(const uint8_t *fb) {
@@ -235,13 +288,15 @@ static void prv_send_frame(const uint8_t *fb) {
   const uint8_t cmd = CMD_FRAME_BEGIN;
   prv_spi_write(&cmd, 1);
 
+  // Before the kernel runs, so no DMA frame uses the line buffers.
+  uint8_t *line = s_lines[0];
   for (int i = 0; i < DISP_LINES; i++) {
-    prv_get_line(fb, i, s_line);
+    prv_get_line(fb, i, line);
     if (!prv_wait_not_busy()) {
       PBL_LOG_WRN("Display stuck busy at line %d", i);
       break;
     }
-    prv_spi_write(s_line, sizeof(s_line));
+    prv_spi_write(line, DISP_PIXELS);
   }
 
   pbl_gpio_set(scs, false);
@@ -374,7 +429,11 @@ void display_update(NextRowCallback nrcb, UpdateCompleteCallback uccb) {
   // whole frames, so only the first row is needed to find it.
   while (nrcb(&row)) {
     if (!fb) {
+#if PBL_ROUND
+      fb = row.data - prv_row_info(row.address)->offset;
+#else
       fb = row.data - (uintptr_t)row.address * PBL_DISPLAY_WIDTH;
+#endif
     }
   }
 
