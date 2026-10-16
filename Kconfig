@@ -308,6 +308,14 @@ config CCM_SIZE
       live there instead of in SRAM. DMA cannot reach it, so DMA buffers
       must not be on a kernel stack or the kernel heap.
 
+config ISR_STACK_CCM
+    bool "ISR stack in core-coupled RAM"
+    depends on CCM_SIZE != 0
+    help
+      Put the 1 KiB interrupt stack in core-coupled RAM, with the kernel
+      stacks, leaving that much more SRAM to the kernel and that much less
+      kernel heap.
+
 config FLASH_BASE
     hex
     help
