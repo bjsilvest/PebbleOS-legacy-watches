@@ -2,12 +2,12 @@
 # SPDX-FileCopyrightText: 2026 Brian Silvestri
 # SPDX-License-Identifier: Apache-2.0
 
-"""Boot a silk or snowy build in QEMU and check the stock-owned flash regions survive.
+"""Boot a silk, snowy or tintin build in QEMU and check the stock-owned flash regions survive.
 
 Fills PRF, stock shared PRF storage and MFG info in a copy of the external
 flash image with random bytes, boots the firmware for a while, then checks
-those regions are byte-for-byte unchanged. Exits non-zero if any changed or
-the firmware hit a flash guard assertion.
+those regions are byte-for-byte unchanged. Exits non-zero if any changed,
+or the firmware hit a flash guard assertion or crashed (wrote a core dump).
 
 Targets:
   qemu_silk (default): the flint emulator machine, firmware loaded as ELF.
@@ -16,6 +16,8 @@ Targets:
     ever used here.
   snowy (--board snowy --machine pebble-snowy-bb): the emulated STM32F439
     with its parallel NOR, booted through the stock snowy bootloader.
+  tintin (--board tintin --machine pebble-bb2): the emulated STM32F2 of the
+    original Pebble's bigboard, booted through the stock bb2 bootloader.
 """
 
 import argparse
@@ -54,8 +56,21 @@ BOARDS = {
         "resources_begin": 0x300000,
         "flash_args": lambda path: ["-drive", f"if=none,id=spi-flash,file={path},format=raw"],
     },
+    "tintin": {
+        "protected": (
+            ("stock shared PRF storage", 0x100000, 0x110000),
+            ("MFG info", 0x110000, 0x120000),
+            ("PRF", 0x200000, 0x280000),
+        ),
+        "bootloader": "c6288702d^:bin/boot/boot_bb2@1447134832.hex",
+        "flash_size": 0x400000,
+        "resources_begin": 0x120000,
+        "flash_args": lambda path: ["-drive", f"if=mtd,format=raw,file={path}"],
+        "cpu": "cortex-m3",
+    },
 }
 GUARD_MESSAGE = b"protected flash"
+CRASH_MESSAGE = b"Starting core dump"
 
 
 def stock_v2_sprf(rng):
@@ -160,13 +175,13 @@ def main():
     args = parser.parse_args()
 
     board = BOARDS[args.board]
-    stock_hw = args.machine in ("pebble-silk-bb", "pebble-snowy-bb")
+    stock_hw = args.machine in ("pebble-silk-bb", "pebble-snowy-bb", "pebble-bb2")
 
     with tempfile.TemporaryDirectory() as tmp:
         spi = os.path.join(tmp, "spi.bin")
         if stock_hw:
             micro_bin, image = build_stock_images(board, args.build_dir, tmp)
-            boot_args = ["-cpu", "cortex-m4", "-kernel", micro_bin]
+            boot_args = ["-cpu", board.get("cpu", "cortex-m4"), "-kernel", micro_bin]
         else:
             shutil.copyfile(os.path.join(args.build_dir, "qemu_spi_flash.bin"), spi)
             image = bytearray(Path(spi).read_bytes())
@@ -236,6 +251,9 @@ def main():
         guard_hits = log.count(GUARD_MESSAGE)
         print(f"flash guard assertions     {guard_hits}")
         ok &= guard_hits == 0
+        crashes = log.count(CRASH_MESSAGE)
+        print(f"crashes (core dumps)       {crashes}")
+        ok &= crashes == 0
 
     print("PASS" if ok else "FAIL")
     return 0 if ok else 1
