@@ -8,6 +8,13 @@ config SERVICE_ANALYTICS
 
 if SERVICE_ANALYTICS
 
+config SERVICE_ANALYTICS_NATIVE
+    bool "Native backend"
+    default y
+    help
+      Hourly heartbeats collected and logged by the firmware. Without a
+      backend every analytics call is a no-op.
+
 module = SERVICE_ANALYTICS
 module-str = Analytics
 source "subsys/logging/Kconfig.template.log_level"

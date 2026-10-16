@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 set(sources analytics.c)
-if(NOT CONFIG_RECOVERY_FW)
+if(NOT CONFIG_RECOVERY_FW AND CONFIG_SERVICE_ANALYTICS_NATIVE)
   list(APPEND sources native.c)
   pbl_compile_definitions(ANALYTICS_NATIVE)
 endif()
