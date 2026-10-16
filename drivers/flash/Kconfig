@@ -52,10 +52,10 @@ config FLASH_LAYOUT_SILK
       bootloader's PRF, shared PRF storage and MFG info where they are.
 
 config FLASH_LAYOUT_SNOWY
-    bool "Pebble Time (snowy) stock flash layout"
+    bool "Pebble Time (snowy, spalding) stock flash layout"
     select FLASH_GUARD
     help
-      Use the stock Pebble Time external flash layout, keeping the stock
+      Use the stock Pebble Time and Time Round external flash layout, keeping the stock
       bootloader's PRF, shared PRF storage and MFG info (with the boot FPGA
       bitstream) where they are.
 

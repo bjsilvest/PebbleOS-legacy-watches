@@ -1,0 +1,86 @@
+# spalding (Pebble Time Round) board configuration
+
+CONFIG_SOC_STM32F4=y
+
+CONFIG_HAL_STM32_STM32F439=y
+
+CONFIG_PLATFORM_CHALK=y
+
+CONFIG_SCREEN_COLOR_DEPTH_BITS_8=y
+
+CONFIG_FLASH=y
+CONFIG_FLASH_S29VS=y
+CONFIG_FLASH_LAYOUT_SNOWY=y
+
+CONFIG_GPIO=y
+CONFIG_RNG=y
+
+CONFIG_OTP=y
+
+CONFIG_RTC=y
+
+CONFIG_UART=y
+
+CONFIG_EXTI=y
+
+CONFIG_DISPLAY=y
+
+CONFIG_TEMPERATURE=y
+
+CONFIG_WATCHDOG=y
+
+CONFIG_I2C=y
+
+CONFIG_PMIC=y
+CONFIG_PMIC_MAX14690=y
+
+CONFIG_BATTERY=y
+
+CONFIG_PWM=y
+
+CONFIG_VIBE=y
+CONFIG_VIBE_PWM=y
+
+CONFIG_BACKLIGHT=y
+CONFIG_BACKLIGHT_PWM=y
+
+CONFIG_AMBIENT_LIGHT=y
+CONFIG_AMBIENT_LIGHT_STM32_ADC=y
+
+CONFIG_ACCEL_BMI160=y
+
+CONFIG_MIC=y
+CONFIG_MIC_STM32_I2S_PDM=y
+
+# No LE Audio: drop the ISO buffer pool, kernel heap is scarce on the F439.
+CONFIG_NIMBLE_BLE_TRANSPORT_ISO_COUNT=0
+
+CONFIG_BT_HCI_UART=y
+CONFIG_BT_CONTROLLER_CC2564=y
+
+# The CC2564B (Bluetooth 4.1) as the pebble-dev firmware found it works:
+# legacy pairing allowed, no MITM (LE Secure Connections only with MITM
+# wedged phones there). No host flow control (the pebble-dev firmware had
+# it): the CC2564 sent more ACL packets than the host had buffers for, so
+# NimBLE reset itself as soon as an app download started. UART flow control
+# holds the controller off instead while the host is busy, as on silk.
+CONFIG_NIMBLE_BLE_SM_SC_ONLY=n
+CONFIG_NIMBLE_BLE_SM_LEGACY=y
+CONFIG_NIMBLE_BLE_SM_MITM=n
+CONFIG_NIMBLE_BLE_SM_LVL=0
+
+CONFIG_MAG=y
+CONFIG_MAG_MAG3110=y
+
+# Album art and notification pictures: one 4-bpp image (6.5-9K) at a time in
+# the kernel heap; one that does not fit is dropped.
+CONFIG_SERVICE_IMAGING_PICTURES=y
+
+# Settings: motion sensitivity and left-handed (rotated) wear
+CONFIG_ACCEL_SENSITIVITY=y
+CONFIG_ORIENTATION_MANAGER=y
+
+# System resources (fonts aside) drawn straight from the memory-mapped NOR,
+# as the stock firmware did: the kernel heap is too small to copy the larger
+# vector animations (the incoming call one is 13.6K).
+CONFIG_MMAP_RESOURCES=y

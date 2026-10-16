@@ -4,8 +4,9 @@
 
 #pragma once
 
-// Pebble Time (snowy_dvt) and Pebble Time Steel (snowy_s3), electrically the
-// same. Pins from the stock board_snowy.c/.h.
+// Pebble Time (snowy_dvt), Pebble Time Steel (snowy_s3) and Pebble Time Round
+// (spalding), electrically the same but for the round display and the few
+// values below. Pins from the stock board_snowy.c/.h and board_spalding_evt.c/.h.
 
 #include <pbl/drivers/backlight/pwm.h>
 #include <pbl/drivers/i2c.h>
@@ -23,8 +24,13 @@ static const BoardConfig BOARD_CONFIG = {
   .ambient_k_delta_threshold = 96,
   .photo_en = PBL_GPIO(STM32_GPIOA, 3, 0),
   .als_adc_channel = ADC_Channel_2,
+#ifdef CONFIG_BOARD_SPALDING
+  .als_adc_pin = PBL_GPIO(STM32_GPIOA, 2, 0),
+  .backlight_on_percent = 25,
+#else
   .als_adc_pin = PBL_GPIO(STM32_GPIOC, 2, 0),
   .backlight_on_percent = 45,
+#endif
 };
 
 // Active low with pull-ups; Back has an external one.
@@ -46,6 +52,9 @@ static const BoardConfigPower BOARD_CONFIG_POWER = {
 #ifdef CONFIG_BOARD_SNOWY_S3
   .low_power_threshold = 2,
   .battery_capacity_hours = 204,
+#elifdef CONFIG_BOARD_SPALDING
+  .low_power_threshold = 7,
+  .battery_capacity_hours = 44,
 #else
   .low_power_threshold = 3,
   .battery_capacity_hours = 144,
@@ -55,12 +64,21 @@ static const BoardConfigPower BOARD_CONFIG_POWER = {
 static const BoardConfigAccel BOARD_CONFIG_ACCEL = {
   .accel_config =
       {
+#ifdef CONFIG_BOARD_SPALDING
+        .axes_offsets[AXIS_X] = 0,
+        .axes_offsets[AXIS_Y] = 1,
+        .axes_offsets[AXIS_Z] = 2,
+        .axes_inverts[AXIS_X] = false,
+        .axes_inverts[AXIS_Y] = true,
+        .axes_inverts[AXIS_Z] = false,
+#else
         .axes_offsets[AXIS_X] = 1,
         .axes_offsets[AXIS_Y] = 0,
         .axes_offsets[AXIS_Z] = 2,
         .axes_inverts[AXIS_X] = false,
         .axes_inverts[AXIS_Y] = false,
         .axes_inverts[AXIS_Z] = false,
+#endif
         .shake_thresholds[AccelThresholdHigh] = 0x64,
         .shake_thresholds[AccelThresholdLow] = 0xf,
         .double_tap_threshold = 12500,
@@ -73,12 +91,21 @@ static const BoardConfigAccel BOARD_CONFIG_ACCEL = {
 
 static const BoardConfigMag BOARD_CONFIG_MAG = {
   .mag_config = {
+#ifdef CONFIG_BOARD_SPALDING
+    .axes_offsets[AXIS_X] = 0,
+    .axes_offsets[AXIS_Y] = 1,
+    .axes_offsets[AXIS_Z] = 2,
+    .axes_inverts[AXIS_X] = false,
+    .axes_inverts[AXIS_Y] = true,
+    .axes_inverts[AXIS_Z] = false,
+#else
     .axes_offsets[AXIS_X] = 1,
     .axes_offsets[AXIS_Y] = 0,
     .axes_offsets[AXIS_Z] = 2,
     .axes_inverts[AXIS_X] = true,
     .axes_inverts[AXIS_Y] = true,
     .axes_inverts[AXIS_Z] = false,
+#endif
   },
 };
 
@@ -127,7 +154,12 @@ static const BoardConfigIce40Display BOARD_CONFIG_DISPLAY = {
   .creset = PBL_GPIO(STM32_GPIOG, 15, PBL_GPIO_OPEN_DRAIN),
   .cdone = PBL_GPIO(STM32_GPIOG, 9, 0),
   .busy = PBL_GPIO(STM32_GPIOG, 10, 0),
+#ifdef CONFIG_BOARD_SPALDING
+  // Push-pull on spalding, as the stock firmware drove it.
+  .rail_6v6 = PBL_GPIO(STM32_GPIOF, 3, 0),
+#else
   .rail_6v6 = PBL_GPIO(STM32_GPIOF, 3, PBL_GPIO_OPEN_DRAIN),
+#endif
   .rail_4v5 = PBL_GPIO(STM32_GPIOF, 2, PBL_GPIO_OPEN_DRAIN),
   .base_spi_frequency = 16000000,
   .fast_spi_frequency = 32000000,

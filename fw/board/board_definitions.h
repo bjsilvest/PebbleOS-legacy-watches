@@ -8,7 +8,7 @@
 #include <board/boards/board_asterix.h>
 #elifdef CONFIG_BOARD_SILK
 #include <board/boards/board_silk.h>
-#elifdef CONFIG_BOARD_SNOWY
+#elif defined(CONFIG_BOARD_SNOWY) || defined(CONFIG_BOARD_SPALDING)
 #include <board/boards/board_snowy.h>
 #elif defined(CONFIG_BOARD_OBELIX_DVT) || defined(CONFIG_BOARD_OBELIX_PVT) || \
     defined(CONFIG_BOARD_OBELIX_BB2)

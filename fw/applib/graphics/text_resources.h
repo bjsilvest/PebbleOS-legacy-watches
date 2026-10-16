@@ -92,7 +92,12 @@ typedef struct {
   GlyphHeaderData header;
 } LineCacheData;
 
+#ifdef CONFIG_BOARD_SPALDING
+// The round framebuffer leaves AppState no room for 30 entries.
+#define LINE_CACHE_SIZE 20
+#else
 #define LINE_CACHE_SIZE 30
+#endif
 
 // Allow 1K max for offset tables
 #define OFFSET_TABLE_MAX_SIZE (1024)
