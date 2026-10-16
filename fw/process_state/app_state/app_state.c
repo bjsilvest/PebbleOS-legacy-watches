@@ -118,9 +118,6 @@ typedef struct {
   bool touch_nav_opted_in;
 #endif
 
-  uint8_t *js_runtime_context_buffer;
-  JsRuntimeContext *js_runtime_context;
-
   JsMemoryAPIContext *js_memory_api_context;
 
   AppGlance glance;
@@ -554,20 +551,6 @@ void app_touch_nav_set_participating(bool enable) {
                                &s_app_state_ptr->touch_nav_opted_in, enable);
 }
 #endif
-
-JsRuntimeContext *app_state_get_js_runtime_context(void) {
-  return s_app_state_ptr->js_runtime_context;
-}
-
-uint8_t *app_state_get_js_runtime_context_buffer(void) {
-  return s_app_state_ptr->js_runtime_context_buffer;
-}
-
-void app_state_set_js_runtime_context(uint8_t *unaligned_buffer,
-                                      JsRuntimeContext *js_runtime_context) {
-  s_app_state_ptr->js_runtime_context_buffer = unaligned_buffer;
-  s_app_state_ptr->js_runtime_context = js_runtime_context;
-}
 
 JsMemoryAPIContext *app_state_get_js_memory_api_context(void) {
   return s_app_state_ptr->js_memory_api_context;

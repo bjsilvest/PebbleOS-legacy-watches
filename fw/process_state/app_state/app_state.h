@@ -61,7 +61,6 @@ typedef struct AppStateInitParams {
 
 typedef struct MemorySegment MemorySegment;
 
-typedef struct JsRuntimeContext JsRuntimeContext;
 typedef struct JsMemoryAPIContext JsMemoryAPIContext;
 
 //! Allocate memory in the process' address space for AppState data and
@@ -147,13 +146,6 @@ void app_touch_nav_resync(void);
 //! the app twin's subscription with the master pref (subscribe when enabling with the pref on,
 //! unsubscribe when disabling). Idempotent. Runs on the app task.
 void app_touch_nav_set_participating(bool enable);
-
-JsRuntimeContext *app_state_get_js_runtime_context(void);
-
-uint8_t *app_state_get_js_runtime_context_buffer(void);
-
-void app_state_set_js_runtime_context(uint8_t *unaligned_buffer,
-                                      JsRuntimeContext *js_runtime_context);
 
 JsMemoryAPIContext *app_state_get_js_memory_api_context(void);
 
