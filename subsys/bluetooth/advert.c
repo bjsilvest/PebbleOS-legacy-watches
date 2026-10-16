@@ -5,6 +5,7 @@
 #include "nimble_gattc_op_queue.h"
 #include "nimble_type_conversions.h"
 #include "pairability_priv.h"
+#include "pairing_confirm_priv.h"
 
 #include <stdio.h>
 
@@ -12,6 +13,7 @@
 #include <pbl/bluetooth/bonding_sync.h>
 #include <pbl/bluetooth/gatt.h>
 #include <pbl/bluetooth/pairing_confirm.h>
+#include <pbl/drivers/rng.h>
 #include <pbl/logging/logging.h>
 #include <pbl/util/math.h>
 
@@ -92,17 +94,18 @@ bool pbl_bt_advert_set_advertising_data(const struct pbl_bt_ad_data *ad_data) {
 static struct {
   uint8_t requests;
   uint8_t passkeys;
+  uint8_t passkey_action;
   uint16_t pairing_status;
   uint16_t enc_status;
   uint16_t disconnect_reason;
 } s_pair_trace;
-static char s_pair_trace_str[24];
+static char s_pair_trace_str[32];
 
 const char *pbl_bt_advert_pairing_trace(void) {
-  sniprintf(s_pair_trace_str, sizeof(s_pair_trace_str), "r%uk%u p%03x e%03x d%03x",
+  sniprintf(s_pair_trace_str, sizeof(s_pair_trace_str), "r%uk%ua%u p%03x e%03x d%03x",
             (unsigned)MIN(s_pair_trace.requests, 9U), (unsigned)MIN(s_pair_trace.passkeys, 9U),
-            (unsigned)s_pair_trace.pairing_status, (unsigned)s_pair_trace.enc_status,
-            (unsigned)s_pair_trace.disconnect_reason);
+            (unsigned)s_pair_trace.passkey_action, (unsigned)s_pair_trace.pairing_status,
+            (unsigned)s_pair_trace.enc_status, (unsigned)s_pair_trace.disconnect_reason);
   return s_pair_trace_str;
 }
 
@@ -269,8 +272,38 @@ static void prv_handle_passkey_event(struct ble_gap_event *event) {
   struct pbl_bt_pairing_confirm_ctx *ctx =
       (struct pbl_bt_pairing_confirm_ctx *)((uintptr_t)event->passkey.conn_handle);
 
-  if (event->passkey.params.action == BLE_SM_IOACT_NUMCMP) {
-    passkey = event->passkey.params.numcmp;
+  const uint16_t conn_handle = event->passkey.conn_handle;
+  s_pair_trace.passkey_action = event->passkey.params.action;
+
+  switch (event->passkey.params.action) {
+    case BLE_SM_IOACT_NUMCMP:
+      passkey = event->passkey.params.numcmp;
+      pairing_confirm_set_display_conn(BLE_HS_CONN_HANDLE_NONE);
+      break;
+    case BLE_SM_IOACT_DISP: {
+      // Legacy passkey entry: show a random passkey for the phone's user to
+      // type, and give it to NimBLE now.
+      uint32_t random = 0U;
+      if (!rng_rand(&random)) {
+        PBL_LOG_WRN("No random passkey");
+      }
+      passkey = random % 1000000U;
+      struct ble_sm_io io = {
+        .action = BLE_SM_IOACT_DISP,
+        .passkey = passkey,
+      };
+      const int rc = ble_sm_inject_io(conn_handle, &io);
+      if (rc != 0) {
+        PBL_LOG_ERR("ble_sm_inject_io (passkey) rc=0x%04x", (uint16_t)rc);
+      }
+      pairing_confirm_set_display_conn(conn_handle);
+      break;
+    }
+    default:
+      // No keyboard or out of band data to answer with.
+      PBL_LOG_WRN("Unsupported pairing action %u", (unsigned)event->passkey.params.action);
+      (void)ble_gap_terminate(conn_handle, BLE_ERR_AUTH_FAIL);
+      return;
   }
 
   if (s_device_name[0] != '\0') {
@@ -287,6 +320,7 @@ static void prv_handle_passkey_event(struct ble_gap_event *event) {
 static void prv_handle_pairing_complete_event(struct ble_gap_event *event) {
   s_pair_trace.pairing_status = event->pairing_complete.status;
   PBL_LOG_INFO("Pairing complete: status=0x%04x", (uint16_t)event->pairing_complete.status);
+  pairing_confirm_set_display_conn(BLE_HS_CONN_HANDLE_NONE);
 
   prv_end_pairing(event->pairing_complete.conn_handle, event->pairing_complete.status == 0);
 }
