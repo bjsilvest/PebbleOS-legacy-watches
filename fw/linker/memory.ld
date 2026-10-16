@@ -82,6 +82,10 @@ ASSERT(CONFIG_APP_RAM_3X_SEGMENT_SIZE % 8 == 0,
 ASSERT(CONFIG_APP_RAM_4X_SEGMENT_SIZE % 8 == 0,
        "The app_segment size for the 4x app environment is not a multiple of eight bytes");
 
+/* The MPU stack guards start at these, and MPU regions need 32-byte alignment. */
+ASSERT(__WORKER_RAM__ % 32 == 0, "Worker RAM is not 32-byte aligned")
+ASSERT(__APP_RAM__ % 32 == 0, "App RAM is not 32-byte aligned")
+
 /* Basic sanity checks: apps must fit, and the kernel needs at least 64k. */
 ASSERT(PBL_APP_RAM_SIZE > 0, "App RAM is too small!")
 ASSERT(PBL_RAM_SIZE >= 64K, "Kernel RAM is too small!")

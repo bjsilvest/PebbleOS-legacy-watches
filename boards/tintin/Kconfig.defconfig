@@ -19,3 +19,9 @@ config FIRMWARE_NEW_WORLD_MARKER
 # Show the same 1% charge percent as the phone app.
 config BATTERY_EXACT_PERCENT
     default y
+
+# Apps and the worker sit at the end of RAM, so the 25952 + 6820 aplite app
+# region would start 4 bytes off the 32-byte alignment the MPU needs. Nothing
+# reads the runtime part separately; 6816 makes the region exactly 32 KiB.
+config APP_RAM_APLITE_RUNTIME_SIZE
+    default 6816
