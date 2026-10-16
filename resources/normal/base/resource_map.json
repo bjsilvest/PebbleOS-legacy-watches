@@ -3,7 +3,8 @@
   "media": [
     {
       "name": "FONT_FALLBACK_INTERNAL",
-      "characterRegex": "[0-9a-fx]"
+      "characterRegex": "[0-9a-fx]",
+      "glyphSubset": "normal/base/fallback_subset.json"
     },
     {
       "type": "pdc",
