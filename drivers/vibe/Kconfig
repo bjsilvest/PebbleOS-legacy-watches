@@ -8,6 +8,13 @@ menuconfig VIBE
 
 if VIBE
 
+config VIBE_GPIO
+    bool "GPIO-switched motor"
+    depends on GPIO
+    help
+      Vibe motor switched on and off by a GPIO, with no strength control
+      (the original Pebble).
+
 config VIBE_PWM
     bool "PWM-driven motor"
     depends on PWM
