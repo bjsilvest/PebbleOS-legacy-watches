@@ -59,6 +59,11 @@ PBL_LOG_MODULE_DECLARE(nimble, CONFIG_NIMBLE_LOG_LEVEL);
 #define BTS_ACTION_SERIAL 3U
 #define BTS_ACTION_DELAY  4U
 
+//! nSHUTDOWN low time, as the pebble-dev firmware holds it.
+#define SHUTDOWN_PULSE_MS 100U
+//! While shut down the chip does not drive our CTS, which can read as clear
+//! to send. Give it time to drive CTS high (busy) before waiting for low.
+#define POWER_UP_SETTLE_MS 20U
 //! After nSHUTDOWN rises the chip takes a few ms to start; it drives our CTS
 //! low once it can take commands.
 #define POWER_UP_TIMEOUT_MS 500U
@@ -179,8 +184,9 @@ static int prv_command(const uint8_t *pkt, size_t len, uint8_t *ret, size_t ret_
 
 static void prv_power_cycle(void) {
   pbl_gpio_set(&BOARD_BT_SHUTDOWN, true);
-  pbl_thread_sleep(PBL_MSEC(10));
+  pbl_thread_sleep(PBL_MSEC(SHUTDOWN_PULSE_MS));
   pbl_gpio_set(&BOARD_BT_SHUTDOWN, false);
+  pbl_thread_sleep(PBL_MSEC(POWER_UP_SETTLE_MS));
 }
 
 static void prv_uart_init(void) {
@@ -298,7 +304,10 @@ bool cc2564_boot(void) {
       continue;
     }
     if (!prv_read_version()) {
-      sniprintf(s_status, sizeof(s_status), "No version (try %d)", attempt);
+      // Received byte count and the first byte: none means the chip is
+      // silent, others a baud rate mismatch.
+      sniprintf(s_status, sizeof(s_status), "No version (try %d) rx %lu %02x", attempt,
+                (unsigned long)s_rx_head, s_rx_ring[0]);
       continue;
     }
     if (!prv_run_bts()) {
