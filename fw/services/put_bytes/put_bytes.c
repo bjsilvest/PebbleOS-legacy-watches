@@ -453,7 +453,10 @@ static void prv_commit_object(uint32_t crc) {
       .checksum = crc
     };
 
+#ifndef CONFIG_FIRMWARE_LEGACY_CRC
+    // The phone sends the legacy checksum; the bootloader checks CRC32.
     fw_descr.checksum = pb_storage_calculate_crc(&s_pb_state.storage, PutBytesCrcType_CRC32);
+#endif
     pb_storage_write(&s_pb_state.storage, 0, (uint8_t *)&fw_descr, sizeof(FirmwareDescription));
   }
 #endif

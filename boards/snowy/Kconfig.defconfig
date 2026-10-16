@@ -27,3 +27,8 @@ config SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK_V2
 # Show the same 1% charge percent as the phone app (stock rounded to 10%).
 config BATTERY_EXACT_PERCENT
     default y
+
+# The stock bootloader checks staged firmware, and the stock PRF image was
+# written, with the legacy STM32 CRC.
+config FIRMWARE_LEGACY_CRC
+    default y

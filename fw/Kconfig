@@ -63,6 +63,15 @@ config MMAP_RESOURCES
       Serve read-only system resources as direct pointers into
       memory-mapped flash instead of copying them out.
 
+config FIRMWARE_LEGACY_CRC
+    bool "Firmware descriptions use the legacy STM32 CRC"
+    depends on !PBLBOOT
+    help
+      The checksum in a firmware image's description (in flash, ahead of
+      the image) is the legacy STM32 CRC, not CRC32, as the stock
+      bootloader and recovery firmware of older watches (snowy) expect.
+      Used to check the recovery image and to write staged updates.
+
 endmenu
 
 choice
