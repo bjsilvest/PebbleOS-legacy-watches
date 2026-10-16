@@ -6,6 +6,11 @@ config CPU_CORTEX_M
 	help
 	  ARM Cortex-M core. Selected through the CPU the SoC selects.
 
+config CPU_CORTEX_M3
+	bool
+	select CPU_CORTEX_M
+	select ARMV7_M
+
 config CPU_CORTEX_M4
 	bool
 	select CPU_CORTEX_M
