@@ -388,7 +388,10 @@
       "id": -59,
       "enum": "WEATHER",
       "md_fn": "weather_app_get_info",
-      "color_argb8": "GColorBlueMoonARGB8"
+      "color_argb8": "GColorBlueMoonARGB8",
+      "ifdefs": [
+        "CONFIG_SERVICE_WEATHER"
+      ]
     },
     {
       "id": -95,

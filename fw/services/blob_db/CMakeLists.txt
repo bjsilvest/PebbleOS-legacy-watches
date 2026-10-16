@@ -21,7 +21,7 @@ set(sources
   timeline_item_storage.c
   util.c
   watch_app_prefs_db.c
-  weather_db.c
 )
 pbl_library()
 pbl_library_sources(${sources})
+pbl_library_sources_ifdef(CONFIG_SERVICE_WEATHER weather_db.c)

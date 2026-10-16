@@ -89,6 +89,7 @@ static const BlobDB s_blob_dbs[NumBlobDBs] = {
         .flush = notif_db_flush,
         .name = "notif_db",
       },
+#ifdef CONFIG_SERVICE_WEATHER
   [BlobDBIdWeather] =
       {
         .init = weather_db_init,
@@ -100,6 +101,9 @@ static const BlobDB s_blob_dbs[NumBlobDBs] = {
         .compact = weather_db_compact,
         .name = "weather_db",
       },
+#else
+  [BlobDBIdWeather] = { .disabled = true },
+#endif
   [BlobDBIdiOSNotifPref] =
       {
         .init = ios_notif_pref_db_init,

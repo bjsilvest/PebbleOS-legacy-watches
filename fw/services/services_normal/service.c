@@ -115,7 +115,9 @@ void services_normal_init(void) {
   send_text_service_init();
   protobuf_log_init();
 
+#ifdef CONFIG_SERVICE_WEATHER
   weather_service_init();
+#endif
 
   speaker_service_init();
 

@@ -218,6 +218,7 @@ static LauncherAppGlance *prv_load_glance_for_node(const AppMenuNode *node,
            0x57},
       .constructor = launcher_app_glance_music_create,
     },
+#ifdef CONFIG_SERVICE_WEATHER
     {
       // Weather
       .uuid =
@@ -225,6 +226,7 @@ static LauncherAppGlance *prv_load_glance_for_node(const AppMenuNode *node,
            0xff},
       .constructor = launcher_app_glance_weather_create,
     },
+#endif
     {
       // Notifications
       .uuid =
