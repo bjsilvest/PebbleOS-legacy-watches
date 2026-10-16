@@ -19,3 +19,7 @@ endchoice
 # paired, in either firmware. Stock snowy pinned no address.
 config SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK_V2
     default y
+
+# Show the same 1% charge percent as the phone app (stock rounded to 10%).
+config BATTERY_EXACT_PERCENT
+    default y
