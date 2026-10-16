@@ -3,7 +3,9 @@
 
 #pragma once
 
-#if defined(CONFIG_HAL_STM32_STM32F412)
+#if defined(CONFIG_HAL_STM32_STM32F205)
+#include "soc_irqs_stm32f205.h"
+#elif defined(CONFIG_HAL_STM32_STM32F412)
 #include "soc_irqs_stm32f412.h"
 #elif defined(CONFIG_HAL_STM32_STM32F439)
 #include "soc_irqs_stm32f439.h"

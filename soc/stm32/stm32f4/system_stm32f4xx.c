@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Brian Silvestri */
 /* SPDX-License-Identifier: Apache-2.0 */
 
-//! STM32F412 / STM32F439 clock setup.
+//! STM32F205 / STM32F412 / STM32F439 clock setup.
 //!
 //! The stock bootloader calls RCC_DeInit() before jumping to the firmware,
 //! so we start on the 16 MHz HSI. Run the PLL from it:
@@ -28,6 +28,9 @@
 #define PLLI2S_R 5
 // RM0090: 4 wait states up to 100 MHz at 1.8-2.1 V, as stock snowy used.
 #define FLASH_LATENCY FLASH_ACR_LATENCY_4WS
+#elif defined(CONFIG_HAL_STM32_STM32F205)
+// RM0033: 16 MHz per wait state at 1.8-2.1 V, so 6 covers 96 MHz at any supply.
+#define FLASH_LATENCY FLASH_ACR_LATENCY_6WS
 #else
 // VDD on silk is 1.8-2.0V. 6 wait states covers 100 MHz at the lowest
 // supply voltage the part supports; tune once checked against RM0402.
@@ -46,7 +49,10 @@ void SystemInit(void) {
   RCC->CIR = 0;
 
   RCC->APB1ENR |= RCC_APB1ENR_PWREN;
+#if !defined(CONFIG_HAL_STM32_STM32F205)
+  // The F2 has no regulator voltage scaling
   PWR->CR |= PWR_CR_VOS;
+#endif
 
   // HCLK = SYSCLK, PCLK2 = HCLK / 2, PCLK1 = HCLK / 4
   RCC->CFGR |= RCC_CFGR_HPRE_DIV1 | RCC_CFGR_PPRE2_DIV2 | RCC_CFGR_PPRE1_DIV4;

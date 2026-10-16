@@ -8,6 +8,14 @@ menuconfig HAL_STM32
 
 if HAL_STM32
 
+config HAL_STM32_STM32F205
+    bool "STM32F205 SoC variant"
+    default y if SOC_STM32F205
+    help
+      Configure the library for the STM32F205 used by the original Pebble
+      (tintin). Its peripherals are the F4's (built as an STM32F40x) on a
+      Cortex-M3 without an FPU.
+
 config HAL_STM32_STM32F412
     bool "STM32F412xG SoC variant"
     help
