@@ -42,7 +42,8 @@ pbl_filter_sources(sources EXCLUDE
   ${nimble}/porting/nimble/src/hal_timer.c
 )
 
-set(defines "")
+# assert() without file, function and expression strings; the LR is kept
+set(defines __ASSERT_QUIET)
 
 if(CONFIG_BT_HCI_NRF52)
   file(GLOB controller_sources CONFIGURE_DEPENDS

@@ -16,3 +16,7 @@ void __assert_func(const char *file, int line, const char *func, const char *e) 
   PBL_LOG_ERR("%s, expr: %s", func, e);
   PBL_ASSERTN_LR(0, lr);
 }
+
+void __assert_no_args(void) {
+  PBL_ASSERTN_LR(0, (uint32_t)(uintptr_t)PBL_RETURN_ADDRESS(0));
+}
