@@ -16,6 +16,8 @@ Targets:
     ever used here.
   snowy (--board snowy --machine pebble-snowy-bb): the emulated STM32F439
     with its parallel NOR, booted through the stock snowy bootloader.
+  spalding (--board spalding --machine pebble-s4-bb): the same, with the
+    round display, booted through the stock spalding bootloader.
 """
 
 import argparse
@@ -55,6 +57,9 @@ BOARDS = {
         "flash_args": lambda path: ["-drive", f"if=none,id=spi-flash,file={path},format=raw"],
     },
 }
+BOARDS["spalding"] = dict(
+    BOARDS["snowy"], bootloader="c6288702d^:bin/boot/boot_spalding@1478015115.hex"
+)
 GUARD_MESSAGE = b"protected flash"
 
 
@@ -149,12 +154,12 @@ def main():
     parser.add_argument(
         "--stock-sprf-v2",
         action="store_true",
-        help="put a stock v2 shared PRF storage entry in place (snowy)",
+        help="put a stock v2 shared PRF storage entry in place (snowy, spalding)",
     )
     args = parser.parse_args()
 
     board = BOARDS[args.board]
-    stock_hw = args.machine in ("pebble-silk-bb", "pebble-snowy-bb")
+    stock_hw = args.machine in ("pebble-silk-bb", "pebble-snowy-bb", "pebble-s4-bb")
 
     with tempfile.TemporaryDirectory() as tmp:
         spi = os.path.join(tmp, "spi.bin")
