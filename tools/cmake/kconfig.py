@@ -128,15 +128,8 @@ def main():
     kconf.warn_assign_redun = True
     kconf.warn_assign_undef = True
 
-    sources = [defconfig]
-    kconf.load_config(defconfig)
-
-    revision_defconfig = os.path.join(
-        srcdir, "boards", board.name, f"defconfig.{board.revision}"
-    )
-    if board.revision and os.path.exists(revision_defconfig):
-        kconf.load_config(revision_defconfig, replace=False)
-        sources.append(revision_defconfig)
+    sources = []
+    kconf.load_config(os.devnull)
 
     prj_conf = os.path.join(srcdir, "fw", "prj.conf")
     if os.path.exists(prj_conf):
@@ -147,6 +140,19 @@ def main():
     if os.path.exists(variant_conf):
         kconf.load_config(variant_conf, replace=False)
         sources.append(variant_conf)
+
+    # The board comes after the project defaults so it can turn a feature off
+    kconf.warn_assign_override = False
+    kconf.load_config(defconfig, replace=False)
+    sources.append(defconfig)
+
+    revision_defconfig = os.path.join(
+        srcdir, "boards", board.name, f"defconfig.{board.revision}"
+    )
+    if board.revision and os.path.exists(revision_defconfig):
+        kconf.load_config(revision_defconfig, replace=False)
+        sources.append(revision_defconfig)
+    kconf.warn_assign_override = True
 
     # An interactively edited configuration, kept across reconfigurations.
     if args.fragment and os.path.exists(args.fragment):
