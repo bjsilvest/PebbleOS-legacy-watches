@@ -11,7 +11,8 @@
 //! registers, which the bootloader and PRF read and write the same way.
 //!
 //! Kernel ticks still come from the kernel tick; the fast calendar measures
-//! STOP mode and wakes the MCU from it with alarm A.
+//! STOP mode and the wakeup timer, which runs off RTCCLK and not the
+//! calendar, wakes the MCU from it.
 
 #include <inttypes.h>
 #include <stdio.h>
@@ -41,8 +42,11 @@ static_assert(32768 / ((RTC_ASYNC_PRESCALER + 1) * (RTC_SYNC_PRESCALER + 1)) == 
 //! How often the wall clock is saved to the backup registers.
 #define SAVE_TIME_FREQUENCY (30 * HW_TICKS_HZ)
 
-// EXTI line the RTC alarms are wired to.
-#define EXTI_LINE_RTC_ALARM (1U << 17)
+// EXTI line the RTC wakeup timer is wired to.
+#define EXTI_LINE_RTC_WAKEUP (1U << 22)
+
+// Wakeup counter clock, RTCCLK / 2: up to 4 s, longer than any STOP.
+#define RTC_WAKEUP_HZ (32768 / 2)
 
 typedef uint32_t RtcIntervalTicks;
 
@@ -212,25 +216,25 @@ void rtc_get_time_ms(time_t *out_seconds, uint16_t *out_ms) {
 // Wakeup alarm, to leave STOP mode
 ///////////////////////////////////////////////////////////////////////////////
 
-static void prv_rtc_alarm_irq_handler(void) {
-  if (RTC_GetITStatus(RTC_IT_ALRA) != RESET) {
-    RTC_AlarmCmd(RTC_Alarm_A, DISABLE);
-    RTC_ClearITPendingBit(RTC_IT_ALRA);
+static void prv_rtc_wkup_irq_handler(void) {
+  if (RTC_GetITStatus(RTC_IT_WUT) != RESET) {
+    RTC_WakeUpCmd(DISABLE);
+    RTC_ClearITPendingBit(RTC_IT_WUT);
   }
-  EXTI->PR = EXTI_LINE_RTC_ALARM;
+  EXTI->PR = EXTI_LINE_RTC_WAKEUP;
 }
 
-PBL_IRQ_CONNECT(RTC_Alarm, 14, prv_rtc_alarm_irq_handler, , 0);
+PBL_IRQ_CONNECT(RTC_WKUP, 14, prv_rtc_wkup_irq_handler, , 0);
 
 void rtc_alarm_init(void) {
-  RTC_ITConfig(RTC_IT_ALRA, DISABLE);
-  RTC_AlarmCmd(RTC_Alarm_A, DISABLE);
-  RTC_ClearITPendingBit(RTC_IT_ALRA);
+  RTC_ITConfig(RTC_IT_WUT, DISABLE);
+  RTC_WakeUpCmd(DISABLE);
+  RTC_WakeUpClockConfig(RTC_WakeUpClock_RTCCLK_Div2);
 
-  EXTI->RTSR |= EXTI_LINE_RTC_ALARM;
-  EXTI->FTSR &= ~EXTI_LINE_RTC_ALARM;
-  EXTI->IMR |= EXTI_LINE_RTC_ALARM;
-  pbl_irq_enable(PBL_IRQN(RTC_Alarm));
+  EXTI->RTSR |= EXTI_LINE_RTC_WAKEUP;
+  EXTI->FTSR &= ~EXTI_LINE_RTC_WAKEUP;
+  EXTI->IMR |= EXTI_LINE_RTC_WAKEUP;
+  pbl_irq_enable(PBL_IRQN(RTC_WKUP));
 
   s_alarm_initialized = true;
 }
@@ -238,29 +242,19 @@ void rtc_alarm_init(void) {
 void rtc_alarm_set(RtcTicks num_ticks) {
   PBL_ASSERTN(s_alarm_initialized);
 
-  // Kernel ticks to calendar ticks; must expire before the counter wraps.
-  const uint64_t hw_ticks = (num_ticks * HW_TICKS_HZ) / RTC_TICKS_HZ;
-  PBL_ASSERTN(hw_ticks < TICKS_IN_AN_INTERVAL);
+  // The first WUTF comes (WUT + 1) wakeup clock cycles after WUTE.
+  uint32_t wakeup_counter = (uint32_t)((num_ticks * RTC_WAKEUP_HZ) / RTC_TICKS_HZ) - 1;
+  PBL_ASSERTN(wakeup_counter < 65536);
 
-  RTC_ITConfig(RTC_IT_ALRA, DISABLE);
-  RTC_AlarmCmd(RTC_Alarm_A, DISABLE);
-
+  RTC_ITConfig(RTC_IT_WUT, DISABLE);
+  RTC_WakeUpCmd(DISABLE);
+  RTC_SetWakeUpCounter(wakeup_counter);
+  RTC_ClearFlag(RTC_FLAG_WUTF);
+  EXTI->PR = EXTI_LINE_RTC_WAKEUP;
+  RTC_ClearITPendingBit(RTC_IT_WUT);
   s_alarm_set_ticks = prv_hw_ticks();
-  const uint32_t expiry = (uint32_t)((s_alarm_set_ticks + hw_ticks) % TICKS_IN_AN_INTERVAL);
-
-  RTC_AlarmTypeDef alarm;
-  RTC_AlarmStructInit(&alarm);
-  alarm.RTC_AlarmMask = RTC_AlarmMask_DateWeekDay;
-  alarm.RTC_AlarmTime.RTC_Hours = (uint8_t)(expiry / 3600);
-  alarm.RTC_AlarmTime.RTC_Minutes = (uint8_t)((expiry / 60) % 60);
-  alarm.RTC_AlarmTime.RTC_Seconds = (uint8_t)(expiry % 60);
-  RTC_SetAlarm(RTC_Format_BIN, RTC_Alarm_A, &alarm);
-
-  RTC_ClearFlag(RTC_FLAG_ALRAF);
-  EXTI->PR = EXTI_LINE_RTC_ALARM;
-  RTC_ClearITPendingBit(RTC_IT_ALRA);
-  RTC_ITConfig(RTC_IT_ALRA, ENABLE);
-  RTC_AlarmCmd(RTC_Alarm_A, ENABLE);
+  RTC_WakeUpCmd(ENABLE);
+  RTC_ITConfig(RTC_IT_WUT, ENABLE);
 }
 
 RtcTicks rtc_alarm_get_elapsed_ticks(void) {
