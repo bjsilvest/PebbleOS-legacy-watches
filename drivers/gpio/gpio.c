@@ -6,7 +6,8 @@
 #include <system/passert.h>
 
 int pbl_gpio_configure(const struct pbl_gpio *gpio, uint32_t flags) {
-  PBL_ASSERTN(pbl_device_is_ready(&gpio->port->dev));
+  // Ports are not declared as deps; bring one up on first use, whatever the link order
+  PBL_ASSERTN(pbl_device_init(&gpio->port->dev) == 0);
 
   flags |= gpio->flags;
   if ((flags & PBL_GPIO_OUTPUT_INIT_LOGICAL) && (flags & PBL_GPIO_ACTIVE_LOW) &&
