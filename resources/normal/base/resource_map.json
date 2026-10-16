@@ -104,7 +104,8 @@
     {
       "type": "pbi8",
       "name": "MENU_ICON_KICKSTART_WATCH",
-      "file": "normal/base/images/menu_icon_kickstart_watch.png"
+      "file": "normal/base/images/menu_icon_kickstart_watch.png",
+      "config": "CONFIG_SERVICE_ACTIVITY"
     },
     {
       "type": "pbi",
@@ -2408,27 +2409,32 @@
     {
       "type": "png",
       "name": "HEALTH_APP_ACTIVITY",
-      "file": "normal/base/images/health_app_activity.png"
+      "file": "normal/base/images/health_app_activity.png",
+      "config": "CONFIG_SERVICE_ACTIVITY"
     },
     {
       "type": "png",
       "name": "HEALTH_APP_SLEEP",
-      "file": "normal/base/images/health_app_sleep.png"
+      "file": "normal/base/images/health_app_sleep.png",
+      "config": "CONFIG_SERVICE_ACTIVITY"
     },
     {
       "type": "pdc",
       "name": "HEALTH_APP_CROWN",
-      "file": "normal/base/images/health_app_crown.svg"
+      "file": "normal/base/images/health_app_crown.svg",
+      "config": "CONFIG_SERVICE_ACTIVITY"
     },
     {
       "type": "png",
       "name": "HEALTH_APP_HR",
-      "file": "normal/base/images/health_app_hr.png"
+      "file": "normal/base/images/health_app_hr.png",
+      "config": "CONFIG_SERVICE_ACTIVITY"
     },
     {
       "type": "raw",
       "name": "HEALTH_APP_PULSING_HEART",
-      "file": "normal/base/images/health_app_pulsing_heart.pdc"
+      "file": "normal/base/images/health_app_pulsing_heart.pdc",
+      "config": "CONFIG_SERVICE_ACTIVITY"
     },
     {
       "type": "png",
@@ -2438,12 +2444,14 @@
     {
       "type": "png",
       "name": "WORKOUT_APP_WALK_SMALL",
-      "file": "normal/base/images/workout_app_walk_small.png"
+      "file": "normal/base/images/workout_app_walk_small.png",
+      "config": "CONFIG_SERVICE_ACTIVITY"
     },
     {
       "type": "png",
       "name": "WORKOUT_APP_WALK_TINY",
-      "file": "normal/base/images/workout_app_walk_tiny.png"
+      "file": "normal/base/images/workout_app_walk_tiny.png",
+      "config": "CONFIG_SERVICE_ACTIVITY"
     },
     {
       "type": "png",
@@ -2453,12 +2461,14 @@
     {
       "type": "png",
       "name": "WORKOUT_APP_RUN_SMALL",
-      "file": "normal/base/images/workout_app_run_small.png"
+      "file": "normal/base/images/workout_app_run_small.png",
+      "config": "CONFIG_SERVICE_ACTIVITY"
     },
     {
       "type": "png",
       "name": "WORKOUT_APP_RUN_TINY",
-      "file": "normal/base/images/workout_app_run_tiny.png"
+      "file": "normal/base/images/workout_app_run_tiny.png",
+      "config": "CONFIG_SERVICE_ACTIVITY"
     },
     {
       "type": "png",
@@ -2468,12 +2478,14 @@
     {
       "type": "png",
       "name": "WORKOUT_APP_WORKOUT_SMALL",
-      "file": "normal/base/images/workout_app_workout_small.png"
+      "file": "normal/base/images/workout_app_workout_small.png",
+      "config": "CONFIG_SERVICE_ACTIVITY"
     },
     {
       "type": "png",
       "name": "WORKOUT_APP_DETECTED",
-      "file": "normal/base/images/workout_app_detected.png"
+      "file": "normal/base/images/workout_app_detected.png",
+      "config": "CONFIG_SERVICE_ACTIVITY"
     },
     {
       "type": "png",
@@ -2488,7 +2500,8 @@
     {
       "type": "png",
       "name": "WORKOUT_APP_HR_PULSE_TINY",
-      "file": "normal/base/images/workout_app_hr_pulse_tiny.png"
+      "file": "normal/base/images/workout_app_hr_pulse_tiny.png",
+      "config": "CONFIG_SERVICE_ACTIVITY"
     },
     {
       "type": "png",
@@ -2498,17 +2511,20 @@
     {
       "type": "pdc",
       "name": "WORKOUT_APP_ONE",
-      "file": "normal/base/images/workout_app_one.svg"
+      "file": "normal/base/images/workout_app_one.svg",
+      "config": "CONFIG_SERVICE_ACTIVITY"
     },
     {
       "type": "pdc",
       "name": "WORKOUT_APP_TWO",
-      "file": "normal/base/images/workout_app_two.svg"
+      "file": "normal/base/images/workout_app_two.svg",
+      "config": "CONFIG_SERVICE_ACTIVITY"
     },
     {
       "type": "pdc",
       "name": "WORKOUT_APP_THREE",
-      "file": "normal/base/images/workout_app_three.svg"
+      "file": "normal/base/images/workout_app_three.svg",
+      "config": "CONFIG_SERVICE_ACTIVITY"
     },
     {
       "type": "pdc",
@@ -2543,112 +2559,134 @@
     {
       "type": "png",
       "name": "WX_SUNNY_TINY",
-      "file": "normal/base/images/wx_sunny_day_25x25.png"
+      "file": "normal/base/images/wx_sunny_day_25x25.png",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "png",
       "name": "WX_SUNNY_SMALL",
-      "file": "normal/base/images/wx_sunny_day_50x50.png"
+      "file": "normal/base/images/wx_sunny_day_50x50.png",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "png",
       "name": "WX_PARTLY_TINY",
-      "file": "normal/base/images/wx_partly_cloudy_25x25.png"
+      "file": "normal/base/images/wx_partly_cloudy_25x25.png",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "png",
       "name": "WX_PARTLY_SMALL",
-      "file": "normal/base/images/wx_partly_cloudy_50x50.png"
+      "file": "normal/base/images/wx_partly_cloudy_50x50.png",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "png",
       "name": "WX_CLOUDY_TINY",
-      "file": "normal/base/images/wx_cloudy_day_25x25.png"
+      "file": "normal/base/images/wx_cloudy_day_25x25.png",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "png",
       "name": "WX_CLOUDY_SMALL",
-      "file": "normal/base/images/wx_cloudy_day_50x50.png"
+      "file": "normal/base/images/wx_cloudy_day_50x50.png",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "png",
       "name": "WX_LIGHTRAIN_TINY",
-      "file": "normal/base/images/wx_light_rain_25x25.png"
+      "file": "normal/base/images/wx_light_rain_25x25.png",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "png",
       "name": "WX_LIGHTRAIN_SMALL",
-      "file": "normal/base/images/wx_light_rain_50x50.png"
+      "file": "normal/base/images/wx_light_rain_50x50.png",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "png",
       "name": "WX_HEAVYRAIN_TINY",
-      "file": "normal/base/images/wx_heavy_rain_25x25.png"
+      "file": "normal/base/images/wx_heavy_rain_25x25.png",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "png",
       "name": "WX_HEAVYRAIN_SMALL",
-      "file": "normal/base/images/wx_heavy_rain_50x50.png"
+      "file": "normal/base/images/wx_heavy_rain_50x50.png",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "png",
       "name": "WX_LIGHTSNOW_TINY",
-      "file": "normal/base/images/wx_light_snow_25x25.png"
+      "file": "normal/base/images/wx_light_snow_25x25.png",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "png",
       "name": "WX_LIGHTSNOW_SMALL",
-      "file": "normal/base/images/wx_light_snow_50x50.png"
+      "file": "normal/base/images/wx_light_snow_50x50.png",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "png",
       "name": "WX_HEAVYSNOW_TINY",
-      "file": "normal/base/images/wx_heavy_snow_25x25.png"
+      "file": "normal/base/images/wx_heavy_snow_25x25.png",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "png",
       "name": "WX_HEAVYSNOW_SMALL",
-      "file": "normal/base/images/wx_heavy_snow_50x50.png"
+      "file": "normal/base/images/wx_heavy_snow_50x50.png",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "png",
       "name": "WX_RAINSNOW_TINY",
-      "file": "normal/base/images/wx_raining_and_snowing_25x25.png"
+      "file": "normal/base/images/wx_raining_and_snowing_25x25.png",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "png",
       "name": "WX_RAINSNOW_SMALL",
-      "file": "normal/base/images/wx_raining_and_snowing_50x50.png"
+      "file": "normal/base/images/wx_raining_and_snowing_50x50.png",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "png",
       "name": "WX_GENERIC_TINY",
-      "file": "normal/base/images/wx_generic_weather_25x25.png"
+      "file": "normal/base/images/wx_generic_weather_25x25.png",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "png",
       "name": "WX_GENERIC_SMALL",
-      "file": "normal/base/images/wx_generic_weather_50x50.png"
+      "file": "normal/base/images/wx_generic_weather_50x50.png",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "pdc",
       "name": "WX_SUNNY_LARGE",
-      "file": "normal/base/images/wx_sunny_day_80x80.svg"
+      "file": "normal/base/images/wx_sunny_day_80x80.svg",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "pdc",
       "name": "WX_PARTLY_LARGE",
-      "file": "normal/base/images/wx_partly_cloudy_80x80.svg"
+      "file": "normal/base/images/wx_partly_cloudy_80x80.svg",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "pdc",
       "name": "WX_CLOUDY_LARGE",
-      "file": "normal/base/images/wx_cloudy_day_80x80.svg"
+      "file": "normal/base/images/wx_cloudy_day_80x80.svg",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "pdc",
       "name": "WX_GENERIC_LARGE",
-      "file": "normal/base/images/wx_generic_weather_80x80.svg"
+      "file": "normal/base/images/wx_generic_weather_80x80.svg",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "raw",
@@ -2657,12 +2695,14 @@
       "_comment": [
         "raw-deflate + u32 size prefix (tools/deflate_resource.py);",
         "inflated at load by globe_view.c prv_load_inflated"
-      ]
+      ],
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "raw",
       "name": "GLOBE_STARFIELD",
-      "file": "normal/base/raw/globe_starfield.deflate"
+      "file": "normal/base/raw/globe_starfield.deflate",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "raw",
@@ -2671,17 +2711,20 @@
       "_comment": [
         "PDC PAYLOAD (8-byte file header stripped) deflated; the loader",
         "inflates + gdraw_command_sequence_validate()s it"
-      ]
+      ],
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "raw",
       "name": "GLOBE_CRADLE_PDC",
-      "file": "normal/base/raw/globe_cradle.pdc"
+      "file": "normal/base/raw/globe_cradle.pdc",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "raw",
       "name": "WX_WEATHER_ICONS_PDC",
-      "file": "normal/base/raw/weather_icons.pdc"
+      "file": "normal/base/raw/weather_icons.pdc",
+      "config": "CONFIG_SERVICE_WEATHER"
     },
     {
       "type": "pdc",
