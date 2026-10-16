@@ -77,6 +77,14 @@ extern const uint8_t cc2564_bts_end[];
 static char s_status[32] = "Not started";
 static char s_chip_id[32] = "?";
 
+// Start-up diagnostics: CTS while shut down and after the settle time, bytes
+// received per attempt and the first few of attempt 1.
+static int s_cts_shut;
+static int s_cts_up;
+static uint32_t s_rx_count[BOOT_ATTEMPTS];
+static uint8_t s_rx_first[6];
+static uint32_t s_rx_first_len;
+
 // Boot-time receive: the UART interrupt fills a ring, the boot thread
 // assembles events from it.
 #define RX_RING_SIZE 512U
@@ -185,8 +193,21 @@ static int prv_command(const uint8_t *pkt, size_t len, uint8_t *ret, size_t ret_
 static void prv_power_cycle(void) {
   pbl_gpio_set(&BOARD_BT_SHUTDOWN, true);
   pbl_thread_sleep(PBL_MSEC(SHUTDOWN_PULSE_MS));
+  s_cts_shut = pbl_gpio_get(&BOARD_BT_CTS);
   pbl_gpio_set(&BOARD_BT_SHUTDOWN, false);
   pbl_thread_sleep(PBL_MSEC(POWER_UP_SETTLE_MS));
+  s_cts_up = pbl_gpio_get(&BOARD_BT_CTS);
+}
+
+static bool prv_read_version(void);
+
+//! A chip that nSHUTDOWN did not reset still runs at the rate a previous
+//! start left it at. @return true if it answers there.
+static bool prv_read_version_at_run_baud(void) {
+  uart_set_baud_rate(BT_HCI_UART, CONFIG_BT_CC2564_HCI_BAUD);
+  s_evt_len = 0U;
+  s_rx_tail = s_rx_head;
+  return prv_read_version();
 }
 
 static void prv_uart_init(void) {
@@ -303,12 +324,28 @@ bool cc2564_boot(void) {
       sniprintf(s_status, sizeof(s_status), "No CTS (try %d)", attempt);
       continue;
     }
+    bool fast = false;
     if (!prv_read_version()) {
-      // Received byte count and the first byte: none means the chip is
-      // silent, others a baud rate mismatch.
-      sniprintf(s_status, sizeof(s_status), "No version (try %d) rx %lu %02x", attempt,
-                (unsigned long)s_rx_head, s_rx_ring[0]);
-      continue;
+      // None received means the chip is silent, others a baud rate mismatch.
+      s_rx_count[attempt - 1] = s_rx_head;
+      if (attempt == 1) {
+        s_rx_first_len = MIN(s_rx_head, sizeof(s_rx_first));
+        memcpy(s_rx_first, s_rx_ring, s_rx_first_len);
+      }
+      sniprintf(s_status, sizeof(s_status), "No version t%d rx %lu,%lu,%lu c%d%d", attempt,
+                (unsigned long)s_rx_count[0], (unsigned long)s_rx_count[1],
+                (unsigned long)s_rx_count[2], s_cts_shut, s_cts_up);
+      char *p = s_chip_id;
+      const char *end = s_chip_id + sizeof(s_chip_id);
+      p += sniprintf(p, end - p, "a1");
+      for (uint32_t i = 0U; i < s_rx_first_len; i++) {
+        p += sniprintf(p, end - p, "%02x", s_rx_first[i]);
+      }
+      if (!prv_read_version_at_run_baud()) {
+        sniprintf(p, end - p, " no fast");
+        continue;
+      }
+      fast = true;
     }
     if (!prv_run_bts()) {
       continue;
@@ -317,7 +354,8 @@ bool cc2564_boot(void) {
     uart_set_rx_interrupt_enabled(BT_HCI_UART, false);
     // Held while the controller is awake; the transport's eHCILL releases it.
     soc_stm32_stop_block();
-    sniprintf(s_status, sizeof(s_status), "Running (try %d)", attempt);
+    sniprintf(s_status, sizeof(s_status), "Running (try %d%s) c%d%d", attempt,
+              fast ? ", not reset" : "", s_cts_shut, s_cts_up);
     return true;
   }
 
