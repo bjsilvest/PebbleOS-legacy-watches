@@ -35,7 +35,9 @@ static const uint32_t SETTINGS_MENU_ICON_RESOURCES[SettingsMenuItem_Count] = {
   [SettingsMenuItemNotifications] = RESOURCE_ID_SETTINGS_MENU_ICON_NOTIFICATIONS,
   [SettingsMenuItemVibrations] = RESOURCE_ID_SETTINGS_MENU_ICON_VIBRATIONS,
   [SettingsMenuItemQuietTime] = RESOURCE_ID_SETTINGS_MENU_ICON_QUIET_TIME,
+#ifdef CONFIG_TIMELINE_PEEK
   [SettingsMenuItemTimeline] = RESOURCE_ID_SETTINGS_MENU_ICON_TIMELINE,
+#endif
   [SettingsMenuItemQuickLaunch] = RESOURCE_ID_SETTINGS_MENU_ICON_QUICK_LAUNCH,
   [SettingsMenuItemDateTime] = RESOURCE_ID_SETTINGS_MENU_ICON_DATE_TIME,
   [SettingsMenuItemDisplay] = RESOURCE_ID_SETTINGS_MENU_ICON_DISPLAY,

@@ -22,6 +22,10 @@ if(NOT CONFIG_SERVICE_ACTIVITY)
   list(FILTER source EXCLUDE REGEX "/workout/(countdown|data|selection|workout)\\.c$")
   list(FILTER source EXCLUDE REGEX "/(launcher/default/app_glance_workout|settings/health)\\.c$")
 endif()
+# The timeline settings page only holds the Quick View options
+if(NOT CONFIG_TIMELINE_PEEK)
+  list(FILTER source EXCLUDE REGEX "/settings/timeline\\.c$")
+endif()
 # Reminders are created by dictation
 if(NOT CONFIG_SERVICE_VOICE)
   list(FILTER source EXCLUDE REGEX "/reminders/[^/]*\\.c$")

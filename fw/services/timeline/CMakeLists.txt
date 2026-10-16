@@ -18,7 +18,6 @@ set(sources
   layout_node.c
   metricgroup.c
   notification_layout.c
-  peek.c
   reminders.c
   sports_layout.c
   swap_layer.c
@@ -31,3 +30,4 @@ set(sources
 )
 pbl_library()
 pbl_library_sources(${sources})
+pbl_library_sources_ifdef(CONFIG_TIMELINE_PEEK peek.c)

@@ -8,6 +8,13 @@ config SERVICE_TIMELINE
 
 if SERVICE_TIMELINE
 
+config TIMELINE_PEEK
+    bool "Timeline peek (Quick View)"
+    default y
+    help
+      Show the next timeline event over the watchface. Without it the
+      peek calls are no-ops and the watchface is never obstructed.
+
 module = SERVICE_TIMELINE
 module-str = Timeline
 source "subsys/logging/Kconfig.template.log_level"
