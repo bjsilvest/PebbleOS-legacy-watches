@@ -4,7 +4,8 @@
 
 //! Sharp LS013B7DH01 on an STM32F4 SPI, write-only and LSB first.
 //!
-//! On silk the panel's VCOM (EXTCOMIN) is driven by the PMIC, not the MCU.
+//! On silk the panel's VCOM (EXTCOMIN) is driven by the PMIC; on the original
+//! Pebble the MCU pulses it every second.
 //! Transfers are polled for now; completion is still reported through a
 //! kernel event, as with a DMA transfer.
 
@@ -13,10 +14,12 @@
 
 #include <pbl/drivers/display/sharp_ls013b7dh01/sharp_ls013b7dh01.h>
 #include <pbl/drivers/gpio/stm32.h>
+#include <pbl/services/regular_timer.h>
 #include <pbl/util/bitops.h>
 
 #include <board/board.h>
 #include <kernel/events.h>
+#include <kernel/util/delay.h>
 #include <stm32f4xx.h>
 #include <system/passert.h>
 
@@ -68,12 +71,23 @@ static void prv_spi_write(const uint8_t *buf, size_t len) {
   pbl_gpio_set(&BOARD_CONFIG_DISPLAY.cs, false);
 }
 
+// The panel needs its VCOM inverted regularly, or a DC bias builds up.
+static void prv_pulse_vcom(void *data) {
+  pbl_gpio_set(&BOARD_CONFIG_DISPLAY.extcomin, true);
+  // At least 1 us high
+  delay_us(2);
+  pbl_gpio_set(&BOARD_CONFIG_DISPLAY.extcomin, false);
+}
+
 void display_init(void) {
   RCC_APB1PeriphClockCmd(BOARD_CONFIG_DISPLAY.spi_rcc, ENABLE);
 
   pbl_gpio_stm32_af(&BOARD_CONFIG_DISPLAY.clk, BOARD_CONFIG_DISPLAY.spi_af, 0, GPIO_Speed_50MHz);
   pbl_gpio_stm32_af(&BOARD_CONFIG_DISPLAY.mosi, BOARD_CONFIG_DISPLAY.spi_af, 0, GPIO_Speed_50MHz);
   pbl_gpio_configure(&BOARD_CONFIG_DISPLAY.cs, PBL_GPIO_OUTPUT_INACTIVE);
+  if (pbl_gpio_is_connected(&BOARD_CONFIG_DISPLAY.power_5v)) {
+    pbl_gpio_configure(&BOARD_CONFIG_DISPLAY.power_5v, PBL_GPIO_OUTPUT_ACTIVE);
+  }
   pbl_gpio_configure(&BOARD_CONFIG_DISPLAY.on_ctrl, PBL_GPIO_OUTPUT_ACTIVE);
 
   SPI_InitTypeDef spi_cfg;
@@ -89,6 +103,12 @@ void display_init(void) {
   spi_cfg.SPI_FirstBit = SPI_FirstBit_LSB;
   SPI_Init(BOARD_CONFIG_DISPLAY.spi, &spi_cfg);
   SPI_Cmd(BOARD_CONFIG_DISPLAY.spi, ENABLE);
+
+  if (pbl_gpio_is_connected(&BOARD_CONFIG_DISPLAY.extcomin)) {
+    pbl_gpio_configure(&BOARD_CONFIG_DISPLAY.extcomin, PBL_GPIO_OUTPUT_INACTIVE);
+    static RegularTimerInfo s_vcom_timer = {.cb = prv_pulse_vcom};
+    regular_timer_add_seconds_callback(&s_vcom_timer);
+  }
 }
 
 void display_clear(void) {
@@ -121,10 +141,13 @@ void display_update(NextRowCallback nrcb, UpdateCompleteCallback uccb) {
   // write command
   *pbuf++ = DISP_MODE_WRITE;
 
+  // The board's mounting, then the user's (left-handed) rotation on top
+  const bool rotated_180 = s_rotated_180 != BOARD_CONFIG_DISPLAY.rotated_180;
+
   while (nrcb(&row)) {
     // row address, data and trailing dummy
-    *pbuf++ = s_rotated_180 ? (PBL_DISPLAY_HEIGHT - 1) - row.address + 1 : row.address + 1;
-    if (s_rotated_180) {
+    *pbuf++ = rotated_180 ? (PBL_DISPLAY_HEIGHT - 1) - row.address + 1 : row.address + 1;
+    if (rotated_180) {
       for (int i = DISP_LINE_BYTES - 1; i >= 0; --i) {
         *pbuf++ = pbl_bitrev8(row.data[i]);
       }
