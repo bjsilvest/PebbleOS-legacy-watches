@@ -13,6 +13,9 @@ config QEMU_MACHINE
 config FIRMWARE_LEGACY_CRC
     default y
 
+config FIRMWARE_NEW_WORLD_MARKER
+    default y
+
 # Show the same 1% charge percent as the phone app.
 config BATTERY_EXACT_PERCENT
     default y

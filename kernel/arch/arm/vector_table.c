@@ -39,7 +39,11 @@ PBL_EXTERNALLY_VISIBLE PBL_SECTION(".isr_vector") const void *const arch_vector_
   MemManage_Handler,
   BusFault_Handler,
   UsageFault_Handler,
+#ifdef CONFIG_FIRMWARE_NEW_WORLD_MARKER
+  (const void *)0x4E65576F,
+#else
   0,
+#endif
   0,
   0,
   0,

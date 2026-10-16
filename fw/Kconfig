@@ -72,6 +72,14 @@ config FIRMWARE_LEGACY_CRC
       bootloader and recovery firmware of older watches (snowy) expect.
       Used to check the recovery image and to write staged updates.
 
+config FIRMWARE_NEW_WORLD_MARKER
+    bool "Mark the vector table for the original Pebble's bootloader"
+    depends on !PBLBOOT
+    help
+      Put "NeWo" (0x4E65576F) in the reserved vector table word at offset
+      28. The stock tintin bootloader only boots, and only installs, an
+      image at 0x08004000 when it finds the marker there.
+
 endmenu
 
 choice
