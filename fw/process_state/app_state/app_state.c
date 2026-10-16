@@ -81,11 +81,15 @@ typedef struct {
 
   TickTimerServiceState tick_timer_service_state;
 
+#ifdef CONFIG_TOUCH
   TouchServiceState touch_service_state;
+#endif
 
   ConnectionServiceState connection_service_state;
 
+#ifdef CONFIG_SERVICE_ACTIVITY
   HealthServiceState health_service_state;
+#endif
 
   LocaleInfo locale_info;
 
@@ -120,7 +124,9 @@ typedef struct {
 
   JsMemoryAPIContext *js_memory_api_context;
 
+#ifdef CONFIG_SERVICE_APP_GLANCES
   AppGlance glance;
+#endif
 
   TextRenderState text_render_state;
 
@@ -132,6 +138,12 @@ typedef struct {
 
   ContentIndicatorsBuffer content_indicators_buffer;
 } AppState;
+
+// On aplite, AppState must fit the app RAM left over by the app segment.
+#ifdef CONFIG_PLATFORM_APLITE
+static_assert(sizeof(AppState) <= CONFIG_APP_RAM_APLITE_RUNTIME_SIZE,
+              "AppState does not fit the aplite app runtime RAM");
+#endif
 
 KERNEL_READONLY_DATA static AppState *s_app_state_ptr;
 
@@ -311,7 +323,9 @@ PBL_NOINLINE void app_state_init(void) {
 
   tick_timer_service_state_init(app_state_get_tick_timer_service_state());
 
+#ifdef CONFIG_TOUCH
   touch_service_state_init(app_state_get_touch_service_state());
+#endif
 
 #ifdef CONFIG_TOUCH
   // Route this app's touch events through the nav bridge when the master pref is on. No-op for
@@ -319,7 +333,9 @@ PBL_NOINLINE void app_state_init(void) {
   app_touch_nav_subscribe();
 #endif
 
+#ifdef CONFIG_SERVICE_ACTIVITY
   health_service_state_init(app_state_get_health_service_state());
+#endif
 
   locale_init_app_locale(app_state_get_locale_info());
 
@@ -337,7 +353,9 @@ PBL_NOINLINE void app_state_init(void) {
 
 PBL_NOINLINE void app_state_deinit(void) {
   animation_private_state_deinit(&s_app_state_ptr->animation_state);
+#ifdef CONFIG_SERVICE_ACTIVITY
   health_service_state_deinit(app_state_get_health_service_state());
+#endif
   unobstructed_area_service_deinit(app_state_get_unobstructed_area_state());
 }
 
@@ -434,17 +452,21 @@ TickTimerServiceState *app_state_get_tick_timer_service_state(void) {
   return &s_app_state_ptr->tick_timer_service_state;
 }
 
+#ifdef CONFIG_TOUCH
 TouchServiceState *app_state_get_touch_service_state(void) {
   return &s_app_state_ptr->touch_service_state;
 }
+#endif
 
 ConnectionServiceState *app_state_get_connection_service_state(void) {
   return &s_app_state_ptr->connection_service_state;
 }
 
+#ifdef CONFIG_SERVICE_ACTIVITY
 HealthServiceState *app_state_get_health_service_state(void) {
   return &s_app_state_ptr->health_service_state;
 }
+#endif
 
 ContentIndicatorsBuffer *app_state_get_content_indicators_buffer(void) {
   return &s_app_state_ptr->content_indicators_buffer;
@@ -470,9 +492,11 @@ UnobstructedAreaState *app_state_get_unobstructed_area_state(void) {
   return &s_app_state_ptr->unobstructed_area_service_state;
 }
 
+#ifdef CONFIG_SERVICE_APP_GLANCES
 AppGlance *app_state_get_glance(void) {
   return &s_app_state_ptr->glance;
 }
+#endif
 
 WakeupHandler app_state_get_wakeup_handler(void) {
   return s_app_state_ptr->wakeup_handler;
