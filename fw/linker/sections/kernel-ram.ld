@@ -26,7 +26,10 @@
 #else
         *nimble.dir*(.bss .bss.* COMMON)
 #endif
+#ifdef CONFIG_PULSE_EVERYWHERE
+        /* Only without PULSE's buffers is there room for it in SRAM. */
         *task_timer.c.obj(.bss .bss.*)
+#endif
 
         . = ALIGN(8);
         __ccm_bss_end = .;

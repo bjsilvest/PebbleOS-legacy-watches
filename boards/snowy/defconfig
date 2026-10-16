@@ -84,3 +84,8 @@ CONFIG_ORIENTATION_MANAGER=y
 # as the stock firmware did: the kernel heap is too small to copy the larger
 # vector animations (the incoming call one is 13.6K).
 CONFIG_MMAP_RESOURCES=y
+
+# No PULSE serial console: its port is only on internal test pads, and its
+# buffers (9K of SRAM) are better spent on the kernel. Logs and coredumps
+# still come over Bluetooth, and the serial port keeps plain text logs.
+CONFIG_PULSE_EVERYWHERE=n
