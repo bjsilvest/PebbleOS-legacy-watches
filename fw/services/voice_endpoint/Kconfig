@@ -3,7 +3,7 @@
 
 config SERVICE_VOICE_ENDPOINT
     bool "Voice endpoint"
-    select SPEEX
+    select SPEEX if MIC
     help
       Voice endpoint (phone-side voice transport).
 
