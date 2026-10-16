@@ -109,9 +109,12 @@ static volatile uint8_t s_last_reply_len;
 static char s_reset_snapshot[32];
 
 // SMP opcodes seen on the link, oldest first: '<' received, '>' sent, then the
-// opcode in hex, and for Pairing Failed its reason.
+// opcode in hex, for Pairing Failed its reason, and for Pairing Request and
+// Response the IO capability and the AuthReq byte (bit 2 MITM, bit 3 SC).
 #define SMP_TRACE_LEN    40U
 #define L2CAP_CID_SMP    0x0006U
+#define SMP_OP_PAIR_REQ  0x01U
+#define SMP_OP_PAIR_RSP  0x02U
 #define SMP_OP_PAIR_FAIL 0x05U
 
 static char s_smp_trace[SMP_TRACE_LEN + 1];
@@ -157,9 +160,17 @@ static void prv_note_smp(char dir, struct os_mbuf *om) {
     return;
   }
 
-  char entry[4] = {dir, "0123456789abcdef"[hdr[8] & 0xfU], '\0', '\0'};
+  static const char hex[] = "0123456789abcdef";
+  char entry[6] = {dir, hex[hdr[8] & 0xfU], '\0', '\0', '\0', '\0'};
+  uint8_t params[3];
   if (hdr[8] == SMP_OP_PAIR_FAIL && os_mbuf_copydata(om, 9, 1, &hdr[9]) == 0) {
-    entry[2] = "0123456789abcdef"[hdr[9] & 0xfU];
+    entry[2] = hex[hdr[9] & 0xfU];
+  } else if ((hdr[8] == SMP_OP_PAIR_REQ || hdr[8] == SMP_OP_PAIR_RSP) &&
+             os_mbuf_copydata(om, 9, sizeof(params), params) == 0) {
+    // IO capability, then AuthReq (params[1] is the OOB flag).
+    entry[2] = hex[params[0] & 0xfU];
+    entry[3] = hex[params[2] >> 4];
+    entry[4] = hex[params[2] & 0xfU];
   }
   prv_trace_append(entry);
   if (dir == '>') {
