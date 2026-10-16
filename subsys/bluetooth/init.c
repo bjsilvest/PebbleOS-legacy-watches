@@ -95,6 +95,14 @@ static int prv_ensure_addr(void) {
   enum pbl_bt_id_addr_type type;
   int rc;
 
+#ifdef CONFIG_BT_ID_ADDR_PREFER_PUBLIC
+  // NimBLE advertises from a random address whenever one is set, so set none
+  // when the controller has a public address.
+  if (ble_hs_id_copy_addr(BLE_ADDR_PUBLIC, nullptr, nullptr) == 0) {
+    return 0;
+  }
+#endif
+
   rc = pbl_bt_id_addr_get(&addr, &type);
   if (rc != 0) {
     PBL_LOG_ERR("No identity address (%d)", rc);

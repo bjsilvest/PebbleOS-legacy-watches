@@ -97,6 +97,15 @@ config BT_ID_ADDR
     help
       An identity address backend is selected (pbl/bluetooth/id_addr.h).
 
+config BT_ID_ADDR_PREFER_PUBLIC
+    bool "Prefer the controller's public address"
+    depends on BT_ID_ADDR
+    help
+      Use the public address the controller reports, when it has one, and
+      the identity address source above only when it reports none. For
+      controllers that some units ship with a factory address and others
+      not.
+
 module = BT
 module-str = Bluetooth
 source "subsys/logging/Kconfig.template.log_level"

@@ -8,11 +8,15 @@ config FW_FLASH_SIZE
 config QEMU_MACHINE
     default "pebble-snowy-bb"
 
-# Like the legacy firmware, derive the identity address (a random static
-# one) from the serial number, so the watch keeps its stock name and address.
+# Like the stock firmware, use the CC2564's factory (public, TI) address, so
+# the watch keeps its stock name and address. Fall back to one derived from
+# the serial number if the chip reports none.
 choice BT_ID_ADDR_SOURCE
     default BT_ID_ADDR_SERIAL
 endchoice
+
+config BT_ID_ADDR_PREFER_PUBLIC
+    default y
 
 # The recovery firmware is the stock one, with its own (v2) shared PRF
 # storage. Import its keys and pairing so phones see one watch, already

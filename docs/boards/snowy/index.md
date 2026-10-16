@@ -244,8 +244,12 @@ those commands itself and resolves a peer's private address against the
 bonded IRKs on connection, reporting it as an enhanced LE Connection
 Complete (the pebble-dev firmware patched NimBLE's host for the same). Snowy
 also uses that firmware's pairing settings for this chip: legacy pairing
-allowed, no MITM, host flow control. The identity address is derived from
-the serial number, like the legacy firmware.
+allowed, no MITM, host flow control. The identity address is the CC2564's
+factory public address (TI prefix `B0:B4:48`), as stock and the stock PRF use
+(`BT_ID_ADDR_PREFER_PUBLIC`); one derived from the serial number, silk's
+scheme, is only the fallback for a chip that reports none. Advertising from
+the serial-derived address instead (a random static one) made the watch a
+different device to phones paired with stock.
 
 Settings > System > Information shows "BT Radio" (boot progress, e.g.
 `Running (try 1)`, `No CTS (try 3)` or `Init <n> <opcode>:<status>`), "BT
