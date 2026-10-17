@@ -17,8 +17,13 @@ static UARTDevice DBG_UART_DEVICE = {
   .state = &s_dbg_uart_state,
   .periph = USART3,
   .rcc_apb_periph = RCC_APB1Periph_USART3,
+#ifdef CONFIG_BOARD_TINTIN_V1_5
+  .tx = PBL_GPIO(STM32_GPIOD, 8, 0),
+  .rx = PBL_GPIO(STM32_GPIOD, 9, 0),
+#else
   .tx = PBL_GPIO(STM32_GPIOC, 10, 0),
   .rx = PBL_GPIO(STM32_GPIOC, 11, 0),
+#endif
   .af = GPIO_AF_USART3,
   .irqn = PBL_IRQN(USART3),
 };

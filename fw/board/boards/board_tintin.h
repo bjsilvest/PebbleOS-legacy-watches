@@ -4,10 +4,11 @@
 
 #pragma once
 
-// Original Pebble (tintin): Kickstarter ev2_4 and the bb2 bigboard QEMU
-// emulates. Pins from the stock board_ev2_4.c/.h and board_bb2.c/.h; the two
-// differ only in the USB power and Bluetooth wake lines (swapped), the vibe
-// pin and the charger controls.
+// Original Pebble (tintin): Kickstarter ev2_4, retail v1_5 and the bb2
+// bigboard QEMU emulates. Pins from the stock board_ev2_4.c/.h,
+// board_v1_5.c/.h and board_bb2.c/.h. ev2_4 has the USB power and Bluetooth
+// wake lines swapped and no charger controls; bb2 has the vibe on another
+// pin; v1_5 has the debug UART on other pins.
 
 #include <pbl/drivers/backlight/pwm.h>
 #include <pbl/drivers/i2c.h>
@@ -18,8 +19,10 @@
 #define BT_VENDOR_NAME "Pebble Technology"
 
 static const BoardConfig BOARD_CONFIG = {
-#ifdef CONFIG_BOARD_TINTIN_BB2
+#if defined(CONFIG_BOARD_TINTIN_BB2)
   .ambient_light_dark_threshold = 3000,
+#elif defined(CONFIG_BOARD_TINTIN_V1_5)
+  .ambient_light_dark_threshold = 3120,
 #else
   .ambient_light_dark_threshold = 3180,
 #endif
@@ -47,11 +50,14 @@ static const BoardConfigButton BOARD_CONFIG_BUTTON = {
 static const BoardConfigPower BOARD_CONFIG_POWER = {
 #ifdef CONFIG_BOARD_TINTIN_BB2
   .low_power_threshold = 5,
+#else
+  .low_power_threshold = 3,
+#endif
+#if defined(CONFIG_BOARD_TINTIN_BB2) || defined(CONFIG_BOARD_TINTIN_V1_5)
   .vusb_stat = PBL_GPIO(STM32_GPIOC, 13, PBL_GPIO_ACTIVE_LOW | PBL_GPIO_PULL_UP),
   .chg_fast = PBL_GPIO(STM32_GPIOB, 6, PBL_GPIO_ACTIVE_LOW | PBL_GPIO_OPEN_DRAIN),
   .chg_en = PBL_GPIO(STM32_GPIOB, 9, PBL_GPIO_OPEN_DRAIN),
 #else
-  .low_power_threshold = 3,
   .vusb_stat = PBL_GPIO(STM32_GPIOC, 12, PBL_GPIO_ACTIVE_LOW | PBL_GPIO_PULL_UP),
 #endif
   .battery_capacity_hours = 144,
