@@ -2,6 +2,8 @@
 /* SPDX-FileCopyrightText: 2026 Brian Silvestri */
 /* SPDX-License-Identifier: Apache-2.0 */
 
+#include <pbl/drivers/i2c/stm32.h>
+#include <pbl/drivers/regulator/gpio.h>
 #include <pbl/drivers/uart/stm32.h>
 #include <pbl/kernel/irq.h>
 
@@ -45,6 +47,31 @@ static UARTDevice BT_HCI_UART_DEVICE = {
 UARTDevice *const BT_HCI_UART = &BT_HCI_UART_DEVICE;
 PBL_IRQ_CONNECT(USART1, 12, uart_irq_handler, BT_HCI_UART, 0);
 #endif
+
+// I2C1: accelerometer
+///////////////////////////////////////////////////////////////////////////////
+
+PBL_I2C_STM32_DEFINE(s_i2c1, "i2c1", I2C1, RCC_APB1Periph_I2C1, 400000, PBL_GPIO(STM32_GPIOB, 8, 0),
+                     GPIO_AF_I2C1, PBL_GPIO(STM32_GPIOB, 7, 0), GPIO_AF_I2C1, nullptr);
+PBL_IRQ_CONNECT(I2C1_EV, 12, pbl_i2c_stm32_ev_irq_handler, &s_i2c1, 0);
+PBL_IRQ_CONNECT(I2C1_ER, 12, pbl_i2c_stm32_er_irq_handler, &s_i2c1, 0);
+
+static const struct pbl_i2c_dev I2C_SLAVE_LIS3DH = PBL_I2C_DEV(&s_i2c1.bus, 0x19);
+const struct pbl_i2c_dev *const I2C_LIS3DH = &I2C_SLAVE_LIS3DH;
+
+// I2C2: magnetometer (and the unused MFi chip), on a switched 2.5 V rail
+///////////////////////////////////////////////////////////////////////////////
+
+PBL_GPIO_REGULATOR_DEFINE(BOARD_RAIL_2V5, "rail_2v5", STM32_GPIOH, 0, 0, false);
+
+PBL_I2C_STM32_DEFINE(s_i2c2, "i2c2", I2C2, RCC_APB1Periph_I2C2, 400000,
+                     PBL_GPIO(STM32_GPIOB, 10, 0), GPIO_AF_I2C2, PBL_GPIO(STM32_GPIOB, 11, 0),
+                     GPIO_AF_I2C2, nullptr);
+PBL_IRQ_CONNECT(I2C2_EV, 12, pbl_i2c_stm32_ev_irq_handler, &s_i2c2, 0);
+PBL_IRQ_CONNECT(I2C2_ER, 12, pbl_i2c_stm32_er_irq_handler, &s_i2c2, 0);
+
+static const struct pbl_i2c_dev I2C_SLAVE_MAG3110 = PBL_I2C_DEV(&s_i2c2.bus, 0x0e);
+const struct pbl_i2c_dev *const I2C_MAG3110 = &I2C_SLAVE_MAG3110;
 
 void board_early_init(void) {
   // The buttons' common line

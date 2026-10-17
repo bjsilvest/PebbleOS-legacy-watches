@@ -10,6 +10,8 @@
 // pin and the charger controls.
 
 #include <pbl/drivers/backlight/pwm.h>
+#include <pbl/drivers/i2c.h>
+#include <pbl/drivers/regulator/gpio.h>
 #include <pbl/services/imu/units.h>
 
 #define BT_VENDOR_ID   0x0154
@@ -129,6 +131,27 @@ static const BoardConfigNorSpi BOARD_CONFIG_NOR_SPI = {
 static const struct pbl_gpio BOARD_MCO1 = PBL_GPIO(STM32_GPIOA, 8, 0);
 
 extern UARTDevice *const DBG_UART;
+
+// LIS3DH on I2C1 (PB8 SCL, PB7 SDA)
+extern const struct pbl_i2c_dev *const I2C_LIS3DH;
+
+// MAG3110 on I2C2 (PB10 SCL, PB11 SDA), whose 2.5 V rail (PH0) also feeds
+// the unused Apple MFi chip; on only while the magnetometer is in use.
+static const BoardConfigMag BOARD_CONFIG_MAG = {
+  .mag_config = {
+    .axes_offsets[AXIS_X] = 1,
+    .axes_offsets[AXIS_Y] = 0,
+    .axes_offsets[AXIS_Z] = 2,
+    .axes_inverts[AXIS_X] = false,
+    .axes_inverts[AXIS_Y] = true,
+    .axes_inverts[AXIS_Z] = true,
+  },
+};
+// Data ready, active high
+static const struct pbl_gpio BOARD_MAG_INT = PBL_GPIO(STM32_GPIOC, 4, 0);
+extern const struct pbl_i2c_dev *const I2C_MAG3110;
+extern const struct pbl_gpio_regulator BOARD_RAIL_2V5;
+#define BOARD_MAG_RAIL (&BOARD_RAIL_2V5.reg)
 
 #ifdef CONFIG_BT_HCI_UART
 // CC2564A HCI: USART1 with hardware flow control.

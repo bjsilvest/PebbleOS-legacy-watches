@@ -76,8 +76,13 @@ CONFIG_NIMBLE_BLE_SM_LEGACY=y
 CONFIG_NIMBLE_BLE_SM_MITM=n
 CONFIG_NIMBLE_BLE_SM_LVL=0
 
-# TODO: LIS3DH driver. Until then, an accelerometer lying still.
-CONFIG_ACCEL_POSIX=y
+CONFIG_I2C=y
+CONFIG_REGULATOR_GPIO=y
+
+CONFIG_ACCEL_LIS3DH=y
+
+CONFIG_MAG=y
+CONFIG_MAG_MAG3110=y
 
 # The 256 KiB stock resource bank has no room for Gothic 36 and LECO 60;
 # the tintin resource map aliases them to Gothic 28 and LECO 42.
