@@ -3,17 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-    .kernel_data : ALIGN(32) {
-        __data_start = .; /* This is used by the startup in order to initialize the .data section */
-
-        *(.data)
-        *(.data.*)
-
-        . = ALIGN(8);
-        __data_end = .;
-    } >RAM AT>FLASH
-    __data_load_start = LOADADDR(.kernel_data);
-
 #if CONFIG_CCM_SIZE
     /* Zeroed data that is never a DMA target, moved out of the scarce SRAM.
        Must come before the generic .bss rules below, which would take it. */
@@ -57,6 +46,19 @@
 
         __bss_end = .;
     } >RAM
+
+    /* After the bss: the read-only bss below is aligned to its (2K) size, and
+       in front of it .data would leave that alignment gap unused. */
+    .kernel_data : ALIGN(32) {
+        __data_start = .; /* This is used by the startup in order to initialize the .data section */
+
+        *(.data)
+        *(.data.*)
+
+        . = ALIGN(8);
+        __data_end = .;
+    } >RAM AT>FLASH
+    __data_load_start = LOADADDR(.kernel_data);
 
     .stack (NOLOAD) : {
         . = ALIGN(__stack_guard_size__);
