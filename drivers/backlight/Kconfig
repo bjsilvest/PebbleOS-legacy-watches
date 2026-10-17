@@ -25,6 +25,12 @@ config BACKLIGHT_AW9364E
     help
       Support for the AW9364E LED controller.
 
+config BACKLIGHT_IS31FL3196
+    bool "IS31FL3196"
+    depends on I2C
+    help
+      Support for the ISSI IS31FL3196 LED controller of the Pebble Steel.
+
 config BACKLIGHT_PWM
     bool "PWM"
     help
