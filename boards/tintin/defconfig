@@ -123,3 +123,6 @@ CONFIG_SERVICE_ACCEL_MANAGER_MIN_BUFFER_SAMPLES=100
 
 # Left-handed mode: Settings > Display, 520 B of flash and no RAM.
 CONFIG_ORIENTATION_MANAGER=y
+
+# Settings > Motion Sensitivity; the LIS3DH driver scales the shake threshold.
+CONFIG_ACCEL_SENSITIVITY=y
