@@ -25,3 +25,22 @@ config BATTERY_EXACT_PERCENT
 # reads the runtime part separately; 6816 makes the region exactly 32 KiB.
 config APP_RAM_APLITE_RUNTIME_SIZE
     default 6816
+
+# Like the stock firmware, use the CC2564's factory (public, TI) address, so
+# the watch keeps its stock name and address. Fall back to one derived from
+# the serial number if the chip reports none.
+choice BT_ID_ADDR_SOURCE
+    default BT_ID_ADDR_SERIAL
+endchoice
+
+config BT_ID_ADDR_PREFER_PUBLIC
+    default y
+
+# As on snowy: four event buffers run out under notification traffic.
+config NIMBLE_BLE_TRANSPORT_EVT_COUNT
+    default 16
+
+# As on snowy, where the same driver sleeps on hardware: the chip deep
+# sleeps (eHCILL) and the host enters STOP meanwhile.
+config BT_CC2564_SLEEP
+    default y

@@ -56,6 +56,13 @@ CONFIG_SERVICE_ANALYTICS_NATIVE=n
 CONFIG_SHELL=n
 CONFIG_PULSE_EVERYWHERE=n
 
+# TI CC2564A on USART1. Its 24 KB init script stays unmodified in the
+# system resources (third_party/ti_bt_sp/bluetooth_init_cc2564_2.14.bts).
+CONFIG_BT_HCI_UART=y
+CONFIG_BT_CONTROLLER_CC2564=y
+CONFIG_BT_CC2564_BTS_RESOURCE=y
+CONFIG_NIMBLE_BLE_TRANSPORT_ISO_COUNT=0
+
 # Peripheral only, legacy pairing (the CC2564A is Bluetooth 4.0).
 CONFIG_NIMBLE_BLE_ROLE_CENTRAL=n
 CONFIG_NIMBLE_BLE_ROLE_OBSERVER=n
@@ -77,3 +84,7 @@ CONFIG_ACCEL_POSIX=y
 CONFIG_RESOURCES_LARGE_FONTS=n
 # Same glyphs in less space.
 CONFIG_RESOURCES_COMPACT_FONTS=y
+
+# 24 task timers are in use once booted (192 on the bigger watches); give
+# the 3.8 KB back to the kernel heap.
+CONFIG_TASK_TIMER_POOL_SIZE=96

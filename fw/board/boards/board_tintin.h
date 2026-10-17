@@ -129,3 +129,16 @@ static const BoardConfigNorSpi BOARD_CONFIG_NOR_SPI = {
 static const struct pbl_gpio BOARD_MCO1 = PBL_GPIO(STM32_GPIOA, 8, 0);
 
 extern UARTDevice *const DBG_UART;
+
+#ifdef CONFIG_BT_HCI_UART
+// CC2564A HCI: USART1 with hardware flow control.
+extern UARTDevice *const BT_HCI_UART;
+#define BOARD_BT_HCI_USART USART1
+
+// nSHUTDOWN: active (low) keeps the controller off.
+static const struct pbl_gpio BOARD_BT_SHUTDOWN = PBL_GPIO(STM32_GPIOA, 3, PBL_GPIO_ACTIVE_LOW);
+// The controller's RTS, our CTS: active (low) when it can take bytes.
+static const struct pbl_gpio BOARD_BT_CTS = PBL_GPIO(STM32_GPIOA, 11, PBL_GPIO_ACTIVE_LOW);
+// Our RTS, normally driven by the UART; held high while the controller sleeps.
+static const struct pbl_gpio BOARD_BT_HOST_RTS = PBL_GPIO(STM32_GPIOA, 12, 0);
+#endif

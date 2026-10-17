@@ -6,6 +6,11 @@
   ],
   "media": [
     {
+      "type": "raw",
+      "name": "BT_INIT_SCRIPT",
+      "file": "../third_party/ti_bt_sp/bluetooth_init_cc2564_2.14.bts"
+    },
+    {
       "name": "GOTHIC_28",
       "aliases": ["GOTHIC_36"]
     },
@@ -445,11 +450,13 @@
   ],
   "files": [
     {
-      "comments": "Kept deflated in the system resources to fit the 256 KiB bank and inflated into this file at boot: everything but the Gothic text fonts and the images.",
+      "comments": "Kept deflated in the system resources to fit the 256 KiB bank and inflated into this file at boot: what the firmware itself does not need to show its UI (the Gothic text fonts, images and the Bluetooth init script stay in the bank).",
       "name": "sysres",
       "unpack": true,
       "resources": [
         "TIMEZONE_DATABASE",
+        "STORED_APP_GOLF",
+        "GOTHIC_09",
         "GOTHIC_14_EMOJI",
         "GOTHIC_18_EMOJI",
         "GOTHIC_24_EMOJI",
