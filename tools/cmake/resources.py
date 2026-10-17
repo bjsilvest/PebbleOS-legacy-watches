@@ -134,6 +134,11 @@ def get_resources_dict(bld, variant, config=frozenset()):
         if "config" not in item or item["config"] in config
     ]
 
+    if "CONFIG_RESOURCES_COMPACT_FONTS" in config:
+        for item in resources_dict["media"]:
+            if item.get("type") == "font":
+                item["compact"] = True
+
     # "files" and "timeline" cannot exist in the common resource map.
     for key in ("files", "timeline"):
         if key in specific_dict:

@@ -155,6 +155,13 @@ config RESOURCES_LARGE_FONTS
       resources. Without them, the board's resource map should alias those
       font keys to smaller fonts it keeps.
 
+config RESOURCES_COMPACT_FONTS
+    bool "Compact system fonts"
+    help
+      Store system fonts in less space, drawing the same glyphs: smaller
+      glyph hash tables, and RLE4 encoded glyphs where that is smaller.
+      Glyph lookups and decoding cost a little more.
+
 config BUNDLE_HWREV
     string
     help

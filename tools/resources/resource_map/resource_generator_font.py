@@ -7,6 +7,7 @@ from pathlib import Path
 from threading import Lock
 
 from font.fontgen import MAX_GLYPHS, MAX_GLYPHS_EXTENDED, Font
+from font.pbf_compact import compact_pbf
 from font.pbf_subset import load_codepoints, subset_pbf
 from pebble_sdk_platform import pebble_platforms
 from resources.resource_map.resource_generator import ResourceGenerator
@@ -41,6 +42,7 @@ class FontResourceGenerator(ResourceGenerator):
         definition.extended = bool(definition_dict.get("extended"))
         definition.tracking_adjust = definition_dict.get("trackingAdjust")
         definition.pixel_height = definition_dict.get("pixelHeight")
+        definition.compact = bool(definition_dict.get("compact"))
         return definition
 
     @staticmethod
@@ -83,6 +85,9 @@ class FontResourceGenerator(ResourceGenerator):
                 font_data = subset_pbf(font_data, load_codepoints(definition.glyph_subset))
         else:
             raise RuntimeError(f"Unsupported font format: {font_ext}")
+
+        if getattr(definition, "compact", False):
+            font_data = compact_pbf(font_data, definition.max_glyph_size)
 
         return ResourceObject(definition, font_data)
 

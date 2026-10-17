@@ -75,3 +75,5 @@ CONFIG_ACCEL_POSIX=y
 # The 256 KiB stock resource bank has no room for Gothic 36 and LECO 60;
 # the tintin resource map aliases them to Gothic 28 and LECO 42.
 CONFIG_RESOURCES_LARGE_FONTS=n
+# Same glyphs in less space.
+CONFIG_RESOURCES_COMPACT_FONTS=y

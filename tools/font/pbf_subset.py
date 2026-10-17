@@ -63,8 +63,26 @@ class Pbf:
         return len(self.glyphs[self.entries[codepoint]])
 
     def subset(self, keep):
+        return self.rebuild(keep)
+
+    def rebuild(self, keep=None, table_size=None, glyphs=None, features=None):
+        """Serialize the font again.
+
+        keep: codepoints to keep (all when None; the wildcard always stays).
+        table_size: hash table size (the current one when None).
+        glyphs: glyph data by old offset, replacing self.glyphs.
+        features: feature flags apart from FEATURE_OFFSET_16.
+        """
+        if keep is None:
+            keep = self.entries
         keep = set(keep) | {self.wildcard}
         keep &= set(self.entries)
+        if table_size is None:
+            table_size = self.table_size
+        if glyphs is None:
+            glyphs = self.glyphs
+        if features is None:
+            features = self.features
 
         # Keep glyph data in its original order so a full subset is a no-op.
         glyph_table = [struct.pack("<I", 0)]
@@ -72,11 +90,11 @@ class Pbf:
         next_offset = 4
         for old in sorted({self.entries[cp] for cp in keep}):
             new_offsets[old] = next_offset
-            glyph_table.append(self.glyphs[old])
-            next_offset += len(self.glyphs[old])
+            glyph_table.append(glyphs[old])
+            next_offset += len(glyphs[old])
         cp_entries = [(cp, new_offsets[self.entries[cp]]) for cp in sorted(keep)]
 
-        features = self.features & ~FEATURE_OFFSET_16
+        features &= ~FEATURE_OFFSET_16
         off_bytes = 4
         if next_offset < 65536:
             features |= FEATURE_OFFSET_16
@@ -87,9 +105,9 @@ class Pbf:
         )
         entry_size = struct.calcsize(entry_fmt)
 
-        buckets = [[] for _ in range(self.table_size)]
+        buckets = [[] for _ in range(table_size)]
         for cp, off in cp_entries:
-            buckets[cp % self.table_size].append(struct.pack(entry_fmt, cp, off))
+            buckets[cp % table_size].append(struct.pack(entry_fmt, cp, off))
 
         hash_table = []
         acc = 0
@@ -105,7 +123,7 @@ class Pbf:
             self.max_height,
             len(cp_entries),
             self.wildcard,
-            self.table_size,
+            table_size,
             cp_bytes,
             self.info_size,
             features,
