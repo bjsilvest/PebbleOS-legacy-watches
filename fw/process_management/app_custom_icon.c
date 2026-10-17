@@ -138,7 +138,7 @@ void customizable_app_protocol_msg_callback(CommSession *session, const uint8_t 
 }
 
 static CustomizableAppType get_app_type_for_app_id(AppInstallId app_id) {
-  if (app_id == APP_ID_SPORTS) {
+  if (APP_ID_SPORTS != 0 && app_id == APP_ID_SPORTS) {
     return SPORTS;
   } else if (app_id == APP_ID_GOLF) {
     return GOLF;

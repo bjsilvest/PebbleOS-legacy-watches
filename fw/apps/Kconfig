@@ -10,6 +10,13 @@ config LAUNCHER_LEGACY
       The plain app list of the original Pebble, used when there are no
       app glances.
 
+config APP_SPORTS
+    bool "Sports app"
+    default y
+    help
+      The Sports app, which phone apps drive through the PebbleKit Sports
+      API to show time, distance and pace on the watch.
+
 rsource "demo/Kconfig"
 rsource "watch/Kconfig"
 

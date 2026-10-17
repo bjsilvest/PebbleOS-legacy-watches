@@ -694,7 +694,10 @@
     {
       "id": -97,
       "enum": "SPORTS",
-      "md_fn": "sports_app_get_info"
+      "md_fn": "sports_app_get_info",
+      "ifdefs": [
+        "CONFIG_APP_SPORTS"
+      ]
     },
     {
       "id": -32,

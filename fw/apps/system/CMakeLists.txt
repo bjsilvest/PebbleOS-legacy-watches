@@ -16,8 +16,12 @@ if(CONFIG_LAUNCHER_LEGACY)
 else()
   list(FILTER source EXCLUDE REGEX "/launcher/legacy/[^/]*\\.c$")
 endif()
+if(NOT CONFIG_APP_SPORTS AND NOT CONFIG_SERVICE_ACTIVITY)
+  # Only the Sports app uses these workout screens without Health
+  list(FILTER source EXCLUDE REGEX "/workout/(sports|active|dialog|summary|utils)\\.c$")
+endif()
 if(NOT CONFIG_SERVICE_ACTIVITY)
-  # The Sports app (PebbleKit Sports) stays; it shares the workout screens
+  # Health and the Workout app
   list(FILTER source EXCLUDE REGEX "/health/[^/]*\\.c$")
   list(FILTER source EXCLUDE REGEX "/workout/(countdown|data|selection|workout)\\.c$")
   list(FILTER source EXCLUDE REGEX "/(launcher/default/app_glance_workout|settings/health)\\.c$")
