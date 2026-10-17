@@ -4,13 +4,16 @@
 
 #pragma once
 
-// Original Pebble (tintin): Kickstarter ev2_4, retail v1_5 and the bb2
-// bigboard QEMU emulates. Pins from the stock board_ev2_4.c/.h,
-// board_v1_5.c/.h and board_bb2.c/.h. ev2_4 has the USB power and Bluetooth
-// wake lines swapped and no charger controls; bb2 has the vibe on another
-// pin; v1_5 has the debug UART on other pins.
+// Original Pebble (tintin): Kickstarter ev2_4, retail v1_5, the Pebble Steel
+// (v2_0) and the bb2 bigboard QEMU emulates. Pins from the stock
+// board_ev2_4.c/.h, board_v1_5.c/.h, board_v2_0.c/.h and board_bb2.c/.h.
+// ev2_4 has the USB power and Bluetooth wake lines swapped and no charger
+// controls; bb2 has the vibe on another pin; v1_5 and v2_0 have the debug UART
+// on other pins; v2_0 has its backlight on an I2C LED controller.
 
+#ifdef CONFIG_BACKLIGHT_PWM
 #include <pbl/drivers/backlight/pwm.h>
+#endif
 #include <pbl/drivers/i2c.h>
 #include <pbl/drivers/regulator/gpio.h>
 #include <pbl/services/imu/units.h>
@@ -23,6 +26,8 @@ static const BoardConfig BOARD_CONFIG = {
   .ambient_light_dark_threshold = 3000,
 #elif defined(CONFIG_BOARD_TINTIN_V1_5)
   .ambient_light_dark_threshold = 3120,
+#elif defined(CONFIG_BOARD_TINTIN_V2_0)
+  .ambient_light_dark_threshold = 3200,
 #else
   .ambient_light_dark_threshold = 3180,
 #endif
@@ -30,7 +35,11 @@ static const BoardConfig BOARD_CONFIG = {
   .photo_en = PBL_GPIO(STM32_GPIOD, 2, 0),
   .als_adc_channel = ADC_Channel_12,
   .als_adc_pin = PBL_GPIO(STM32_GPIOC, 2, 0),
+#ifdef CONFIG_BOARD_TINTIN_V2_0
+  .backlight_on_percent = 100,
+#else
   .backlight_on_percent = 25,
+#endif
 };
 
 // Pressed buttons pull their line to the common line (PA0), which the board
@@ -48,12 +57,14 @@ static const BoardConfigButton BOARD_CONFIG_BUTTON = {
 };
 
 static const BoardConfigPower BOARD_CONFIG_POWER = {
-#ifdef CONFIG_BOARD_TINTIN_BB2
+#if defined(CONFIG_BOARD_TINTIN_BB2)
   .low_power_threshold = 5,
+#elif defined(CONFIG_BOARD_TINTIN_V2_0)
+  .low_power_threshold = 6,
 #else
   .low_power_threshold = 3,
 #endif
-#if defined(CONFIG_BOARD_TINTIN_BB2) || defined(CONFIG_BOARD_TINTIN_V1_5)
+#ifndef CONFIG_BOARD_TINTIN_EV2_4
   .vusb_stat = PBL_GPIO(STM32_GPIOC, 13, PBL_GPIO_ACTIVE_LOW | PBL_GPIO_PULL_UP),
   .chg_fast = PBL_GPIO(STM32_GPIOB, 6, PBL_GPIO_ACTIVE_LOW | PBL_GPIO_OPEN_DRAIN),
   .chg_en = PBL_GPIO(STM32_GPIOB, 9, PBL_GPIO_OPEN_DRAIN),
@@ -96,6 +107,11 @@ static const BoardConfigActuator BOARD_CONFIG_VIBE = {
 #endif
 };
 
+#ifdef CONFIG_BACKLIGHT_IS31FL3196
+// Backlight: IS31FL3196 on I2C1, shutdown line on PB5 (active = running)
+extern const struct pbl_i2c_dev *const I2C_IS31FL3196;
+static const struct pbl_gpio BOARD_BACKLIGHT_SDB = PBL_GPIO(STM32_GPIOB, 5, 0);
+#else
 // Backlight: TIM3 CH2
 static const BacklightPwmConfig BACKLIGHT_PWM = {
   .pwm =
@@ -108,6 +124,7 @@ static const BacklightPwmConfig BACKLIGHT_PWM = {
       },
   .max_duty_cycle_percent = 100,
 };
+#endif
 
 static const BoardConfigSharpDisplay BOARD_CONFIG_DISPLAY = {
   .spi = SPI2,

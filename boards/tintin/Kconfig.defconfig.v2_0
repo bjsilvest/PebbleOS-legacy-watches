@@ -1,0 +1,5 @@
+# SPDX-FileCopyrightText: 2026 Brian Silvestri
+# SPDX-License-Identifier: Apache-2.0
+
+config BUNDLE_HWREV
+    default "v2_0"

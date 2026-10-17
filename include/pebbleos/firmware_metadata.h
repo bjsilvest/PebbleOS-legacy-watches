@@ -177,6 +177,8 @@ static_assert(sizeof(struct FirmwareMetadata) ==
 #define FIRMWARE_METADATA_HW_PLATFORM (FirmwareMetadataPlatformPebbleOneEV2_4)
 #elifdef CONFIG_BOARD_TINTIN_V1_5
 #define FIRMWARE_METADATA_HW_PLATFORM (FirmwareMetadataPlatformPebbleOnePointFive)
+#elifdef CONFIG_BOARD_TINTIN_V2_0
+#define FIRMWARE_METADATA_HW_PLATFORM (FirmwareMetadataPlatformPebbleTwoPointZero)
 #elifdef CONFIG_BOARD_TINTIN_BB2
 #define FIRMWARE_METADATA_HW_PLATFORM (FirmwareMetadataPlatformPebbleOneBigboard2)
 #elifdef CONFIG_BOARD_ASTERIX

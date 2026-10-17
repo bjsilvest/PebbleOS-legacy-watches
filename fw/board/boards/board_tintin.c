@@ -17,7 +17,7 @@ static UARTDevice DBG_UART_DEVICE = {
   .state = &s_dbg_uart_state,
   .periph = USART3,
   .rcc_apb_periph = RCC_APB1Periph_USART3,
-#ifdef CONFIG_BOARD_TINTIN_V1_5
+#if defined(CONFIG_BOARD_TINTIN_V1_5) || defined(CONFIG_BOARD_TINTIN_V2_0)
   .tx = PBL_GPIO(STM32_GPIOD, 8, 0),
   .rx = PBL_GPIO(STM32_GPIOD, 9, 0),
 #else
@@ -53,7 +53,7 @@ UARTDevice *const BT_HCI_UART = &BT_HCI_UART_DEVICE;
 PBL_IRQ_CONNECT(USART1, 12, uart_irq_handler, BT_HCI_UART, 0);
 #endif
 
-// I2C1: accelerometer
+// I2C1: accelerometer (and on v2_0 the backlight's LED controller)
 ///////////////////////////////////////////////////////////////////////////////
 
 PBL_I2C_STM32_DEFINE(s_i2c1, "i2c1", I2C1, RCC_APB1Periph_I2C1, 400000, PBL_GPIO(STM32_GPIOB, 8, 0),
@@ -63,6 +63,11 @@ PBL_IRQ_CONNECT(I2C1_ER, 12, pbl_i2c_stm32_er_irq_handler, &s_i2c1, 0);
 
 static const struct pbl_i2c_dev I2C_SLAVE_LIS3DH = PBL_I2C_DEV(&s_i2c1.bus, 0x19);
 const struct pbl_i2c_dev *const I2C_LIS3DH = &I2C_SLAVE_LIS3DH;
+
+#ifdef CONFIG_BACKLIGHT_IS31FL3196
+static const struct pbl_i2c_dev I2C_SLAVE_IS31FL3196 = PBL_I2C_DEV(&s_i2c1.bus, 0x64);
+const struct pbl_i2c_dev *const I2C_IS31FL3196 = &I2C_SLAVE_IS31FL3196;
+#endif
 
 // I2C2: magnetometer (and the unused MFi chip), on a switched 2.5 V rail
 ///////////////////////////////////////////////////////////////////////////////
