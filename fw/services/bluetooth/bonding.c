@@ -1,7 +1,6 @@
 /* SPDX-FileCopyrightText: 2024 Google LLC */
 /* SPDX-License-Identifier: Apache-2.0 */
 
-#include <pbl/bluetooth/advert.h>
 #include <pbl/bluetooth/bonding_sync.h>
 #include <pbl/bluetooth/gap_le_device_name.h>
 #include <pbl/bluetooth/types.h>
@@ -39,7 +38,6 @@ static void prv_finalize_create_bonding(pbl_bt_bonding_id_t bonding_id,
     // The name may already have been read before the bonding existed, when
     // it could not be stored; a re-read of the same name is not stored again,
     // so store it now.
-    PBL_BT_NAME_TRACE(connection->device_name ? 'b' : 'B');
     if (connection->device_name) {
       struct pbl_bt_addr *name_addr = kernel_zalloc_check(sizeof(*name_addr));
       *name_addr = connection->device.address;

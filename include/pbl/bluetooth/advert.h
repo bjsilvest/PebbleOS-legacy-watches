@@ -80,19 +80,4 @@ bool pbl_bt_advert_set_advertising_data(const struct pbl_bt_ad_data *ad_data);
  */
 const char *pbl_bt_advert_pairing_trace(void);
 
-#ifdef CONFIG_BOARD_TINTIN_EV2_4
-/**
- * @brief Note a step of reading and storing the peer's device name, for diagnostics.
- *
- * @param c One character naming the step; the last 23 are kept.
- */
-void pbl_bt_name_trace(char c);
-
-/** @brief The device name trace, oldest step first. */
-const char *pbl_bt_name_trace_str(void);
-#define PBL_BT_NAME_TRACE(c) pbl_bt_name_trace(c)
-#else
-#define PBL_BT_NAME_TRACE(c) ((void)0)
-#endif
-
 /** @} */

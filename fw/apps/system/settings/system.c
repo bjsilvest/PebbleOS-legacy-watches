@@ -88,7 +88,6 @@ enum {
   SystemInformationItemAppFetch2,
   SystemInformationItemBtChip,
 #ifdef CONFIG_BOARD_TINTIN_EV2_4
-  SystemInformationItemBtName,
   SystemInformationItemHeap,
   SystemInformationItemHeapTop,
   SystemInformationItemHeapTop2,
@@ -305,7 +304,6 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemAppFetch2] = i18n_noop("App fetch 2"),
   [SystemInformationItemBtChip] = i18n_noop("BT Chip"),
 #ifdef CONFIG_BOARD_TINTIN_EV2_4
-  [SystemInformationItemBtName] = i18n_noop("BT Name"),
   [SystemInformationItemHeap] = i18n_noop("Heap"),
   [SystemInformationItemHeapTop] = i18n_noop("Heap top"),
   [SystemInformationItemHeapTop2] = i18n_noop("Heap top 2"),
@@ -481,7 +479,6 @@ static void prv_information_window_push(SettingsSystemData *data) {
   strncpy(info->bt_pair_string, pbl_bt_advert_pairing_trace(), sizeof(info->bt_pair_string) - 1);
   info->subtitle_text[SystemInformationItemBtPair] = info->bt_pair_string;
 #ifdef CONFIG_BOARD_TINTIN_EV2_4
-  info->subtitle_text[SystemInformationItemBtName] = pbl_bt_name_trace_str();
   // Kernel heap: free now, largest free block, lowest free since boot
   unsigned int heap_used, heap_free, heap_max_free;
   heap_calc_totals(kernel_heap_get(), &heap_used, &heap_free, &heap_max_free);
