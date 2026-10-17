@@ -85,6 +85,9 @@ enum {
   SystemInformationItemAppFetch,
   SystemInformationItemAppFetch2,
   SystemInformationItemBtChip,
+#ifdef CONFIG_BOARD_TINTIN_EV2_4
+  SystemInformationItemBtName,
+#endif
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   SystemInformationItemBtRxBoot,
   SystemInformationItemBtRxReset,
@@ -288,6 +291,9 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemAppFetch] = i18n_noop("App fetch"),
   [SystemInformationItemAppFetch2] = i18n_noop("App fetch 2"),
   [SystemInformationItemBtChip] = i18n_noop("BT Chip"),
+#ifdef CONFIG_BOARD_TINTIN_EV2_4
+  [SystemInformationItemBtName] = i18n_noop("BT Name"),
+#endif
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   [SystemInformationItemBtRxBoot] = i18n_noop("BT Rx boot"),
   [SystemInformationItemBtRxReset] = i18n_noop("BT Rx reset"),
@@ -455,6 +461,9 @@ static void prv_information_window_push(SettingsSystemData *data) {
   info->subtitle_text[SystemInformationItemBtHci] = info->bt_hci_string;
   strncpy(info->bt_pair_string, pbl_bt_advert_pairing_trace(), sizeof(info->bt_pair_string) - 1);
   info->subtitle_text[SystemInformationItemBtPair] = info->bt_pair_string;
+#ifdef CONFIG_BOARD_TINTIN_EV2_4
+  info->subtitle_text[SystemInformationItemBtName] = pbl_bt_name_trace_str();
+#endif
   sniprintf(info->bt_reset_string, sizeof(info->bt_reset_string), "%s c%lu b%u",
             pbl_bt_hci_uart_reset_snapshot(), (unsigned long)pbl_bt_hci_uart_acl_clamped(),
             (unsigned)pbl_bt_hci_uart_le_acl_len_reported());

@@ -3,6 +3,7 @@
 
 #include "gap_le_device_name.h"
 
+#include <pbl/bluetooth/advert.h>
 #include <pbl/bluetooth/gap_le_device_name.h>
 #include <pbl/services/bluetooth/bluetooth_persistent_storage.h>
 
@@ -43,13 +44,16 @@ void pbl_bt_store_device_name_kernelbg_cb(void *ctx) {
   kernel_free(ctx);
 
   if (bonding_id == PBL_BT_BONDING_ID_INVALID) {
+    PBL_BT_NAME_TRACE('i');
     return;
   }
 
   // Can't access flash when bt_lock() is held...
   if (!bt_persistent_storage_update_ble_device_name(bonding_id, device_name)) {
+    PBL_BT_NAME_TRACE('f');
     return;
   }
+  PBL_BT_NAME_TRACE('W');
 
   PebbleEvent event = {
     .type = PEBBLE_BLE_DEVICE_NAME_UPDATED_EVENT,

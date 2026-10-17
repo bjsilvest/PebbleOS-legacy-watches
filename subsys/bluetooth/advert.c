@@ -17,6 +17,8 @@
 #include <pbl/logging/logging.h>
 #include <pbl/util/math.h>
 
+#include <string.h>
+
 #include <host/ble_gap.h>
 #include <kernel/pbl_malloc.h>
 #include <os/os_mbuf.h>
@@ -100,6 +102,24 @@ static struct {
   uint16_t disconnect_reason;
 } s_pair_trace;
 static char s_pair_trace_str[32];
+
+#ifdef CONFIG_BOARD_TINTIN_EV2_4
+static char s_name_trace[24];
+
+void pbl_bt_name_trace(char c) {
+  size_t len = strlen(s_name_trace);
+  if (len == sizeof(s_name_trace) - 1) {
+    memmove(s_name_trace, &s_name_trace[1], len); // drop the oldest
+    len--;
+  }
+  s_name_trace[len] = c;
+  s_name_trace[len + 1] = '\0';
+}
+
+const char *pbl_bt_name_trace_str(void) {
+  return s_name_trace;
+}
+#endif
 
 const char *pbl_bt_advert_pairing_trace(void) {
   sniprintf(s_pair_trace_str, sizeof(s_pair_trace_str), "r%uk%ua%u p%03x e%03x d%03x",
