@@ -50,6 +50,7 @@
 #include <applib/ui/ui.h>
 #include <kernel/core_dump.h>
 #include <kernel/event_loop.h>
+#include <kernel/kernel_heap.h>
 #include <kernel/pbl_malloc.h>
 #include <kernel/ui/modals/modal_manager.h>
 #include <kernel/util/sleep.h>
@@ -87,6 +88,7 @@ enum {
   SystemInformationItemBtChip,
 #ifdef CONFIG_BOARD_TINTIN_EV2_4
   SystemInformationItemBtName,
+  SystemInformationItemHeap,
 #endif
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   SystemInformationItemBtRxBoot,
@@ -184,6 +186,9 @@ typedef struct SystemInformationData {
   char bt_pair_string[24];
   char bt_reset_string[40];
   char last_reboot_string[24];
+#ifdef CONFIG_BOARD_TINTIN_EV2_4
+  char heap_string[24];
+#endif
   char bt_smp_string[21];
   char bt_rx_string[48];
   char app_fetch_string[21];
@@ -293,6 +298,7 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemBtChip] = i18n_noop("BT Chip"),
 #ifdef CONFIG_BOARD_TINTIN_EV2_4
   [SystemInformationItemBtName] = i18n_noop("BT Name"),
+  [SystemInformationItemHeap] = i18n_noop("Heap"),
 #endif
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   [SystemInformationItemBtRxBoot] = i18n_noop("BT Rx boot"),
@@ -463,6 +469,12 @@ static void prv_information_window_push(SettingsSystemData *data) {
   info->subtitle_text[SystemInformationItemBtPair] = info->bt_pair_string;
 #ifdef CONFIG_BOARD_TINTIN_EV2_4
   info->subtitle_text[SystemInformationItemBtName] = pbl_bt_name_trace_str();
+  // Kernel heap: free now, largest free block, lowest free since boot
+  unsigned int heap_used, heap_free, heap_max_free;
+  heap_calc_totals(kernel_heap_get(), &heap_used, &heap_free, &heap_max_free);
+  sniprintf(info->heap_string, sizeof(info->heap_string), "%u %u %lu", heap_free, heap_max_free,
+            (unsigned long)heap_get_minimum_headroom(kernel_heap_get()));
+  info->subtitle_text[SystemInformationItemHeap] = info->heap_string;
 #endif
   sniprintf(info->bt_reset_string, sizeof(info->bt_reset_string), "%s c%lu b%u",
             pbl_bt_hci_uart_reset_snapshot(), (unsigned long)pbl_bt_hci_uart_acl_clamped(),
