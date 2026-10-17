@@ -1,3 +1,5 @@
 # Temporary, for the hardware test: the Information "Heap top" rows need the
 # caller of each heap allocation.
 CONFIG_MALLOC_INSTRUMENTATION=y
+# Room for the rows above
+CONFIG_DEFAULT_LOG_LEVEL_ERROR=y
