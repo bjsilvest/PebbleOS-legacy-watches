@@ -4,6 +4,7 @@
 #pragma once
 
 // clang-format off
+#include <stddef.h>
 #include <stdint.h>
 
 #include <board/display.h>
@@ -98,5 +99,13 @@ void display_update(NextRowCallback nrcb, UpdateCompleteCallback uccb);
  * @return True between display_update() and its completion.
  */
 bool display_update_in_progress(void);
+
+#ifdef CONFIG_DISPLAY_ICE40LP_STM32
+/**
+ * @brief Copy frame diagnostics as text: frames, busy-before-frame, busy-in-black-frame, timeouts,
+ * line of the last timeout.
+ */
+void display_copy_stats(char *buf, size_t len);
+#endif
 
 /** @} */
