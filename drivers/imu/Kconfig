@@ -30,6 +30,12 @@ config ACCEL_LIS2DW12
     help
       Support for the ST LIS2DW12 accelerometer.
 
+config ACCEL_LIS3DH
+    bool "ST LIS3DH"
+    depends on I2C
+    help
+      Support for the ST LIS3DH accelerometer (the original Pebble).
+
 config ACCEL_LSM6DSO
     bool "ST LSM6DSO"
     help
