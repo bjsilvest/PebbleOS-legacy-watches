@@ -183,6 +183,23 @@ static void prv_mco1_enable(void) {
   RCC_MCO1Config(RCC_MCO1Source_LSE, RCC_MCO1Div_1);
 }
 
+//! Polled all-black frame; the line buffers must not be in use.
+static void prv_send_black_frame(void) {
+  memset(s_line, 0, sizeof(s_line));
+  const struct pbl_gpio *scs = &BOARD_CONFIG_DISPLAY.scs;
+  pbl_gpio_set(scs, true);
+  delay_us(5);
+  const uint8_t cmd = CMD_FRAME_BEGIN;
+  prv_spi_write(&cmd, 1);
+  for (int i = 0; i < DISP_LINES; i++) {
+    if (!prv_wait_not_busy()) {
+      break;
+    }
+    prv_spi_write(s_line, sizeof(s_line));
+  }
+  pbl_gpio_set(scs, false);
+}
+
 void display_init(void) {
   const BoardConfigIce40Display *cfg = &BOARD_CONFIG_DISPLAY;
 
@@ -202,6 +219,11 @@ void display_init(void) {
 
   s_programmed = prv_program();
   prv_power_enable();
+
+  // Don't leave the bootloader's logo, or garbage, up until the first frame.
+  if (s_programmed) {
+    prv_send_black_frame();
+  }
 }
 
 //! One panel line: the MSBs of every pixel's color channels, then the LSBs.
@@ -361,23 +383,9 @@ void display_clear(void) {
     delay_us(1000);
   }
 
-  // Black is all zeros. Send it twice so the panel is driven to black again
-  // after the first refresh.
-  memset(s_line, 0, sizeof(s_line));
-  const struct pbl_gpio *scs = &BOARD_CONFIG_DISPLAY.scs;
+  // Send black twice so the panel is driven to black again after the first refresh.
   for (int pass = 0; pass < 2; pass++) {
-    pbl_gpio_set(scs, true);
-    delay_us(5);
-    const uint8_t cmd = CMD_FRAME_BEGIN;
-    prv_spi_write(&cmd, 1);
-    for (int i = 0; i < DISP_LINES; i++) {
-      if (!prv_wait_not_busy()) {
-        break;
-      }
-      prv_spi_write(s_line, sizeof(s_line));
-    }
-    pbl_gpio_set(scs, false);
-
+    prv_send_black_frame();
     for (int ms = 0; ms < CLEAR_SETTLE_MS; ms++) {
       delay_us(1000);
     }
