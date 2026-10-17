@@ -66,6 +66,16 @@ CONFIG_NIMBLE_BLE_TRANSPORT_ISO_COUNT=0
 # Peripheral only, legacy pairing (the CC2564A is Bluetooth 4.0).
 CONFIG_NIMBLE_BLE_ROLE_CENTRAL=n
 CONFIG_NIMBLE_BLE_ROLE_OBSERVER=n
+# GATT client procedures default to the central role, but a peripheral
+# needs these too: discovering and reading the phone's services (ANCS, AMS,
+# its device name) and writing to them.
+CONFIG_NIMBLE_BLE_GATT_DISC_ALL_SVCS=y
+CONFIG_NIMBLE_BLE_GATT_DISC_ALL_CHRS=y
+CONFIG_NIMBLE_BLE_GATT_DISC_ALL_DSCS=y
+CONFIG_NIMBLE_BLE_GATT_READ=y
+CONFIG_NIMBLE_BLE_GATT_READ_UUID=y
+CONFIG_NIMBLE_BLE_GATT_WRITE=y
+CONFIG_NIMBLE_BLE_GATT_WRITE_NO_RSP=y
 CONFIG_NIMBLE_BLE_GATT_SIGNED_WRITE=n
 CONFIG_NIMBLE_BLE_GATT_WRITE_RELIABLE=n
 CONFIG_NIMBLE_BLE_GATT_READ_MULT=n
@@ -93,3 +103,10 @@ CONFIG_RESOURCES_COMPACT_FONTS=y
 # 24 task timers are in use once booted (192 on the bigger watches); give
 # the 3.8 KB back to the kernel heap.
 CONFIG_TASK_TIMER_POOL_SIZE=96
+
+# Room for the GATT client (ANCS, AMS, device names) in 496 KiB: warnings and
+# errors only in the log, no core dumps (the reboot reason keeps the faulting
+# address), and whole-program LTO.
+CONFIG_DEFAULT_LOG_LEVEL_WARNING=y
+CONFIG_CORE_DUMP=n
+CONFIG_LTO_WHOLE_PROGRAM=y
