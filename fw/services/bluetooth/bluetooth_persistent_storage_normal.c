@@ -143,7 +143,10 @@ static void prv_update_bondings(pbl_bt_bonding_id_t id, BtPersistBondingType typ
 }
 
 //! Returns the size of the data read. If the buffer provided is too small then 0 is returned
-static int prv_file_get(const void *key, size_t key_len, void *data_out, size_t buf_len) {
+//! Read a value. With @p allow_shorter, a value shorter than @p buf_len reads with the rest
+//! zeroed; otherwise it is treated as missing.
+static int prv_file_get_impl(const void *key, size_t key_len, void *data_out, size_t buf_len,
+                             bool allow_shorter) {
   unsigned int data_len = 0;
   // Zero the output up front so callers that ignore the return value (a 0 length on
   // open/read failure or an oversized record) read defined zeros, not stack garbage.
@@ -159,8 +162,9 @@ static int prv_file_get(const void *key, size_t key_len, void *data_out, size_t 
 
     data_len = settings_file_get_len(&fd, key, key_len);
     // If a big enough buffer wasn't passed in, then the data can't be read.
-    if (data_len > buf_len ||
-        settings_file_get(&fd, key, key_len, data_out, buf_len) != S_SUCCESS) {
+    const size_t read_len = allow_shorter ? data_len : buf_len;
+    if (data_len == 0 || data_len > buf_len ||
+        settings_file_get(&fd, key, key_len, data_out, read_len) != S_SUCCESS) {
       data_len = 0;
     }
 
@@ -169,6 +173,10 @@ static int prv_file_get(const void *key, size_t key_len, void *data_out, size_t 
 cleanup:
   prv_unlock();
   return data_len;
+}
+
+static int prv_file_get(const void *key, size_t key_len, void *data_out, size_t buf_len) {
+  return prv_file_get_impl(key, key_len, data_out, buf_len, false);
 }
 
 //! @return the value that was read at that key or `default_value` if the key does not exist,
@@ -428,7 +436,10 @@ BtPersistBondingType prv_get_type_for_id(pbl_bt_bonding_id_t id) {
 
 bool prv_delete_pairing_with_type_by_id(pbl_bt_bonding_id_t bonding, BtPersistBondingType type,
                                         BtPersistBondingData *data_out) {
-  if (!prv_file_get(&bonding, sizeof(bonding), data_out, sizeof(*data_out))) {
+  // A shorter record must be deletable too: the stock firmware of the CC2564 watches
+  // (tintin, snowy) shares the filesystem and stored 109-byte BLE pairings in another layout,
+  // which the settings list shows by name. Only the type, at the same offset, is needed here.
+  if (!prv_file_get_impl(&bonding, sizeof(bonding), data_out, sizeof(*data_out), true)) {
     return false;
   }
 
