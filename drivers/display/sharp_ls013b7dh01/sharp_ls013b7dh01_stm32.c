@@ -28,7 +28,6 @@
 
 #define DISP_SPI_CLOCK_HZ 2000000
 
-static uint8_t s_buf[2 + ((DISP_LINE_BYTES + 2) * PBL_DISPLAY_HEIGHT)];
 static bool s_updating;
 static UpdateCompleteCallback s_uccb;
 
@@ -53,22 +52,31 @@ static uint16_t prv_baud_prescaler(void) {
   return SPI_BaudRatePrescaler_256;
 }
 
-static void prv_spi_write(const uint8_t *buf, size_t len) {
+static void prv_spi_put(const uint8_t *buf, size_t len) {
   SPI_TypeDef *spi = BOARD_CONFIG_DISPLAY.spi;
-
-  pbl_gpio_set(&BOARD_CONFIG_DISPLAY.cs, true);
 
   for (size_t i = 0; i < len; i++) {
     while (!(spi->SR & SPI_SR_TXE)) {
     }
     spi->DR = buf[i];
   }
+}
+
+static void prv_spi_end(void) {
+  SPI_TypeDef *spi = BOARD_CONFIG_DISPLAY.spi;
+
   while (!(spi->SR & SPI_SR_TXE)) {
   }
   while (spi->SR & SPI_SR_BSY) {
   }
 
   pbl_gpio_set(&BOARD_CONFIG_DISPLAY.cs, false);
+}
+
+static void prv_spi_write(const uint8_t *buf, size_t len) {
+  pbl_gpio_set(&BOARD_CONFIG_DISPLAY.cs, true);
+  prv_spi_put(buf, len);
+  prv_spi_end();
 }
 
 // The panel needs its VCOM inverted regularly, or a DC bias builds up.
@@ -134,37 +142,39 @@ static void prv_terminate_transfer(void *data) {
 
 void display_update(NextRowCallback nrcb, UpdateCompleteCallback uccb) {
   DisplayRow row;
-  uint8_t *pbuf = s_buf;
+  // row address, data and trailing dummy
+  uint8_t line[1 + DISP_LINE_BYTES + 1];
+  const uint8_t cmd = DISP_MODE_WRITE;
 
   PBL_ASSERTN(!s_updating);
-
-  // write command
-  *pbuf++ = DISP_MODE_WRITE;
-
-  // The board's mounting, then the user's (left-handed) rotation on top
-  const bool rotated_180 = s_rotated_180 != BOARD_CONFIG_DISPLAY.rotated_180;
-
-  while (nrcb(&row)) {
-    // row address, data and trailing dummy
-    *pbuf++ = rotated_180 ? (PBL_DISPLAY_HEIGHT - 1) - row.address + 1 : row.address + 1;
-    if (rotated_180) {
-      for (int i = DISP_LINE_BYTES - 1; i >= 0; --i) {
-        *pbuf++ = pbl_bitrev8(row.data[i]);
-      }
-    } else {
-      memcpy(pbuf, row.data, DISP_LINE_BYTES);
-      pbuf += DISP_LINE_BYTES;
-    }
-    *pbuf++ = 0x00;
-  }
-
-  // last trailing dummy
-  *pbuf++ = 0x00;
 
   s_uccb = uccb;
   s_updating = true;
 
-  prv_spi_write(s_buf, pbuf - s_buf);
+  // The board's mounting, then the user's (left-handed) rotation on top
+  const bool rotated_180 = s_rotated_180 != BOARD_CONFIG_DISPLAY.rotated_180;
+
+  // Rows go out as they come; a whole frame buffer would cost 3.3 KB of RAM
+  pbl_gpio_set(&BOARD_CONFIG_DISPLAY.cs, true);
+  prv_spi_put(&cmd, sizeof(cmd));
+
+  while (nrcb(&row)) {
+    line[0] = rotated_180 ? (PBL_DISPLAY_HEIGHT - 1) - row.address + 1 : row.address + 1;
+    if (rotated_180) {
+      for (int i = 0; i < DISP_LINE_BYTES; i++) {
+        line[1 + i] = pbl_bitrev8(row.data[DISP_LINE_BYTES - 1 - i]);
+      }
+    } else {
+      memcpy(&line[1], row.data, DISP_LINE_BYTES);
+    }
+    line[1 + DISP_LINE_BYTES] = 0x00;
+    prv_spi_put(line, sizeof(line));
+  }
+
+  // last trailing dummy
+  line[0] = 0x00;
+  prv_spi_put(line, 1);
+  prv_spi_end();
 
   PebbleEvent e = {
     .type = PEBBLE_CALLBACK_EVENT,
