@@ -1,8 +1,10 @@
 /* SPDX-FileCopyrightText: 2024 Google LLC */
 /* SPDX-License-Identifier: Apache-2.0 */
 
-//! NXP MAG3110 magnetometer on I2C (snowy), as the stock firmware drove it:
-//! raw mode with automatic sensor reset, 5 or 20 Hz, an interrupt per sample.
+//! NXP MAG3110 magnetometer on I2C (snowy, tintin), as the stock firmware
+//! drove it: raw mode with automatic sensor reset, 5 or 20 Hz, an interrupt
+//! per sample. A board can switch its supply (BOARD_MAG_RAIL), which is then
+//! on only while the magnetometer is in use.
 
 #include <inttypes.h>
 #include <stdint.h>
@@ -10,6 +12,7 @@
 #include <pbl/drivers/exti.h>
 #include <pbl/drivers/i2c.h>
 #include <pbl/drivers/mag.h>
+#include <pbl/drivers/regulator.h>
 #include <pbl/kernel/mutex.h>
 #include <pbl/logging/logging.h>
 
@@ -35,6 +38,20 @@ static bool s_present;
 static int s_use_refcount;
 //! Watch worn rotated by 180 degrees: X and Y flip.
 static bool s_rotated_180;
+
+static void prv_rail(bool on) {
+#ifdef BOARD_MAG_RAIL
+  if (on) {
+    pbl_regulator_enable(BOARD_MAG_RAIL);
+    // Supply up and the chip out of its 1.7 ms power-on reset.
+    psleep(10);
+  } else {
+    pbl_regulator_disable(BOARD_MAG_RAIL);
+  }
+#else
+  (void)on;
+#endif
+}
 
 static bool prv_read(uint8_t reg, uint8_t len, uint8_t *data) {
   pbl_i2c_use(I2C_MAG3110);
@@ -93,7 +110,9 @@ void mag_init(void) {
   s_initialized = true;
 
   uint8_t whoami = 0;
+  prv_rail(true);
   prv_read(WHO_AM_I_REG, 1, &whoami);
+  prv_rail(false);
   s_present = (whoami == MAG3110_WHOAMI);
   if (!s_present) {
     PBL_LOG_WRN("MAG3110 whoami 0x%x, expecting 0x%x", whoami, MAG3110_WHOAMI);
@@ -108,6 +127,7 @@ void mag_use(void) {
 
   pbl_mutex_lock(&s_mag_mutex, PBL_FOREVER);
   if (s_use_refcount == 0 && s_present) {
+    prv_rail(true);
     exti_enable(prv_exti());
   }
   ++s_use_refcount;
@@ -125,6 +145,7 @@ void mag_release(void) {
     uint8_t raw_data[7];
     prv_read(DR_STATUS_REG, sizeof(raw_data), raw_data);
     exti_disable(prv_exti());
+    prv_rail(false);
   }
   pbl_mutex_unlock(&s_mag_mutex);
 }
