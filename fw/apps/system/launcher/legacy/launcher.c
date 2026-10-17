@@ -25,6 +25,7 @@
 #include <process_state/app_state/app_state.h>
 #include <resource/resource_ids.auto.h>
 #include <shell/normal/app_idle_timeout.h>
+#include <shell/prefs.h>
 
 typedef struct LauncherMenuData {
   Window window;
@@ -195,6 +196,11 @@ static void prv_window_load(Window *window) {
         .draw_row = (MenuLayerDrawRowCallback)prv_draw_row_callback,
         .select_click = (MenuLayerSelectCallback)prv_select_callback,
       });
+  menu_layer_set_scroll_wrap_around(menu_layer, shell_prefs_get_menu_scroll_wrap_around_enable());
+  menu_layer_set_scroll_vibe_on_wrap(
+      menu_layer, shell_prefs_get_menu_scroll_vibe_behavior() == MenuScrollVibeOnWrapAround);
+  menu_layer_set_scroll_vibe_on_blocked(
+      menu_layer, shell_prefs_get_menu_scroll_vibe_behavior() == MenuScrollVibeOnLocked);
   menu_layer_set_click_config_onto_window(menu_layer, window);
   layer_add_child(&window->layer, menu_layer_get_layer(menu_layer));
 
