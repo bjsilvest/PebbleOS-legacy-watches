@@ -1,6 +1,15 @@
 # SPDX-FileCopyrightText: 2026 Core Devices LLC
 # SPDX-License-Identifier: Apache-2.0
 
+config CORE_DUMP
+    bool "Core dumps"
+    default y
+    depends on !ARCH_POSIX
+    help
+      On a crash, save the memory and register state to flash for later
+      retrieval. Without it the watch only resets; the reboot reason still
+      records the faulting address.
+
 config TASK_TIMER_POOL_SIZE
     int "TaskTimer slab pool size"
     default 192
