@@ -108,9 +108,12 @@ static const BoardConfigActuator BOARD_CONFIG_VIBE = {
 };
 
 #ifdef CONFIG_BACKLIGHT_IS31FL3196
-// Backlight: IS31FL3196 on I2C1, shutdown line on PB5 (active = running)
+// Backlight and status LED: IS31FL3196 on I2C1, shutdown line on PB5
+// (active = running)
 extern const struct pbl_i2c_dev *const I2C_IS31FL3196;
 static const struct pbl_gpio BOARD_BACKLIGHT_SDB = PBL_GPIO(STM32_GPIOB, 5, 0);
+// Battery voltage drop while the status LED is lit
+#define BOARD_STATUS_LED_COMPENSATION_MV 30
 #else
 // Backlight: TIM3 CH2
 static const BacklightPwmConfig BACKLIGHT_PWM = {

@@ -8,6 +8,12 @@ menuconfig BACKLIGHT
 
 if BACKLIGHT
 
+config STATUS_LED
+    bool
+    help
+      Backlight drivers that also drive a charging status LED select this
+      Kconfig symbol.
+
 config BACKLIGHT_HAS_COLOR
     bool
     help
@@ -28,8 +34,10 @@ config BACKLIGHT_AW9364E
 config BACKLIGHT_IS31FL3196
     bool "IS31FL3196"
     depends on I2C
+    select STATUS_LED
     help
-      Support for the ISSI IS31FL3196 LED controller of the Pebble Steel.
+      Support for the ISSI IS31FL3196 LED controller of the Pebble Steel,
+      which drives its backlight and status LED.
 
 config BACKLIGHT_PWM
     bool "PWM"

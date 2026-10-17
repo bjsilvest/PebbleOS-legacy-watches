@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 
+#include <pbl/drivers/status_led.h>
 #include <pbl/services/battery/battery_curve.h>
 #include <pbl/services/notifications/do_not_disturb.h>
 #include <pbl/services/vibe_pattern.h>
@@ -194,18 +195,22 @@ static void prv_display_plugged(void *data) {
     vibes_short_pulse();
   }
   battery_ui_display_plugged();
+  status_led_set(StatusLedState_Charging);
 }
 
 static void prv_dismiss_plugged(void) {
   battery_ui_dismiss_modal();
+  status_led_set(StatusLedState_Off);
 }
 
 static void prv_display_fully_charged(void *data) {
   battery_ui_display_fully_charged();
+  status_led_set(StatusLedState_FullyCharged);
 }
 
 static void prv_dismiss_fully_charged(void) {
   battery_ui_dismiss_modal();
+  status_led_set(StatusLedState_Off);
 }
 
 static void prv_shutdown(void *ignored) {
