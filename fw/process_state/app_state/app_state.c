@@ -125,7 +125,8 @@ typedef struct {
   JsMemoryAPIContext *js_memory_api_context;
 
 #ifdef CONFIG_SERVICE_APP_GLANCES
-  AppGlance glance;
+  //! Only set while app_glance_reload runs: the glance is too big to keep in every app.
+  AppGlance *glance;
 #endif
 
   TextRenderState text_render_state;
@@ -345,7 +346,7 @@ PBL_NOINLINE void app_state_init(void) {
                                  s_app_state_ptr->initial_obstruction_origin_y);
 
 #if !defined(CONFIG_RECOVERY_FW) && defined(CONFIG_SERVICE_APP_GLANCES)
-  app_glance_service_init_glance(app_state_get_glance());
+  s_app_state_ptr->glance = nullptr;
 #endif
 
   s_app_state_ptr->current_timeline_item_action_source = TimelineItemActionSourceModalNotification;
@@ -494,7 +495,11 @@ UnobstructedAreaState *app_state_get_unobstructed_area_state(void) {
 
 #ifdef CONFIG_SERVICE_APP_GLANCES
 AppGlance *app_state_get_glance(void) {
-  return &s_app_state_ptr->glance;
+  return s_app_state_ptr->glance;
+}
+
+void app_state_set_glance(AppGlance *glance) {
+  s_app_state_ptr->glance = glance;
 }
 #endif
 

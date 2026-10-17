@@ -13,6 +13,7 @@
 #ifdef CONFIG_SERVICE_APP_GLANCES
 #include <apps/system/launcher/default/app_glance_generic.h>
 #endif
+#include <applib/applib_malloc.auto.h>
 #include <process_state/app_state/app_state.h>
 #include <resource/resource_ids.auto.h>
 #include <syscall/syscall.h>
@@ -101,7 +102,11 @@ AppGlanceResult app_glance_add_slice(AppGlanceReloadSession *session, AppGlanceS
 }
 
 void app_glance_reload(AppGlanceReloadCallback callback, void *context) {
-  AppGlance *glance = app_state_get_glance();
+  AppGlance *glance = applib_malloc(sizeof(AppGlance));
+  if (!glance) {
+    return;
+  }
+  app_state_set_glance(glance);
 
   Uuid current_app_uuid;
   sys_get_app_uuid(&current_app_uuid);
@@ -118,6 +123,9 @@ void app_glance_reload(AppGlanceReloadCallback callback, void *context) {
   }
 
   sys_app_glance_update(&current_app_uuid, glance);
+
+  app_state_set_glance(nullptr);
+  applib_free(glance);
 }
 #else
 AppGlanceResult app_glance_add_slice(AppGlanceReloadSession *session, AppGlanceSlice slice) {
