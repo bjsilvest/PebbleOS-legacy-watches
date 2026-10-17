@@ -147,6 +147,14 @@ config RESOURCES_BOARD
       the firmware uses, for boards that share another board's. Empty to
       use the board's own.
 
+config RESOURCES_LARGE_FONTS
+    bool "Large system fonts"
+    default y
+    help
+      Build Gothic 36 (regular and bold) and LECO 60 into the system
+      resources. Without them, the board's resource map should alias those
+      font keys to smaller fonts it keeps.
+
 config BUNDLE_HWREV
     string
     help
