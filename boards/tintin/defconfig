@@ -84,6 +84,8 @@ CONFIG_NIMBLE_BLE_GATT_WRITE_NO_RSP=y
 CONFIG_NIMBLE_BLE_GATT_SIGNED_WRITE=n
 CONFIG_NIMBLE_BLE_GATT_WRITE_RELIABLE=n
 CONFIG_NIMBLE_BLE_GATT_READ_MULT=n
+CONFIG_NIMBLE_BLE_ATT_SVR_READ_MULT=n
+CONFIG_NIMBLE_BLE_WHITELIST=n
 CONFIG_NIMBLE_BLE_GATT_FIND_INC_SVCS=n
 CONFIG_NIMBLE_BLE_SM_SC=n
 CONFIG_NIMBLE_BLE_SM_SC_ONLY=n
@@ -109,11 +111,10 @@ CONFIG_RESOURCES_COMPACT_FONTS=y
 # the 3.8 KB back to the kernel heap.
 CONFIG_TASK_TIMER_POOL_SIZE=96
 
-# Room for the GATT client (ANCS, AMS, device names) in 496 KiB: warnings and
-# errors only in the log, no core dumps (the reboot reason keeps the faulting
-# address), and whole-program LTO.
-CONFIG_DEFAULT_LOG_LEVEL_WARNING=y
-CONFIG_CORE_DUMP=n
+# Room for the GATT client (ANCS, AMS, device names) and core dumps in 496 KiB:
+# errors only in the log, and whole-program LTO.
+CONFIG_DEFAULT_LOG_LEVEL_ERROR=y
+CONFIG_CORE_DUMP=y
 CONFIG_LTO_WHOLE_PROGRAM=y
 
 # RAM is the scarce resource here: smaller buffers than the larger boards.

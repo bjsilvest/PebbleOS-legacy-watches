@@ -39,10 +39,9 @@ free when idle, measured in QEMU with Bluetooth off).
 | Gothic 36 (regular and bold) and LECO 60 fonts | `RESOURCES_LARGE_FONTS=n`; the tintin resource map aliases them to Gothic 28 and LECO 42 | 75 KB of resources. None is an SDK font. On 144x168 only the Extra Large text size used Gothic 36, so Extra Large now looks like Large. |
 | Native analytics heartbeats | `SERVICE_ANALYTICS_NATIVE=n` | About 3 KB |
 | Debug shell and the PULSE serial console | `SHELL=n`, `PULSE_EVERYWHERE=n` | About 13 KB (shell) and 9.5 KB (PULSE) of flash, and 9 KB of RAM. QEMU app installs through pypkjs need PULSE. |
-| INFO-level logging | `DEFAULT_LOG_LEVEL_WARNING=y` | 3.3 KB; warnings and errors are still logged |
-| Core dumps | `CORE_DUMP=n` (`core_dump_stub.c`) | 2.2 KB. A crash still records the reboot reason with the faulting address (Settings, Information, Last reboot) and still counts toward the stock bootloader's three strikes. |
+| INFO- and WARNING-level logging | `DEFAULT_LOG_LEVEL_ERROR=y` | About 8 KB; only errors are logged. Core dumps are kept (2.8 KB) and make up for the lost warnings. |
 | LE Secure Connections | Legacy pairing only: `NIMBLE_BLE_SM_SC=n`, `SM_LEGACY=y`, `SM_MITM=n` | The CC2564A is a Bluetooth 4.0 controller |
-| Bluetooth central and observer roles; signed and reliable writes, read multiple, find included services | `NIMBLE_BLE_ROLE_CENTRAL=n` and the matching `NIMBLE_BLE_GATT_*=n` | A watch is a peripheral; unused |
+| Bluetooth central and observer roles; signed and reliable writes, read multiple (client and server), find included services, the whitelist | `NIMBLE_BLE_ROLE_CENTRAL=n` and the matching `NIMBLE_BLE_GATT_*=n` | A watch is a peripheral; unused |
 | Bluetooth Classic (iOS over MFi, the stock Pebble app) | NimBLE is LE only | Phones connect over LE: Core app, and ANCS/AMS for iPhone notifications and music |
 | LE Audio buffers | `NIMBLE_BLE_TRANSPORT_ISO_COUNT=0` | Unused; saves kernel RAM |
 | Accelerometer double tap | The LIS3DH driver does not implement it (nor does the BMA255 one) | Not used by the system |
