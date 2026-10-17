@@ -51,6 +51,7 @@
 #include <kernel/core_dump.h>
 #include <kernel/event_loop.h>
 #include <kernel/kernel_heap.h>
+#include <pbl/kernel/debug.h>
 #include <kernel/pbl_malloc.h>
 #include <kernel/ui/modals/modal_manager.h>
 #include <kernel/util/sleep.h>
@@ -89,6 +90,11 @@ enum {
 #ifdef CONFIG_BOARD_TINTIN_EV2_4
   SystemInformationItemBtName,
   SystemInformationItemHeap,
+  SystemInformationItemHeapTop,
+  SystemInformationItemHeapTop2,
+  SystemInformationItemStacks,
+  SystemInformationItemStacks2,
+  SystemInformationItemStacks3,
 #endif
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   SystemInformationItemBtRxBoot,
@@ -188,6 +194,8 @@ typedef struct SystemInformationData {
   char last_reboot_string[24];
 #ifdef CONFIG_BOARD_TINTIN_EV2_4
   char heap_string[24];
+  char heap_top_string[2][24];
+  char stacks_string[3][24];
 #endif
   char bt_smp_string[21];
   char bt_rx_string[48];
@@ -299,6 +307,11 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
 #ifdef CONFIG_BOARD_TINTIN_EV2_4
   [SystemInformationItemBtName] = i18n_noop("BT Name"),
   [SystemInformationItemHeap] = i18n_noop("Heap"),
+  [SystemInformationItemHeapTop] = i18n_noop("Heap top"),
+  [SystemInformationItemHeapTop2] = i18n_noop("Heap top 2"),
+  [SystemInformationItemStacks] = i18n_noop("Stacks"),
+  [SystemInformationItemStacks2] = i18n_noop("Stacks 2"),
+  [SystemInformationItemStacks3] = i18n_noop("Stacks 3"),
 #endif
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   [SystemInformationItemBtRxBoot] = i18n_noop("BT Rx boot"),
@@ -475,6 +488,35 @@ static void prv_information_window_push(SettingsSystemData *data) {
   sniprintf(info->heap_string, sizeof(info->heap_string), "%u %u %lu", heap_free, heap_max_free,
             (unsigned long)heap_get_minimum_headroom(kernel_heap_get()));
   info->subtitle_text[SystemInformationItemHeap] = info->heap_string;
+  // The four callers holding the most kernel heap: low 6 hex digits of the
+  // caller's address, then bytes
+  uintptr_t top_pcs[4];
+  uint32_t top_bytes[4];
+  const size_t num_top = heap_top_allocators(kernel_heap_get(), top_pcs, top_bytes, 4);
+  for (size_t i = 0; i < 2; i++) {
+    char *str = info->heap_top_string[i];
+    str[0] = '\0';
+    for (size_t j = 2 * i; j < MIN(num_top, 2 * i + 2); j++) {
+      const size_t len = strlen(str);
+      sniprintf(&str[len], sizeof(info->heap_top_string[i]) - len, "%06lx:%lu ",
+                (unsigned long)(top_pcs[j] & 0xffffff), (unsigned long)top_bytes[j]);
+    }
+    info->subtitle_text[SystemInformationItemHeapTop + i] = str;
+  }
+  // Unused stack bytes per thread, named by the first and last letter
+  struct pbl_thread_stats stats[12];
+  const size_t num_threads = pbl_thread_stats_snapshot(stats, ARRAY_LENGTH(stats), nullptr);
+  for (size_t i = 0; i < 3; i++) {
+    char *str = info->stacks_string[i];
+    str[0] = '\0';
+    for (size_t j = 4 * i; j < MIN(num_threads, 4 * i + 4); j++) {
+      const char *name = stats[j].name ? stats[j].name : "??";
+      const size_t len = strlen(str);
+      sniprintf(&str[len], sizeof(info->stacks_string[i]) - len, "%c%c%u ", name[0],
+                name[strlen(name) - 1], (unsigned)stats[j].stack_high_water);
+    }
+    info->subtitle_text[SystemInformationItemStacks + i] = str;
+  }
 #endif
   sniprintf(info->bt_reset_string, sizeof(info->bt_reset_string), "%s c%lu b%u",
             pbl_bt_hci_uart_reset_snapshot(), (unsigned long)pbl_bt_hci_uart_acl_clamped(),

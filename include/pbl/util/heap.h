@@ -226,4 +226,17 @@ void heap_calc_totals(Heap *const heap, unsigned int *used, unsigned int *free,
  */
 void heap_dump_malloc_instrumentation_to_dbgserial(Heap *heap);
 
+/**
+ * @brief Find the callers holding the most allocated bytes.
+ *
+ * Only available with @c CONFIG_MALLOC_INSTRUMENTATION.
+ *
+ * @param heap Heap.
+ * @param[out] pcs Caller addresses, most bytes first.
+ * @param[out] bytes Bytes held by each caller, including block headers.
+ * @param n Capacity of @p pcs and @p bytes.
+ * @return Number of entries written.
+ */
+size_t heap_top_allocators(Heap *heap, uintptr_t pcs[], uint32_t bytes[], size_t n);
+
 /** @} */

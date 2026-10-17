@@ -562,6 +562,52 @@ uint32_t heap_get_minimum_headroom(Heap *heap) {
 // Serial Commands
 ///////////////////////////////////////////////////////////
 #ifdef CONFIG_MALLOC_INSTRUMENTATION
+size_t heap_top_allocators(Heap *heap, uintptr_t pcs[], uint32_t bytes[], size_t n) {
+  // Bytes per caller, for up to this many distinct callers
+  enum { MAX_CALLERS = 32 };
+  uintptr_t caller_pc[MAX_CALLERS];
+  uint32_t caller_bytes[MAX_CALLERS];
+  size_t num_callers = 0;
+
+  heap_lock(heap);
+  for (HeapInfo_t *block = heap->begin; block < heap->end; block = get_next_block(heap, block)) {
+    if (!block->is_allocated) {
+      continue;
+    }
+    size_t i = 0;
+    while ((i < num_callers) && (caller_pc[i] != block->pc)) {
+      i++;
+    }
+    if (i == num_callers) {
+      if (num_callers == MAX_CALLERS) {
+        continue;
+      }
+      caller_pc[i] = block->pc;
+      caller_bytes[i] = 0;
+      num_callers++;
+    }
+    caller_bytes[i] += block->Size * ALIGNMENT_SIZE;
+  }
+  heap_unlock(heap);
+
+  size_t count = 0;
+  for (; count < n; count++) {
+    size_t best = MAX_CALLERS;
+    for (size_t i = 0; i < num_callers; i++) {
+      if ((caller_bytes[i] != 0) && ((best == MAX_CALLERS) || (caller_bytes[i] > caller_bytes[best]))) {
+        best = i;
+      }
+    }
+    if (best == MAX_CALLERS) {
+      break;
+    }
+    pcs[count] = caller_pc[best];
+    bytes[count] = caller_bytes[best];
+    caller_bytes[best] = 0;
+  }
+  return count;
+}
+
 void heap_dump_malloc_instrumentation_to_dbgserial(Heap *heap) {
   char buffer[80];
   unsigned long num_free_blocks = 0;
