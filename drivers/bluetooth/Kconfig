@@ -38,10 +38,19 @@ config BT_CONTROLLER_CC2564
     bool "TI CC2564 controller"
     depends on SOC_STM32F4 && BT_HCI_UART
     help
-      Power up a TI CC2564B as the H4 HCI controller and load TI's
+      Power up a TI CC2564 as the H4 HCI controller and load TI's
       initialization script (third_party/ti_bt_sp), which it needs at every
       power up. The board provides BOARD_BT_SHUTDOWN, BOARD_BT_CTS and
       BOARD_MCO1 for its 32 kHz slow clock.
+
+config BT_CC2564_BTS_RESOURCE
+    bool "Init script from the system resources"
+    depends on BT_CONTROLLER_CC2564
+    help
+      Read TI's initialization script from the BT_INIT_SCRIPT system
+      resource, which the board's resource map provides, instead of
+      building TIInit_6.7.16.bts into the firmware. For boards with little
+      internal flash and another script (the CC2564A's is 24 KB).
 
 config BT_CC2564_HCI_BAUD
     int "HCI baud rate"

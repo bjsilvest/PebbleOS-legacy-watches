@@ -1,12 +1,12 @@
 /* SPDX-FileCopyrightText: 2026 Brian Silvestri */
 /* SPDX-License-Identifier: Apache-2.0 */
 
-//! TI CC2564B as the H4 HCI controller (snowy).
+//! TI CC2564 as the H4 HCI controller (snowy: CC2564B, tintin: CC2564A).
 //!
 //! The chip runs from ROM, but needs TI's initialization script (patches and
-//! settings) after every power up. The script is TI's TIInit_6.7.16.bts,
-//! embedded unmodified and replayed here: each HCI command it holds is sent
-//! and its Command Complete awaited. Its baud rate change is sent with our
+//! settings) after every power up. The script is TI's .bts file, unmodified,
+//! built into the firmware or kept as a system resource, and replayed here:
+//! each HCI command it holds is sent and its Command Complete awaited. Its baud rate change is sent with our
 //! rate, and its sleep mode setting with deep sleep off until the transport
 //! supports eHCILL. The H4 transport takes the UART over afterwards.
 //!
@@ -35,6 +35,11 @@
 
 #include <board/board.h>
 #include <stm32f4xx.h>
+
+#ifdef CONFIG_BT_CC2564_BTS_RESOURCE
+#include <resource/resource.h>
+#include <resource/resource_ids.auto.h>
+#endif
 
 PBL_LOG_MODULE_DECLARE(nimble, CONFIG_NIMBLE_LOG_LEVEL);
 
@@ -72,9 +77,6 @@ static const uint32_t SHUTDOWN_PULSE_MS[] = {100U, 1000U, 3000U};
 #define CTS_TIMEOUT_MS      100U
 #define CMD_TIMEOUT_MS      1000U
 #define BOOT_ATTEMPTS       3
-
-extern const uint8_t cc2564_bts_start[];
-extern const uint8_t cc2564_bts_end[];
 
 static char s_status[32] = "Not started";
 static char s_chip_id[32] = "?";
@@ -238,42 +240,78 @@ static bool prv_read_version(void) {
   return true;
 }
 
+#ifdef CONFIG_BT_CC2564_BTS_RESOURCE
+static size_t prv_bts_size(void) {
+  return resource_size(SYSTEM_APP, RESOURCE_ID_BT_INIT_SCRIPT);
+}
+
+static bool prv_bts_read(uint32_t offset, void *buf, size_t len) {
+  return resource_load_byte_range_system(SYSTEM_APP, RESOURCE_ID_BT_INIT_SCRIPT, offset, buf,
+                                         len) == len;
+}
+#else
+extern const uint8_t cc2564_bts_start[];
+extern const uint8_t cc2564_bts_end[];
+
+static size_t prv_bts_size(void) {
+  return cc2564_bts_end - cc2564_bts_start;
+}
+
+static bool prv_bts_read(uint32_t offset, void *buf, size_t len) {
+  memcpy(buf, &cc2564_bts_start[offset], len);
+  return true;
+}
+#endif
+
+static uint32_t prv_le32(const uint8_t *p) {
+  return p[0] | (p[1] << 8) | (p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
 //! Replay the init script. @return false on the first failed command.
 static bool prv_run_bts(void) {
-  const uint8_t *p = cc2564_bts_start;
-  const uint8_t *end = cc2564_bts_end;
+  const size_t size = prv_bts_size();
   unsigned commands = 0U;
+  uint8_t pkt[260];
 
-  if ((size_t)(end - p) < BTS_HEADER_SIZE ||
-      (p[0] | (p[1] << 8) | (p[2] << 16) | ((uint32_t)p[3] << 24)) != BTS_MAGIC) {
+  if (size < BTS_HEADER_SIZE || !prv_bts_read(0U, pkt, 4U) || prv_le32(pkt) != BTS_MAGIC) {
     sniprintf(s_status, sizeof(s_status), "Bad init script");
     return false;
   }
-  p += BTS_HEADER_SIZE;
 
-  while (end - p >= 4) {
-    const uint16_t type = p[0] | (p[1] << 8);
-    const uint16_t len = p[2] | (p[3] << 8);
-    const uint8_t *data = p + 4;
-    if (end - data < len) {
+  uint32_t offset = BTS_HEADER_SIZE;
+  while (size - offset >= 4U) {
+    uint8_t action[4];
+    if (!prv_bts_read(offset, action, sizeof(action))) {
       break;
     }
-    p = data + len;
+    const uint16_t type = action[0] | (action[1] << 8);
+    const uint16_t len = action[2] | (action[3] << 8);
+    const uint32_t data = offset + sizeof(action);
+    if (size - data < len) {
+      break;
+    }
+    offset = data + len;
 
     if (type == BTS_ACTION_DELAY && len >= 4U) {
-      pbl_thread_sleep(
-          PBL_MSEC(data[0] | (data[1] << 8) | (data[2] << 16) | ((uint32_t)data[3] << 24)));
+      if (!prv_bts_read(data, pkt, 4U)) {
+        break;
+      }
+      pbl_thread_sleep(PBL_MSEC(prv_le32(pkt)));
       continue;
     }
-    if (type != BTS_ACTION_SEND || len < 4U || data[0] != H4_CMD) {
-      // Waits (we await each command ourselves), serial settings and remarks
+    // Waits (we await each command ourselves), serial settings and remarks
+    // are skipped, as are commands too long for the packet buffer.
+    if (type != BTS_ACTION_SEND || len < 4U || len > sizeof(pkt)) {
+      continue;
+    }
+    if (!prv_bts_read(data, pkt, len)) {
+      break;
+    }
+    if (pkt[0] != H4_CMD) {
       continue;
     }
 
-    const uint16_t opcode = data[1] | (data[2] << 8);
-    uint8_t pkt[260];
-    memcpy(pkt, data, MIN((size_t)len, sizeof(pkt)));
-
+    const uint16_t opcode = pkt[1] | (pkt[2] << 8);
     if (opcode == OP_VS_UPDATE_BAUDRATE && len >= 8U) {
       const uint32_t baud = CONFIG_BT_CC2564_HCI_BAUD;
       memcpy(&pkt[4], &baud, sizeof(baud));
@@ -285,7 +323,7 @@ static bool prv_run_bts(void) {
     }
 #endif
 
-    const int status = prv_command(pkt, MIN((size_t)len, sizeof(pkt)), nullptr, 0U);
+    const int status = prv_command(pkt, len, nullptr, 0U);
     if (status != 0) {
       sniprintf(s_status, sizeof(s_status), "Init %u %04x:%d", commands, opcode, status);
       return false;
@@ -299,6 +337,10 @@ static bool prv_run_bts(void) {
     }
   }
 
+  if (offset != size) {
+    sniprintf(s_status, sizeof(s_status), "Init script cut at %lu", (unsigned long)offset);
+    return false;
+  }
   PBL_LOG_INFO("CC2564: init script done, %u commands", commands);
   return true;
 }
