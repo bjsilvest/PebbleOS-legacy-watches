@@ -15,7 +15,7 @@ static struct pbl_shared_cbuf_client s_buffer_client;
 // During normal operation, since log messages are hashed, most are only 30-40
 // bytes long with the longest being about 80 bytes, so this is enough for 15-40
 // or so messages.
-static uint8_t s_buffer_storage[1200];
+static uint8_t s_buffer_storage[CONFIG_ADVANCED_LOGGING_BUFFER_SIZE];
 static PBL_MUTEX_DEFINE(s_buffer_mutex);      //!< Protects s_buffer
 static PBL_MUTEX_DEFINE(s_flash_write_mutex); //!< Protects log line consistency
 static bool s_initialized;

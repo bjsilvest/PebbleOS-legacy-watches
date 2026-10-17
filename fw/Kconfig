@@ -119,6 +119,13 @@ config MALLOC_INSTRUMENTATION
     help
       Track the caller PC of every heap allocation.
 
+config ADVANCED_LOGGING_BUFFER_SIZE
+    int "Flash log buffer size"
+    default 1200
+    help
+      RAM that collects log lines until they are written to flash. Hashed
+      lines are 30-80 bytes, so 1200 holds 15-40 of them.
+
 config PROFILER
     bool "Profiler"
 

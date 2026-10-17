@@ -17,6 +17,14 @@ config SERVICE_ACCEL_MANAGER_BATCH_SAMPLES
       callback. Sizes the shared accel buffer. Limited by the accelerometer
       FIFO depth.
 
+config SERVICE_ACCEL_MANAGER_MIN_BUFFER_SAMPLES
+    int "Minimum accel samples buffered"
+    default 200
+    help
+      Floor for the size of the shared accel buffer, in samples. It keeps
+      room for high-rate app subscribers when the batch size alone would give
+      a smaller buffer.
+
 module = SERVICE_ACCEL_MANAGER
 module-str = Accelerometer manager
 source "subsys/logging/Kconfig.template.log_level"
