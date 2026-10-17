@@ -62,6 +62,11 @@ CONFIG_BT_HCI_UART=y
 CONFIG_BT_CONTROLLER_CC2564=y
 CONFIG_BT_CC2564_BTS_RESOURCE=y
 CONFIG_NIMBLE_BLE_TRANSPORT_ISO_COUNT=0
+# Discardable events are advertising reports, which a peripheral never gets;
+# they only back up the 16 regular event buffers here.
+CONFIG_NIMBLE_BLE_TRANSPORT_EVT_DISCARDABLE_COUNT=4
+# Enough for a long write of a 512-byte attribute at the minimum MTU
+CONFIG_NIMBLE_BLE_ATT_SVR_MAX_PREP_ENTRIES=32
 
 # Peripheral only, legacy pairing (the CC2564A is Bluetooth 4.0).
 CONFIG_NIMBLE_BLE_ROLE_CENTRAL=n
