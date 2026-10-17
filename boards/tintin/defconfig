@@ -47,11 +47,13 @@ CONFIG_AMBIENT_LIGHT=y
 CONFIG_AMBIENT_LIGHT_STM32_ADC=y
 
 # What the original Pebble never had, or has no room for: Health, weather,
-# app glances, timeline Quick View, analytics heartbeats, the debug shell.
+# timeline Quick View, analytics heartbeats, the debug shell, the Sports
+# app, and right-to-left text (the fonts have no Hebrew or Arabic glyphs).
 CONFIG_SERVICE_ACTIVITY=n
 CONFIG_SERVICE_WEATHER=n
-CONFIG_SERVICE_APP_GLANCES=n
 CONFIG_TIMELINE_PEEK=n
+CONFIG_APP_SPORTS=n
+CONFIG_TEXT_RTL=n
 CONFIG_SERVICE_ANALYTICS_NATIVE=n
 CONFIG_SHELL=n
 CONFIG_PULSE_EVERYWHERE=n
