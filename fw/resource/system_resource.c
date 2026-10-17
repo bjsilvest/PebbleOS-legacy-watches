@@ -16,6 +16,7 @@
 #include <resource/resource.h>
 #include <resource/resource_ids.auto.h>
 #include <resource/resource_storage.h>
+#include <resource/resource_unpack.h>
 #include <resource/resource_version.auto.h>
 #include <font_resource_table.auto.h>
 #include <syscall/syscall_internal.h>
@@ -34,7 +35,11 @@ void system_resource_init(void) {
     PBL_LOG_ERR("System resources are missing or corrupt! Going to PRF");
     fw_reset_into_prf();
 #endif
+    return;
   }
+#ifndef CONFIG_RECOVERY_FW
+  resource_unpack_init();
+#endif
 }
 
 bool system_resource_is_valid(void) {

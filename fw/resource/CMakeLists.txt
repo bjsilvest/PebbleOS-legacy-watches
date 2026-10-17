@@ -5,6 +5,7 @@ set(excl)
 if(CONFIG_RECOVERY_FW)
   list(APPEND excl
     resource_storage_file.c
+    resource_unpack.c
   )
 endif()
 pbl_library()

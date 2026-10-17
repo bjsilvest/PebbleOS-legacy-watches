@@ -442,5 +442,36 @@
       "name": "GOTHIC_28_EMOJI",
       "glyphSubset": "normal/silk/emoji_subset.json"
     }
+  ],
+  "files": [
+    {
+      "comments": "Kept deflated in the system resources to fit the 256 KiB bank and inflated into this file at boot: everything but the Gothic text fonts and the images.",
+      "name": "sysres",
+      "unpack": true,
+      "resources": [
+        "TIMEZONE_DATABASE",
+        "GOTHIC_14_EMOJI",
+        "GOTHIC_18_EMOJI",
+        "GOTHIC_24_EMOJI",
+        "GOTHIC_28_EMOJI",
+        "BITHAM_18_LIGHT_SUBSET",
+        "BITHAM_30_BLACK",
+        "BITHAM_34_LIGHT_SUBSET",
+        "BITHAM_34_MEDIUM_NUMBERS",
+        "BITHAM_42_BOLD",
+        "BITHAM_42_LIGHT",
+        "BITHAM_42_MEDIUM_NUMBERS",
+        "DROID_SERIF_28_BOLD",
+        "ROBOTO_BOLD_SUBSET_49",
+        "ROBOTO_CONDENSED_21",
+        "LECO_20_BOLD_NUMBERS",
+        "LECO_26_BOLD_NUMBERS_AM_PM",
+        "LECO_28_LIGHT_NUMBERS",
+        "LECO_32_BOLD_NUMBERS",
+        "LECO_36_BOLD_NUMBERS",
+        "LECO_38_BOLD_NUMBERS",
+        "LECO_42_NUMBERS"
+      ]
+    }
   ]
 }

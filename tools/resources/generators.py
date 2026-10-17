@@ -8,6 +8,10 @@ The waf task classes in ``waftools/`` and the CMake driver in
 ``tools/cmake/resources.py`` are thin wrappers around these.
 """
 
+import io
+import struct
+import zlib
+
 import generate_c_byte_array
 from pbpack import ResourcePack
 from resources.types.resource_ball import ResourceBall
@@ -71,12 +75,61 @@ def order_resource_objects(resos, resource_id_mapping=None):
     return ordered
 
 
+# A system resource holding an unpacked file's resource pack, deflated. The
+# firmware inflates it into the file (fw/resource/resource_unpack.c).
+UNPACK_MAGIC = b"PBLZ"
+UNPACK_HEADER = struct.Struct("<4sII")  # magic, pack length, pack content CRC
+UNPACK_WINDOW_BITS = 12  # the firmware inflates with a 4 KiB window
+
+
+def unpack_resource_name(file_name):
+    return f"{file_name.upper()}_PACKED"
+
+
+def _deflate(data):
+    c = zlib.compressobj(9, zlib.DEFLATED, -UNPACK_WINDOW_BITS)
+    return c.compress(data) + c.flush()
+
+
+def _add_unpacked_files(resos, files):
+    """Move each unpacked file's resources to the end of the pbpack resources,
+    in the order the file lists them (the file store needs contiguous ids),
+    followed by the deflated pack of the file."""
+    for entry in files:
+        if not entry.get("unpack"):
+            continue
+        by_name = {r.definition.name: r for r in resos}
+        missing = [n for n in entry["resources"] if n not in by_name]
+        if missing:
+            raise ValueError(f"unpacked file {entry['name']}: no resources {missing}")
+        group = [by_name[n] for n in entry["resources"]]
+        for reso in group:
+            if reso.definition.storage != StorageType.pbpack:
+                raise ValueError(f"{reso.definition.name} is not a pbpack resource")
+            reso.definition.unpack_file = entry["name"]
+
+        pack = ResourcePack(is_system=False)
+        for reso in group:
+            pack.add_resource(reso.data)
+        out = io.BytesIO()
+        crc = pack.serialize(out)
+        packed = out.getvalue()
+        blob = UNPACK_HEADER.pack(UNPACK_MAGIC, len(packed), crc) + _deflate(packed)
+        blob_reso = ResourceObject(
+            ResourceDefinition("raw", unpack_resource_name(entry["name"]), ""), blob
+        )
+
+        rest = [r for r in resos if r not in group]
+        split = sum(1 for r in rest if r.definition.storage == StorageType.pbpack)
+        resos = rest[:split] + group + [blob_reso] + rest[split:]
+    return resos
+
+
 def build_resource_ball(reso_paths, output_path, declarations=(),
-                        resource_id_mapping=None):
+                        resource_id_mapping=None, files=()):
     resos = [ResourceObject.load(path) for path in reso_paths]
-    ball = ResourceBall(
-        order_resource_objects(resos, resource_id_mapping), list(declarations)
-    )
+    ordered = order_resource_objects(resos, resource_id_mapping)
+    ball = ResourceBall(_add_unpacked_files(ordered, files), list(declarations))
     ball.dump(output_path)
 
 
@@ -85,7 +138,11 @@ def build_pbpack(ball_path, output_path, is_system=False):
     pack = ResourcePack(is_system)
     for reso in ball.resource_objects:
         if reso.definition.storage == StorageType.pbpack:
-            pack.add_resource(reso.data)
+            # Unpacked resources are served from their file; keep their ids.
+            if getattr(reso.definition, "unpack_file", None):
+                pack.add_resource(b"")
+            else:
+                pack.add_resource(reso.data)
     with open(output_path, "wb") as f:
         pack.serialize(f)
 
@@ -291,6 +348,9 @@ typedef enum {
 
 def build_pfs_resource_table(file_definitions, output_path,
                              resource_id_include):
+    # The firmware searches the files in order of resource id. Unpacked files
+    # hold built resources, whose ids come before every declared one.
+    file_definitions = sorted(file_definitions, key=lambda d: not d.get("unpack"))
     with open(output_path, "w") as f:
         f.write("""
 //
@@ -313,6 +373,17 @@ def build_pfs_resource_table(file_definitions, output_path,
             # FIXME: this offset is trivially computed at compile time; the
             # concept should just go away.
             f.write(f'  {{ {first}, {last}, ({first} - 1), "{d["name"]}" }},\n')
+        f.write("};\n")
+
+        unpacked = [(i, d) for i, d in enumerate(file_definitions) if d.get("unpack")]
+        f.write('\n#include "resource/resource_unpack.h"\n\n')
+        f.write(f"const uint32_t g_num_unpacked_resource_files = {len(unpacked)};\n")
+        f.write("const UnpackedResourceFile g_unpacked_resource_files[] = {\n")
+        for i, d in unpacked:
+            f.write(
+                f"  {{ &g_file_resource_stores[{i}], "
+                f"RESOURCE_ID_{unpack_resource_name(d['name'])} }},\n"
+            )
         f.write("};\n")
 
 

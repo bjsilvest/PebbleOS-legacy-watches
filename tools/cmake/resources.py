@@ -142,7 +142,11 @@ def get_resources_dict(bld, variant, config=frozenset()):
     # "files" and "timeline" cannot exist in the common resource map.
     for key in ("files", "timeline"):
         if key in specific_dict:
-            resources_dict[key] = specific_dict[key]
+            resources_dict[key] = list(specific_dict[key])
+
+    # A board map adds its own filesystem resource files.
+    for override in override_dicts[1:]:
+        resources_dict.setdefault("files", []).extend(override.get("files", []))
 
     # The font scripts want an absolute characterList path.
     for item in resources_dict["media"]:
@@ -194,7 +198,9 @@ def cmd_manifest(args):
 
     declarations = []
     for entry in resources_dict.get("files", []):
-        declarations.extend(ResourceDeclaration(r) for r in entry["resources"])
+        # Unpacked files hold resources built here, which are not declarations.
+        if not entry.get("unpack"):
+            declarations.extend(ResourceDeclaration(r) for r in entry["resources"])
 
     manifest = {
         "definitions": definitions,
@@ -309,7 +315,10 @@ def cmd_ball(args):
     manifest = load_manifest(args.manifest)
     generators = import_generators()
     generators.build_resource_ball(
-        ordered_resos(manifest), Node(args.output), manifest["declarations"]
+        ordered_resos(manifest),
+        Node(args.output),
+        manifest["declarations"],
+        files=manifest["files"],
     )
 
 
