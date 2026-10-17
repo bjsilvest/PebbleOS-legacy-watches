@@ -20,6 +20,8 @@
 //! (N0), explicit directional controls, isolates and levels above two are not
 //! implemented.
 
+#ifdef CONFIG_TEXT_RTL
+
 //! Check whether a UTF-8 range needs bidirectional processing at all.
 //! Scans raw bytes over every block the class table calls strong right-to-left,
 //! so pure-ASCII text costs one comparison per byte and stays on the LTR path.
@@ -70,3 +72,33 @@ size_t bidi_reverse_run(const utf8_t *src, size_t src_len, utf8_t *dest, size_t 
 //! @param end Pointer to end of UTF-8 string (exclusive)
 //! @return true if the range contains at least one shapeable Arabic letter
 bool bidi_contains_arabic(const utf8_t *start, const utf8_t *end);
+
+#else
+
+static inline bool bidi_is_needed(const utf8_t *start, const utf8_t *end) {
+  return false;
+}
+
+static inline bool bidi_paragraph_is_rtl(const utf8_t *start, const utf8_t *end) {
+  return false;
+}
+
+static inline utf8_t *bidi_next_run(const utf8_t *line_start, utf8_t *pos, const utf8_t *end,
+                                    bool para_is_rtl, uint8_t *run_level) {
+  return pos;
+}
+
+static inline Codepoint bidi_mirror_codepoint(Codepoint cp) {
+  return cp;
+}
+
+static inline size_t bidi_reverse_run(const utf8_t *src, size_t src_len, utf8_t *dest,
+                                      size_t dest_size) {
+  return 0;
+}
+
+static inline bool bidi_contains_arabic(const utf8_t *start, const utf8_t *end) {
+  return false;
+}
+
+#endif  // CONFIG_TEXT_RTL

@@ -163,6 +163,13 @@ config RESOURCES_LARGE_FONTS
       resources. Without them, the board's resource map should alias those
       font keys to smaller fonts it keeps.
 
+config TEXT_RTL
+    bool "Right-to-left text"
+    default y
+    help
+      Reorder and shape right-to-left text (Hebrew, Arabic). Needs fonts
+      with those glyphs; without it all text is laid out left to right.
+
 config RESOURCES_COMPACT_FONTS
     bool "Compact system fonts"
     help

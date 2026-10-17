@@ -49,6 +49,10 @@ else()
   list(APPEND excl touch_service.c)
 endif()
 
+if(NOT CONFIG_TEXT_RTL)
+  list(APPEND excl graphics/bidi.c graphics/arabic_shaping.c)
+endif()
+
 file(GLOB_RECURSE sources CONFIGURE_DEPENDS *.c)
 pbl_filter_sources(sources EXCLUDE ${excl})
 

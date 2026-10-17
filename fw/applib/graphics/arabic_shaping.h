@@ -17,6 +17,8 @@ typedef enum {
   ARABIC_FORM_MEDIAL = 3    //!< Middle of word (connects both sides)
 } ArabicForm;
 
+#ifdef CONFIG_TEXT_RTL
+
 //! Check if a codepoint is a shapeable Arabic letter (U+0621-U+064A).
 //! This excludes diacritics, numerals, and other non-letter characters.
 //! @param cp The codepoint to check
@@ -62,3 +64,31 @@ Codepoint arabic_shape_pair(Codepoint prev_cp, Codepoint curr_cp, Codepoint next
 //! @return Number of bytes written to dest (excluding null terminator),
 //!         or 0 on failure
 size_t arabic_shape_text(const utf8_t *src, size_t src_len, utf8_t *dest, size_t dest_size);
+
+#else
+
+static inline bool arabic_is_shapeable(Codepoint cp) {
+  return false;
+}
+
+static inline bool arabic_is_transparent(Codepoint cp) {
+  return false;
+}
+
+static inline Codepoint arabic_shape_codepoint(Codepoint prev_cp, Codepoint curr_cp,
+                                               Codepoint next_cp) {
+  return curr_cp;
+}
+
+static inline Codepoint arabic_shape_pair(Codepoint prev_cp, Codepoint curr_cp, Codepoint next_cp,
+                                          bool *consumed_next) {
+  *consumed_next = false;
+  return curr_cp;
+}
+
+static inline size_t arabic_shape_text(const utf8_t *src, size_t src_len, utf8_t *dest,
+                                       size_t dest_size) {
+  return 0;
+}
+
+#endif  // CONFIG_TEXT_RTL
