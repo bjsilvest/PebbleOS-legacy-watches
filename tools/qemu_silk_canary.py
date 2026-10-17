@@ -71,6 +71,8 @@ BOARDS = {
 }
 GUARD_MESSAGE = b"protected flash"
 CRASH_MESSAGE = b"Starting core dump"
+# Without core dumps: the stock bootloader's note after a software failure
+RESET_MESSAGE = b"Software failure caused a reset"
 
 
 def stock_v2_sprf(rng):
@@ -251,7 +253,7 @@ def main():
         guard_hits = log.count(GUARD_MESSAGE)
         print(f"flash guard assertions     {guard_hits}")
         ok &= guard_hits == 0
-        crashes = log.count(CRASH_MESSAGE)
+        crashes = max(log.count(CRASH_MESSAGE), log.count(RESET_MESSAGE))
         print(f"crashes (core dumps)       {crashes}")
         ok &= crashes == 0
 
