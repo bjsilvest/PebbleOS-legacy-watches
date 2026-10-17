@@ -74,11 +74,16 @@ if(CONFIG_COMPILER_SAVE_TEMPS)
   list(APPEND pbl_arch_flags -save-temps=obj)
 endif()
 
+if(CONFIG_LTO_WHOLE_PROGRAM)
+  set(pbl_lto_partition -flto-partition=one -fipa-pta)
+else()
+  set(pbl_lto_partition -flto-partition=balanced --param=lto-partitions=128)
+endif()
+
 if(CONFIG_LTO)
   list(APPEND pbl_arch_flags
     -flto
-    -flto-partition=balanced
-    --param=lto-partitions=128
+    ${pbl_lto_partition}
     -fuse-linker-plugin
     -fno-if-conversion
     -fno-caller-saves
