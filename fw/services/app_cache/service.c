@@ -51,10 +51,11 @@ PBL_LOG_MODULE_DEFINE(service_app_cache, CONFIG_SERVICE_APP_CACHE_LOG_LEVEL);
 
 //! Keep enough room for the maximum sized application based on platform, plus a little more room.
 //! Source: https://pebbletechnology.atlassian.net/wiki/display/DEV/PBW+3.0
-//! Silk's filesystem is only 5.25 MiB: with a 4 MiB buffer every newly cached
-//! app was evicted again right away, so a watchface fetched in a loop.
+//! Silk's filesystem is only 5.25 MiB (tintin's 2.1 MiB): with a 4 MiB buffer
+//! every newly cached app was evicted again right away, so a watchface fetched
+//! in a loop.
 #if defined(CONFIG_BOARD_ASTERIX) || defined(CONFIG_BOARD_OBELIX) || defined(CONFIG_BOARD_SILK) || \
-    defined(CONFIG_BOARD_SNOWY) || defined(UNITTEST)
+    defined(CONFIG_BOARD_SNOWY) || defined(CONFIG_BOARD_TINTIN) || defined(UNITTEST)
 #define APP_SPACE_BUFFER PBL_KIB(300)
 #else
 #define APP_SPACE_BUFFER PBL_MIB(4)
