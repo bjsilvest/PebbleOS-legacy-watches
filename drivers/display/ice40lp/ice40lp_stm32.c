@@ -403,10 +403,52 @@ static void prv_start_dma_frame(const uint8_t *fb) {
   pbl_irq_unlock();
 }
 
+//! Time for the panel to scan out a frame before its rails drop.
+#define CLEAR_SETTLE_MS 100
+
 void display_clear(void) {
+  if (!s_programmed) {
+    return;
+  }
+
+  // Let a frame in flight finish; its line buffers are in use.
+  for (int ms = 0; display_update_in_progress() && ms < (int)FRAME_TIMEOUT_MS; ms++) {
+    delay_us(1000);
+  }
+
+  // Black is all zeros: send a frame of blank lines.
+  uint8_t *line = s_lines[0];
+  memset(line, 0, DISP_PIXELS);
+  const struct pbl_gpio *scs = &BOARD_CONFIG_DISPLAY.scs;
+  pbl_gpio_set(scs, true);
+  delay_us(5);
+  const uint8_t cmd = CMD_FRAME_BEGIN;
+  prv_spi_write(&cmd, 1);
+  for (int i = 0; i < DISP_LINES; i++) {
+    if (!prv_wait_not_busy()) {
+      break;
+    }
+    prv_spi_write(line, DISP_PIXELS);
+  }
+  pbl_gpio_set(scs, false);
+
+  for (int ms = 0; ms < CLEAR_SETTLE_MS; ms++) {
+    delay_us(1000);
+  }
 }
 
 void display_set_enabled(bool enabled) {
+  if (!s_programmed) {
+    return;
+  }
+  if (enabled) {
+    prv_power_enable();
+  } else {
+    // Reverse of the power-up order.
+    pbl_gpio_set(&BOARD_CONFIG_DISPLAY.rail_4v5, false);
+    delay_us(2000);
+    pbl_gpio_set(&BOARD_CONFIG_DISPLAY.rail_6v6, false);
+  }
 }
 
 void display_set_rotated(bool rotated) {
