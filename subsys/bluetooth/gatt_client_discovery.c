@@ -74,6 +74,8 @@ typedef struct {
   struct ble_gatt_svc service;
   ListNode *characteristics;
   uint16_t num_descriptors;
+  //! Set, and the characteristics freed, once the service is discovered
+  struct pbl_bt_gatt_service *converted;
 } GATTServiceDiscoveryServiceNode;
 
 typedef struct {
@@ -82,6 +84,9 @@ typedef struct {
   ListNode *services;
   ListNode *current_service;
   ListNode *current_characteristic;
+  //! Service Changed characteristic and its CCCD, 0 if the peer has none
+  uint16_t svc_chgd_chr_handle;
+  uint16_t svc_chgd_dsc_handle;
 } GATTServiceDiscoveryContext;
 
 static bool prv_descriptor_free_cb(ListNode *node, void *context) {
@@ -99,6 +104,7 @@ static bool prv_characteristic_free_cb(ListNode *node, void *context) {
 static bool prv_service_free_cb(ListNode *node, void *context) {
   GATTServiceDiscoveryServiceNode *service_node = (GATTServiceDiscoveryServiceNode *)node;
   list_foreach(service_node->characteristics, prv_characteristic_free_cb, nullptr);
+  kernel_free(service_node->converted);
   kernel_free(node);
   return true;
 }
@@ -114,13 +120,52 @@ static void prv_discovery_failed(GATTServiceDiscoveryContext *context, int statu
   prv_free_discovery_context(context);
 }
 
-/* TODO: the way this works is kinda inefficient, really we should notify the OS after we
- discover all the characteristics/descriptors for a service, letting us free the allocations
- related to that service.
- */
-static bool prv_convert_service_and_notify_os_cb(ListNode *node, void *context) {
-  GATTServiceDiscoveryServiceNode *service_node = (GATTServiceDiscoveryServiceNode *)node;
-  GAPLEConnection *connection = context;
+static bool prv_find_chr_by_uuid(ListNode *node, void *data) {
+  GATTServiceDiscoveryCharacteristicNode *chr_node = (GATTServiceDiscoveryCharacteristicNode *)node;
+  const ble_uuid_t *chr_uuid = (const ble_uuid_t *)data;
+  return ble_uuid_cmp(&chr_node->characteristic.uuid.u, chr_uuid) == 0;
+}
+
+static bool prv_find_dsc_by_uuid(ListNode *node, void *data) {
+  GATTServiceDiscoveryDescriptorNode *dsc_node = (GATTServiceDiscoveryDescriptorNode *)node;
+  const ble_uuid_t *dsc_uuid = (const ble_uuid_t *)data;
+  return ble_uuid_cmp(&dsc_node->descriptor.uuid.u, dsc_uuid) == 0;
+}
+
+static bool prv_find_dsc_uuid(const GATTServiceDiscoveryServiceNode *service_node,
+                              const ble_uuid_t *chr_uuid, const ble_uuid_t *dsc_uuid,
+                              uint16_t *chr_handle, uint16_t *dsc_handle) {
+  GATTServiceDiscoveryCharacteristicNode *chr_node =
+      (GATTServiceDiscoveryCharacteristicNode *)list_find(service_node->characteristics,
+                                                          prv_find_chr_by_uuid, (void *)chr_uuid);
+  if (chr_node == nullptr) {
+    return false;
+  }
+
+  GATTServiceDiscoveryDescriptorNode *dsc_node = (GATTServiceDiscoveryDescriptorNode *)list_find(
+      chr_node->descriptors, prv_find_dsc_by_uuid, (void *)dsc_uuid);
+  if (dsc_node == nullptr) {
+    return false;
+  }
+
+  *chr_handle = chr_node->characteristic.val_handle;
+  *dsc_handle = dsc_node->descriptor.handle;
+
+  return true;
+}
+
+//! Converts the current service once its characteristics and descriptors are
+//! discovered, then frees them, so only one service's tree is on the heap at
+//! a time. The OS gets the converted services when discovery completes.
+static void prv_convert_service(GATTServiceDiscoveryContext *context) {
+  GATTServiceDiscoveryServiceNode *service_node =
+      (GATTServiceDiscoveryServiceNode *)context->current_service;
+
+  if (ble_uuid_cmp(&service_node->service.uuid.u, BLE_UUID16_DECLARE(BLE_GATT_SVC_UUID16)) == 0) {
+    prv_find_dsc_uuid(service_node, BLE_UUID16_DECLARE(BLE_SVC_GATT_CHR_SERVICE_CHANGED_UUID16),
+                      BLE_UUID16_DECLARE(BLE_GATT_DSC_CLT_CFG_UUID16),
+                      &context->svc_chgd_chr_handle, &context->svc_chgd_dsc_handle);
+  }
 
   uint16_t num_characteristics = list_count(service_node->characteristics);
   size_t size_bytes =
@@ -166,55 +211,19 @@ static bool prv_convert_service_and_notify_os_cb(ListNode *node, void *context) 
     chr_node = (GATTServiceDiscoveryCharacteristicNode *)list_get_next(&chr_node->node);
   }
 
-  char service_uuid_str[UUID_STRING_BUFFER_LENGTH];
-  uuid_to_string(&gatt_service->uuid, service_uuid_str);
-  pbl_bt_cb_gatt_client_discovery_handle_indication(connection, gatt_service, PBL_BT_ERRNO_OK);
-
-  return true;
+  list_foreach(service_node->characteristics, prv_characteristic_free_cb, nullptr);
+  service_node->characteristics = nullptr;
+  service_node->converted = gatt_service;
 }
 
-static bool prv_find_svc_by_uuid(ListNode *node, void *data) {
+static bool prv_notify_os_cb(ListNode *node, void *context) {
   GATTServiceDiscoveryServiceNode *service_node = (GATTServiceDiscoveryServiceNode *)node;
-  const ble_uuid_t *svc_uuid = (const ble_uuid_t *)data;
-  return ble_uuid_cmp(&service_node->service.uuid.u, svc_uuid) == 0;
-}
+  GAPLEConnection *connection = context;
 
-static bool prv_find_chr_by_uuid(ListNode *node, void *data) {
-  GATTServiceDiscoveryCharacteristicNode *chr_node = (GATTServiceDiscoveryCharacteristicNode *)node;
-  const ble_uuid_t *chr_uuid = (const ble_uuid_t *)data;
-  return ble_uuid_cmp(&chr_node->characteristic.uuid.u, chr_uuid) == 0;
-}
-
-static bool prv_find_dsc_by_uuid(ListNode *node, void *data) {
-  GATTServiceDiscoveryDescriptorNode *dsc_node = (GATTServiceDiscoveryDescriptorNode *)node;
-  const ble_uuid_t *dsc_uuid = (const ble_uuid_t *)data;
-  return ble_uuid_cmp(&dsc_node->descriptor.uuid.u, dsc_uuid) == 0;
-}
-
-static bool prv_find_dsc_uuid(GATTServiceDiscoveryContext *context, const ble_uuid_t *svc_uuid,
-                              const ble_uuid_t *chr_uuid, const ble_uuid_t *dsc_uuid,
-                              uint16_t *chr_handle, uint16_t *dsc_handle) {
-  GATTServiceDiscoveryServiceNode *service_node = (GATTServiceDiscoveryServiceNode *)list_find(
-      context->services, prv_find_svc_by_uuid, (void *)svc_uuid);
-  if (service_node == nullptr) {
-    return false;
-  }
-
-  GATTServiceDiscoveryCharacteristicNode *chr_node =
-      (GATTServiceDiscoveryCharacteristicNode *)list_find(service_node->characteristics,
-                                                          prv_find_chr_by_uuid, (void *)chr_uuid);
-  if (chr_node == nullptr) {
-    return false;
-  }
-
-  GATTServiceDiscoveryDescriptorNode *dsc_node = (GATTServiceDiscoveryDescriptorNode *)list_find(
-      chr_node->descriptors, prv_find_dsc_by_uuid, (void *)dsc_uuid);
-  if (dsc_node == nullptr) {
-    return false;
-  }
-
-  *chr_handle = chr_node->characteristic.val_handle;
-  *dsc_handle = dsc_node->descriptor.handle;
+  // The OS takes ownership of the converted service
+  pbl_bt_cb_gatt_client_discovery_handle_indication(connection, service_node->converted,
+                                                    PBL_BT_ERRNO_OK);
+  service_node->converted = nullptr;
 
   return true;
 }
@@ -243,35 +252,31 @@ static int prv_on_svc_chgd_subscribe(uint16_t conn_handle, const struct ble_gatt
   return 0;
 }
 
-static void prv_convert_service_and_notify_os(uint16_t conn_handle,
-                                              GATTServiceDiscoveryContext *context) {
+static void prv_notify_os(uint16_t conn_handle, GATTServiceDiscoveryContext *context) {
   if (!prv_lock_connection(context->connection)) {
     prv_free_discovery_context(context);
     return;
   }
-  list_foreach(context->services, prv_convert_service_and_notify_os_cb, context->connection);
+  list_foreach(context->services, prv_notify_os_cb, context->connection);
   pbl_bt_cb_gatt_client_discovery_complete(context->connection, PBL_BT_ERRNO_OK);
   bt_unlock();
 
   // Subscribe to service changed indications (BLE Core 6.0, part G 7.7.1)
-  uint16_t chr_handle, dsc_handle;
-  if (prv_find_dsc_uuid(context, BLE_UUID16_DECLARE(BLE_GATT_SVC_UUID16),
-                        BLE_UUID16_DECLARE(BLE_SVC_GATT_CHR_SERVICE_CHANGED_UUID16),
-                        BLE_UUID16_DECLARE(BLE_GATT_DSC_CLT_CFG_UUID16), &chr_handle,
-                        &dsc_handle)) {
+  if (context->svc_chgd_dsc_handle != 0) {
     uint16_t value;
     int ret;
 
     GATTServiceDiscoveryDescriptorContext *ctx =
         kernel_zalloc_check(sizeof(GATTServiceDiscoveryDescriptorContext));
     ctx->connection = context->connection;
-    ctx->chr_handle = chr_handle;
+    ctx->chr_handle = context->svc_chgd_chr_handle;
 
     value = 0x0002;
-    ret = ble_gattc_write_flat(conn_handle, dsc_handle, &value, sizeof(value),
+    ret = ble_gattc_write_flat(conn_handle, context->svc_chgd_dsc_handle, &value, sizeof(value),
                                prv_on_svc_chgd_subscribe, ctx);
     if (ret != 0) {
       PBL_LOG_ERR("Failed to subscribe to service changed: %d", ret);
+      kernel_free(ctx);
     }
   }
 
@@ -364,6 +369,20 @@ static void prv_list_append_or_set(ListNode **list, ListNode *node) {
   }
 }
 
+//! The current service is fully discovered: convert it, then discover the
+//! next one's characteristics, or finish.
+static void prv_discover_next_service(uint16_t conn_handle, GATTServiceDiscoveryContext *context) {
+  prv_convert_service(context);
+
+  context->current_service = list_get_next(context->current_service);
+  if (context->current_service != nullptr) {
+    prv_discover_next_chrs(conn_handle, context);
+  } else {
+    prv_discovery_finished();
+    prv_notify_os(conn_handle, context);
+  }
+}
+
 static int prv_find_dsc_cb(uint16_t conn_handle, const struct ble_gatt_error *error,
                            uint16_t chr_val_handle, const struct ble_gatt_dsc *dsc, void *arg) {
   GATTServiceDiscoveryContext *context = arg;
@@ -399,24 +418,7 @@ static int prv_find_dsc_cb(uint16_t conn_handle, const struct ble_gatt_error *er
       if (context->current_characteristic != nullptr) {
         prv_discover_next_dscs(conn_handle, context);
       } else {
-        context->current_service = list_get_next(context->current_service);
-        while (context->current_service != nullptr) {
-          GATTServiceDiscoveryServiceNode *service_node = prv_get_current_service(context);
-
-          context->current_characteristic = list_get_head(service_node->characteristics);
-
-          if (context->current_characteristic != nullptr) {
-            prv_discover_next_dscs(conn_handle, context);
-            return 0;
-          }
-
-          // Service has no characteristics, skip to next service
-          context->current_service = list_get_next(context->current_service);
-        }
-
-        // we're done!
-        prv_discovery_finished();
-        prv_convert_service_and_notify_os(conn_handle, context);
+        prv_discover_next_service(conn_handle, context);
       }
 
       break;
@@ -459,25 +461,14 @@ static int prv_find_chr_cb(uint16_t conn_handle, const struct ble_gatt_error *er
     case BLE_HS_EDONE:
       PBL_LOG_DBG("Characteristic discovery done");
 
-      context->current_service = list_get_next(context->current_service);
+      // Now this service's descriptors
+      context->current_characteristic =
+          list_get_head(prv_get_current_service(context)->characteristics);
 
-      if (context->current_service != nullptr) {
-        // we have another service to discover characteristics for
-        prv_discover_next_chrs(conn_handle, context);
+      if (context->current_characteristic != nullptr) {
+        prv_discover_next_dscs(conn_handle, context);
       } else {
-        // got all characteristics, now let's get descriptors
-        context->current_service = list_get_head(context->services);
-
-        GATTServiceDiscoveryServiceNode *service_node = prv_get_current_service(context);
-        context->current_characteristic = list_get_head(service_node->characteristics);
-
-        if (context->current_characteristic != nullptr) {
-          prv_discover_next_dscs(conn_handle, context);
-        } else {
-          // No characteristics found, discovery complete
-          prv_discovery_finished();
-          prv_convert_service_and_notify_os(conn_handle, context);
-        }
+        prv_discover_next_service(conn_handle, context);
       }
 
       break;
