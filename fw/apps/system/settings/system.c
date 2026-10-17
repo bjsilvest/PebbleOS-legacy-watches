@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include <pbl/drivers/ambient_light.h>
+#include <pbl/drivers/display/display.h>
 #if defined(CONFIG_BT_CONTROLLER_DA1468X) || defined(CONFIG_BT_CONTROLLER_CC2564)
 // Bring-up diagnostics for boards with an HCI controller on a UART.
 #define BT_CONTROLLER_DIAGNOSTICS 1
@@ -98,6 +99,9 @@ enum {
 #endif
 #ifdef CONFIG_AMBIENT_LIGHT_STM32_ADC
   SystemInformationItemLight,
+#endif
+#ifdef CONFIG_DISPLAY_ICE40LP_STM32
+  SystemInformationItemDisplay,
 #endif
   SystemInformationItemFirmware,
   SystemInformationItemLanguage,
@@ -194,6 +198,9 @@ typedef struct SystemInformationData {
 #endif
 #ifdef CONFIG_AMBIENT_LIGHT_STM32_ADC
   char light_string[24];
+#endif
+#ifdef CONFIG_DISPLAY_ICE40LP_STM32
+  char display_string[40];
 #endif
   char const *subtitle_text[SystemInformationItem_Count];
   char language_string[16];
@@ -299,6 +306,9 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
 #endif
 #ifdef CONFIG_AMBIENT_LIGHT_STM32_ADC
   [SystemInformationItemLight] = i18n_noop("Light"),
+#endif
+#ifdef CONFIG_DISPLAY_ICE40LP_STM32
+  [SystemInformationItemDisplay] = i18n_noop("Display"),
 #endif
   [SystemInformationItemFirmware] = i18n_noop("Firmware"),
   [SystemInformationItemLanguage] = i18n_noop("Language"),
@@ -523,6 +533,10 @@ static void prv_information_window_push(SettingsSystemData *data) {
 #ifdef CONFIG_AMBIENT_LIGHT_STM32_ADC
   strncpy(info->light_string, "Select to read", sizeof(info->light_string) - 1);
   info->subtitle_text[SystemInformationItemLight] = info->light_string;
+#endif
+#ifdef CONFIG_DISPLAY_ICE40LP_STM32
+  display_copy_stats(info->display_string, sizeof(info->display_string));
+  info->subtitle_text[SystemInformationItemDisplay] = info->display_string;
 #endif
   info->subtitle_text[SystemInformationItemFirmware] =
       (char *)(strlen(TINTIN_METADATA.version_tag) >= 2 ? TINTIN_METADATA.version_tag
