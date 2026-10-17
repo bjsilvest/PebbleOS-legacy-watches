@@ -50,8 +50,12 @@ PBL_LOG_MODULE_DECLARE(driver_flash, CONFIG_DRIVER_FLASH_LOG_LEVEL);
 
 #define PAGE_SIZE_BYTES 256
 
-// Micron N25Q032A (1.8 V and 3 V parts), and what QEMU's bb2 machine emulates.
-static const uint32_t s_known_ids[] = {0x20bb16, 0x20ba16, 0x1c3016};
+// Micron N25Q032A and N25Q064A (1.8 V and 3 V parts), and what QEMU's bb2
+// machine emulates.
+static const uint32_t s_known_ids[] = {0x20bb16, 0x20ba16, 0x20bb17, 0x20ba17, 0x1c3016};
+
+// The ID's last byte: log2 of the size in bytes
+#define ID_CAPACITY_8MB 0x17
 
 // tRES1: deep power-down release time.
 #define WAKE_DELAY_US 30
@@ -196,6 +200,8 @@ status_t flash_impl_unprotect(void) {
 ///////////////////////////////////////////////////////////////////////////////
 // Init and identification
 
+static uint32_t prv_read_id(void);
+
 status_t flash_impl_init(bool coredump_mode) {
   prv_hw_init();
   flash_impl_use();
@@ -207,6 +213,13 @@ status_t flash_impl_init(bool coredump_mode) {
   prv_cmd(CMD_CLEAR_FLAG_STATUS_REG);
   prv_set_prf_lock(true);
   flash_impl_release();
+#ifdef CONFIG_FLASH_LAYOUT_TINTIN_8MB
+  // A 4 MiB part ignores the address's top bits, so the filesystem's region
+  // past 4 MiB would overwrite the firmware scratch and resources.
+  if (!coredump_mode) {
+    PBL_ASSERT((prv_read_id() & 0xff) >= ID_CAPACITY_8MB, "Flash is smaller than 8 MiB");
+  }
+#endif
   return S_SUCCESS;
 }
 

@@ -29,7 +29,8 @@ config FLASH_N25Q
     bool "Micron N25Q (SPI)"
     depends on SOC_STM32F4
     help
-      Micron N25Q032 SPI NOR of the original Pebble, on a plain SPI bus.
+      Micron N25Q032 or N25Q064 SPI NOR of the original Pebble, on a plain
+      SPI bus.
 
 config FLASH_S29VS
     bool "Spansion S29VS (FMC)"
@@ -64,6 +65,14 @@ config FLASH_LAYOUT_TINTIN
       Use the stock original Pebble external flash layout, keeping the stock
       bootloader's firmware scratch, PRF, shared PRF storage and factory
       registry where they are.
+
+config FLASH_LAYOUT_TINTIN_8MB
+    bool "8 MiB flash"
+    depends on FLASH_LAYOUT_TINTIN
+    help
+      The 8 MiB N25Q064 of the retail original Pebble (v1_5) and the Pebble
+      Steel (v2_0). As in the stock firmware, the 2 MiB past the 4 MiB layout
+      is a filesystem region, and the 2 MiB after it go unused.
 
 config FLASH_LAYOUT_SNOWY
     bool "Pebble Time (snowy) stock flash layout"

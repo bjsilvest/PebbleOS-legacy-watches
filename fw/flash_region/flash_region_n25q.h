@@ -17,7 +17,12 @@
 
 #define FLASH_FILESYSTEM_BLOCK_SIZE SUBSECTOR_SIZE_BYTES
 
+#ifdef CONFIG_FLASH_LAYOUT_TINTIN_8MB
+// Of the 8 MiB, the stock firmware used 6 MiB
+#define BOARD_NOR_FLASH_SIZE 0x600000
+#else
 #define BOARD_NOR_FLASH_SIZE 0x400000
+#endif
 
 // Firmware scratch space the stock bootloader installs updates from
 #define FLASH_REGION_FIRMWARE_SLOT_1_BEGIN 0x0
@@ -64,4 +69,11 @@
 #define FLASH_REGION_DEBUG_DB_END   0x400000 // 128k
 #define FLASH_DEBUG_DB_BLOCK_SIZE   SUBSECTOR_SIZE_BYTES
 
+#ifdef CONFIG_FLASH_LAYOUT_TINTIN_8MB
+#define FLASH_REGION_EXTRA_FILESYSTEM_BEGIN 0x400000
+#define FLASH_REGION_EXTRA_FILESYSTEM_END   0x600000 // 2M
+
+static_assert(FLASH_REGION_EXTRA_FILESYSTEM_END == BOARD_NOR_FLASH_SIZE, "tintin flash is 6 MiB");
+#else
 static_assert(FLASH_REGION_DEBUG_DB_END == BOARD_NOR_FLASH_SIZE, "tintin flash is 4 MiB");
+#endif
