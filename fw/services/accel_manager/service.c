@@ -723,6 +723,37 @@ static bool prv_shared_buffer_empty(void) {
   return empty;
 }
 
+//! Names the subscriber that has read the least, the one the buffer is about to advance. Logged on
+//! the first overflow and every 32nd after, since a stalled subscriber overflows on every batch.
+static void prv_log_slowest_subscriber(void) {
+  static uint32_t s_overflows;
+
+  if ((s_overflows++ % 32U) != 0U) {
+    return;
+  }
+
+  pbl_mutex_lock(&s_accel_manager_mutex, PBL_FOREVER);
+  AccelManagerState *slowest = nullptr;
+  int slowest_left = -1;
+  for (AccelManagerState *state = (AccelManagerState *)s_data_subscribers; state;
+       state = (AccelManagerState *)state->list_node.next) {
+    const int left =
+        pbl_shared_cbuf_get_read_space_remaining(&s_buffer, &state->buffer_client.buffer_client);
+    if (left > slowest_left) {
+      slowest = state;
+      slowest_left = left;
+    }
+  }
+  if (slowest) {
+    PBL_LOG_WRN("Accel subscriber fell behind (%" PRIu32
+                "): task %d cb %p unread %d posted %d "
+                "have %u/%u",
+                s_overflows, (int)slowest->task, (void *)slowest->data_cb_handler, slowest_left,
+                slowest->event_posted, slowest->num_samples, slowest->samples_per_update);
+  }
+  pbl_mutex_unlock(&s_accel_manager_mutex);
+}
+
 void accel_cb_new_sample(AccelDriverSample const *data) {
   if (!s_enabled) {
     return;
@@ -754,7 +785,7 @@ void accel_cb_new_sample(AccelDriverSample const *data) {
   bool rv = pbl_shared_cbuf_write(&s_buffer, (uint8_t *)&accel_buffer_data,
                                   sizeof(accel_buffer_data), false /*advance_slackers*/);
   if (!rv) {
-    PBL_LOG_WRN("Accel subscriber fell behind, truncating data");
+    prv_log_slowest_subscriber();
     rv = pbl_shared_cbuf_write(&s_buffer, (uint8_t *)&accel_buffer_data, sizeof(accel_buffer_data),
                                true /*advance_slackers*/);
   }
@@ -805,7 +836,7 @@ void accel_cb_new_samples(AccelRawBatch const *batch) {
   bool rv = pbl_shared_cbuf_write_reserve(&s_buffer, total, false /*advance_slackers*/, &seg1,
                                           &seg1_length, &seg2);
   if (!rv) {
-    PBL_LOG_WRN("Accel subscriber fell behind, truncating data");
+    prv_log_slowest_subscriber();
     rv = pbl_shared_cbuf_write_reserve(&s_buffer, total, true /*advance_slackers*/, &seg1,
                                        &seg1_length, &seg2);
   }
