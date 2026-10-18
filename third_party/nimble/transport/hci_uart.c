@@ -676,6 +676,62 @@ static void prv_try_sleep(void) {
   }
   pbl_irq_unlock();
 }
+
+// Reboots after the controller stopped answering, at most this many per boot
+#define MAX_CONTROLLER_REBOOTS 5U
+
+static volatile bool s_reboot_requested;
+static uint32_t s_reboots;
+
+// Runs on the HCI thread. Writers see the state change and drop their bytes
+// until the controller runs again; the host then resyncs with an HCI Reset.
+static void prv_controller_reboot(void) {
+  s_reboot_requested = false;
+  if (s_controller_state != ControllerStateReady || s_reboots >= MAX_CONTROLLER_REBOOTS) {
+    return;
+  }
+  s_reboots++;
+  PBL_LOG_WRN("Rebooting the DA1468x controller (%lu)", (unsigned long)s_reboots);
+
+  // A writer may be between bytes: wait for it to finish.
+  pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
+  s_controller_state = ControllerStatePending;
+  pbl_mutex_unlock(&s_tx_mutex);
+
+  uart_set_tx_interrupt_enabled(BT_HCI_UART_TX, false);
+  uart_set_rx_interrupt_enabled(BT_HCI_UART, false);
+  uart_stop_rx_dma(BT_HCI_UART);
+
+  // Awake holds a STOP block and da1468x_boot() takes its own: hand it over.
+  pbl_irq_lock();
+  if (s_awake) {
+    soc_stm32_stop_release();
+  }
+  s_awake = true;
+  s_rx_head = 0U;
+  s_rx_tail = 0U;
+  s_rx_paused = false;
+  s_frame.len = 0U;
+  s_fake_privacy_mode_reply = false;
+  pbl_irq_unlock();
+
+  // Bounded by the boot attempts
+  pbl_task_wdt_set_waiting(true);
+  const bool booted = da1468x_boot();
+  pbl_task_wdt_set_waiting(false);
+  // The host timed out on commands dropped meanwhile: those were this reboot.
+  s_reboot_requested = false;
+
+  if (booted) {
+    prv_uart_start();
+    s_last_activity = rtc_get_ticks();
+    s_power_save = s_power_save && s_flow_control;
+  } else {
+    // Off for good: nothing holds the STOP block any more.
+    s_power_save = false;
+    s_controller_state = ControllerStateFailed;
+  }
+}
 #endif
 
 static void prv_hci_task_main(void *unused) {
@@ -707,6 +763,9 @@ static void prv_hci_task_main(void *unused) {
         pbl_sem_take(&s_rx_ready, (s_power_save && s_awake) ? PBL_MSEC(BT_IDLE_MS) : PBL_FOREVER) !=
         0;
     pbl_task_wdt_set_waiting(false);
+    if (s_reboot_requested) {
+      prv_controller_reboot();
+    }
     if (s_rx_tail != s_rx_head) {
       prv_wake();
     }
@@ -956,8 +1015,8 @@ uint32_t pbl_bt_hci_uart_acl_clamped(void) {
 
 void pbl_bt_hci_uart_copy_rx_stats(char *buf, size_t len) {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
-  sniprintf(buf, len, "%c%lu!%lu z%lu r%lu o%lu d%lu u%04x@%04x g%lu/%04x",
-            s_flow_control ? 'F' : 'p', (unsigned long)s_tx_flow_waits,
+  sniprintf(buf, len, "R%lu %c%lu!%lu z%lu r%lu o%lu d%lu u%04x@%04x g%lu/%04x",
+            (unsigned long)s_reboots, s_flow_control ? 'F' : 'p', (unsigned long)s_tx_flow_waits,
             (unsigned long)s_tx_flow_forced, (unsigned long)s_sleeps, (unsigned long)s_rx_pauses,
             (unsigned long)s_rx_overruns, (unsigned long)s_rx_dropped_bytes,
             (unsigned)s_unknown_msg_id, (unsigned)s_unknown_task_id, (unsigned long)s_dgtl_skipped,
@@ -972,6 +1031,13 @@ uint16_t pbl_bt_hci_uart_le_acl_len_reported(void) {
   return s_le_acl_len_reported;
 #else
   return 0U;
+#endif
+}
+
+void pbl_bt_hci_uart_controller_unresponsive(void) {
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  s_reboot_requested = true;
+  pbl_sem_give(&s_rx_ready);
 #endif
 }
 

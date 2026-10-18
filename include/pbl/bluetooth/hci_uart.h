@@ -60,6 +60,14 @@ void pbl_bt_hci_uart_copy_status(char *buf, size_t len);
 void pbl_bt_hci_uart_snapshot(void);
 
 /**
+ * @brief Report that the controller stopped answering HCI commands.
+ *
+ * The DA1468x is rebooted from the HCI thread (a few times per boot at most);
+ * no-op for other controllers.
+ */
+void pbl_bt_hci_uart_controller_unresponsive(void);
+
+/**
  * @brief The HCI state at the last pbl_bt_hci_uart_snapshot().
  *
  * Formats "<last command>><last answered command>/<reply length> a<ACL packets sent>
@@ -96,7 +104,7 @@ uint16_t pbl_bt_hci_uart_le_acl_len_reported(void);
 /**
  * @brief Describe flow control and what the transport skipped, for diagnostics.
  *
- * Formats "<F flow control|p pacing><RTS waits>!<sends forced past RTS>
+ * Formats "R<controller reboots> <F flow control|p pacing><RTS waits>!<sends forced past RTS>
  * z<times the host let STOP mode in> r<RX pauses> o<UART overruns> d<bytes dropped to resynchronize>
  * u<message>@<task> of the last GAPM_UNKNOWN_TASK_IND g<non-HCI DGTL packets
  * skipped>/<last GTL message ID>" (DA1468x only; empty otherwise).
