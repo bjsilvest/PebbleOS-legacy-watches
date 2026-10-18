@@ -12,6 +12,7 @@
 #include <pbl/services/analytics/analytics.h>
 #include <pbl/services/event_service.h>
 #include <pbl/services/imu/units.h>
+#include <pbl/services/new_timer/new_timer.h>
 #include <pbl/services/system_task.h>
 #include <pbl/services/vibe_pattern.h>
 #include <pbl/util/math.h>
@@ -723,33 +724,26 @@ static bool prv_shared_buffer_empty(void) {
   return empty;
 }
 
-//! Names the subscriber that has read the least, the one the buffer is about to advance. Logged on
-//! the first overflow and every 32nd after, since a stalled subscriber overflows on every batch.
-static void prv_log_slowest_subscriber(void) {
+//! Lists every subscriber and what the tasks that serve them are running. Logged on the first
+//! overflow and every 32nd after, since a stalled subscriber overflows on every batch.
+static void prv_log_subscribers(void) {
   static uint32_t s_overflows;
 
   if ((s_overflows++ % 32U) != 0U) {
     return;
   }
 
+  PBL_LOG_WRN("Accel subscriber fell behind (%" PRIu32 "): system task in %p, timers in %p",
+              s_overflows, system_task_get_current_callback(),
+              new_timer_debug_get_current_callback());
   pbl_mutex_lock(&s_accel_manager_mutex, PBL_FOREVER);
-  AccelManagerState *slowest = nullptr;
-  int slowest_left = -1;
   for (AccelManagerState *state = (AccelManagerState *)s_data_subscribers; state;
        state = (AccelManagerState *)state->list_node.next) {
     const int left =
         pbl_shared_cbuf_get_read_space_remaining(&s_buffer, &state->buffer_client.buffer_client);
-    if (left > slowest_left) {
-      slowest = state;
-      slowest_left = left;
-    }
-  }
-  if (slowest) {
-    PBL_LOG_WRN("Accel subscriber fell behind (%" PRIu32
-                "): task %d cb %p unread %d posted %d "
-                "have %u/%u",
-                s_overflows, (int)slowest->task, (void *)slowest->data_cb_handler, slowest_left,
-                slowest->event_posted, slowest->num_samples, slowest->samples_per_update);
+    PBL_LOG_WRN("  task %d cb %p unread %d posted %d have %u/%u", (int)state->task,
+                (void *)state->data_cb_handler, left, state->event_posted, state->num_samples,
+                state->samples_per_update);
   }
   pbl_mutex_unlock(&s_accel_manager_mutex);
 }
@@ -785,7 +779,7 @@ void accel_cb_new_sample(AccelDriverSample const *data) {
   bool rv = pbl_shared_cbuf_write(&s_buffer, (uint8_t *)&accel_buffer_data,
                                   sizeof(accel_buffer_data), false /*advance_slackers*/);
   if (!rv) {
-    prv_log_slowest_subscriber();
+    prv_log_subscribers();
     rv = pbl_shared_cbuf_write(&s_buffer, (uint8_t *)&accel_buffer_data, sizeof(accel_buffer_data),
                                true /*advance_slackers*/);
   }
@@ -836,7 +830,7 @@ void accel_cb_new_samples(AccelRawBatch const *batch) {
   bool rv = pbl_shared_cbuf_write_reserve(&s_buffer, total, false /*advance_slackers*/, &seg1,
                                           &seg1_length, &seg2);
   if (!rv) {
-    prv_log_slowest_subscriber();
+    prv_log_subscribers();
     rv = pbl_shared_cbuf_write_reserve(&s_buffer, total, true /*advance_slackers*/, &seg1,
                                        &seg1_length, &seg2);
   }
