@@ -30,7 +30,8 @@ config HRM_AS7000_PRV_PROBE
       application next to HRM, and record the registers around the PPG
       block at each handshake for Settings > System > Information. Falls
       back to HRM alone if the sensor does not start with PRV. Never
-      writes the sensor flash.
+      writes the sensor flash. With PRV running the LEDs pulse too fast
+      to see flicker, so they look solid.
 
 config HRM_SPO2
     bool
