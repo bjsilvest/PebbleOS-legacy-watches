@@ -56,6 +56,8 @@ CONFIG_AMBIENT_LIGHT_STM32_ADC=y
 
 CONFIG_HRM=y
 CONFIG_HRM_AS7000=y
+# Diagnostic: remove once the sensor loader behaviour is known
+CONFIG_HRM_AS7000_LOADER_PROBE=y
 
 # Settings: motion sensitivity and left-handed (rotated) wear
 CONFIG_ACCEL_SENSITIVITY=y

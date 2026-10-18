@@ -35,6 +35,16 @@ config HRM_AS7000_PRV_PROBE
       to see flicker, so they look solid. Apps get no HRV data: the PRV
       results are not decoded.
 
+config HRM_AS7000_LOADER_PROBE
+    bool "AS7000 loader probe (diagnostic)"
+    depends on HRM_AS7000
+    help
+      Once at boot, switch the sensor to its loader, record whether it
+      runs and reports ready, then wait for the loader to time out back
+      into the application. Never sends firmware records, so the sensor
+      flash is not written. Results are shown in Settings > System >
+      Information and logged.
+
 config HRM_SPO2
     bool
     default y if HRM_GH3X2X || HRM_QEMU

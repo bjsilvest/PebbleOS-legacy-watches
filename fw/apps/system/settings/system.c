@@ -55,8 +55,10 @@
 #include <system/reboot_reason.h>
 #include <system/version.h>
 
-#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+#ifdef CONFIG_HRM_AS7000
 #include <pbl/drivers/hrm/as7000.h>
+#endif
+#ifdef CONFIG_HRM_AS7000_PRV_PROBE
 #include <pbl/services/hrm/hrm_manager.h>
 
 #include <applib/app.h>
@@ -78,6 +80,14 @@ enum {
   SystemInformationItemBtChip,
   SystemInformationItemBtRxBoot,
   SystemInformationItemBtRxReset,
+#endif
+#ifdef CONFIG_HRM_AS7000
+  SystemInformationItemHrm,
+#endif
+#ifdef CONFIG_HRM_AS7000_LOADER_PROBE
+  SystemInformationItemHrmLoader,
+  SystemInformationItemHrmLoader2,
+  SystemInformationItemHrmLoaderRegs,
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   SystemInformationItemHrmPrv,
@@ -173,6 +183,14 @@ typedef struct SystemInformationData {
   char bt_smp_string[21];
   char bt_rx_string[48];
   char app_fetch_string[21];
+#endif
+#ifdef CONFIG_HRM_AS7000
+  char hrm_string[32];
+#endif
+#ifdef CONFIG_HRM_AS7000_LOADER_PROBE
+  char hrm_loader_string[40];
+  char hrm_loader2_string[24];
+  char hrm_loader_regs_string[16];
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   char hrm_prv_string[64];
@@ -277,6 +295,14 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemBtChip] = i18n_noop("BT Chip"),
   [SystemInformationItemBtRxBoot] = i18n_noop("BT Rx boot"),
   [SystemInformationItemBtRxReset] = i18n_noop("BT Rx reset"),
+#endif
+#ifdef CONFIG_HRM_AS7000
+  [SystemInformationItemHrm] = i18n_noop("HRM sensor"),
+#endif
+#ifdef CONFIG_HRM_AS7000_LOADER_PROBE
+  [SystemInformationItemHrmLoader] = i18n_noop("HRM loader"),
+  [SystemInformationItemHrmLoader2] = i18n_noop("HRM loader 2"),
+  [SystemInformationItemHrmLoaderRegs] = i18n_noop("HRM loader regs"),
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   [SystemInformationItemHrmPrv] = i18n_noop("HRM PRV"),
@@ -523,6 +549,43 @@ static void prv_information_window_push(SettingsSystemData *data) {
   info->subtitle_text[SystemInformationItemBtChip] = da1468x_chip_id();
   info->subtitle_text[SystemInformationItemBtRxBoot] = da1468x_rx_after_markers();
   info->subtitle_text[SystemInformationItemBtRxReset] = da1468x_rx_after_reset();
+#endif
+#ifdef CONFIG_HRM_AS7000
+  // Sensor application version, for comparing units
+  AS7000InfoRecord hrm_info;
+  if (as7000_get_version_info(HRM, &hrm_info)) {
+    sniprintf(info->hrm_string, sizeof(info->hrm_string), "%u.%u.%u HW %u p%u.%u",
+              hrm_info.sw_version_major >> 6, hrm_info.sw_version_major & 0x3f,
+              hrm_info.sw_version_minor, hrm_info.hw_revision, hrm_info.protocol_version_major,
+              hrm_info.protocol_version_minor);
+  } else if (hrm_info.protocol_version_major != 0 || hrm_info.application_id != 0) {
+    sniprintf(info->hrm_string, sizeof(info->hrm_string), "no app (p%u app %02x)",
+              hrm_info.protocol_version_major, hrm_info.application_id);
+  } else {
+    strncpy(info->hrm_string, "none", sizeof(info->hrm_string) - 1);
+  }
+  info->subtitle_text[SystemInformationItemHrm] = info->hrm_string;
+#endif
+#ifdef CONFIG_HRM_AS7000_LOADER_PROBE
+  // w<write ok> a<app ids>/<ms> s<first>><last status> r<ready ms>, then
+  // t<app after>/<ms> c<power cycles>
+  AS7000LoaderProbe lp;
+  as7000_get_loader_probe(HRM, &lp);
+  if (!lp.ran) {
+    strncpy(info->hrm_loader_string, "not run", sizeof(info->hrm_loader_string) - 1);
+  } else {
+    sniprintf(info->hrm_loader_string, sizeof(info->hrm_loader_string),
+              "w%u a%02x/%u s%02x>%02x r%u", lp.write_ok, lp.apps, lp.apps_ms, lp.status_first,
+              lp.status_last, lp.ready_ms);
+    sniprintf(info->hrm_loader2_string, sizeof(info->hrm_loader2_string), "t%02x/%u c%u",
+              lp.app_after, lp.back_ms, lp.power_cycles);
+    for (size_t i = 0; i < sizeof(lp.loader_regs); i++) {
+      sniprintf(&info->hrm_loader_regs_string[i * 2], 3, "%02x", lp.loader_regs[i]);
+    }
+  }
+  info->subtitle_text[SystemInformationItemHrmLoader] = info->hrm_loader_string;
+  info->subtitle_text[SystemInformationItemHrmLoader2] = info->hrm_loader2_string;
+  info->subtitle_text[SystemInformationItemHrmLoaderRegs] = info->hrm_loader_regs_string;
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   AS7000Probe probe = {};

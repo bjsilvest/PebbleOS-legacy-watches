@@ -2,13 +2,17 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 //! ams AS7000 heart rate sensor on the Pebble 2 HR. Runs the HRM application already in the
-//! sensor's flash: the loader is never entered and nothing is ever written to the sensor flash.
+//! sensor's flash: nothing is ever written to the sensor flash. Only the diagnostic loader probe
+//! enters the loader, and it sends no firmware records.
 
 #include <string.h>
 
 #include <pbl/drivers/gpio/stm32.h>
 #include <pbl/drivers/hrm.h>
 #include <pbl/drivers/hrm/as7000.h>
+#ifdef CONFIG_HRM_AS7000_LOADER_PROBE
+#include <pbl/drivers/watchdog.h>
+#endif
 #include <pbl/logging/logging.h>
 #include <pbl/services/hrm/hrm_manager.h>
 #include <pbl/services/system_task.h>
@@ -31,6 +35,8 @@ PBL_LOG_MODULE_DEFINE(driver_hrm_as7000, CONFIG_DRIVER_HRM_LOG_LEVEL);
 #define WARMUP_HANDSHAKES 2
 // Seconds without a handshake before the sensor is power cycled
 #define WATCHDOG_TIMEOUT_S 5
+// The loader reboots into a valid application after about a second without records
+#define LOADER_TIMEOUT_MS 1250
 // Failed boots before hrm_enable() gives up until reboot
 #define MAX_BOOT_FAILURES 3
 
@@ -47,6 +53,8 @@ _Static_assert(ACCEL_RATE_MILLIHZ >= 10000 && ACCEL_RATE_MILLIHZ <= 20000,
 #define PRES_DETECT_THRSH_BLACK 54 // 3500 counts
 
 #define ADDR_INFO_START 0x00
+// In the loader
+#define ADDR_LOADER_STATUS         0x00
 #define ADDR_APP_IDS 0x04
 #define ADDR_ACCEL_SAMPLE_FREQ_MSB 0x08
 // Host time of one sensor second, in 0.1 ms, for clock skew compensation
@@ -68,6 +76,7 @@ enum {
   AS7000AppId_PRV = 0x04,
 };
 
+#define AS7000_LOADER_STATUS_READY 0x00
 
 // Signal quality index thresholds, upper bounds
 #define SQI_EXCELLENT 2
@@ -519,6 +528,125 @@ static uint8_t prv_pres_detect_thrsh(void) {
   }
 }
 
+#ifdef CONFIG_HRM_AS7000_LOADER_PROBE
+#define LOADER_BACK_MAX_MS  3000
+#define LOADER_POWER_CYCLES 2
+
+static AS7000LoaderProbe s_loader_probe;
+
+static uint16_t prv_ms_since(RtcTicks start) {
+  return (uint16_t)MIN((rtc_get_ticks() - start) * 1000 / RTC_TICKS_HZ, 0xfffe);
+}
+
+static void prv_sleep_fed(uint32_t ms) {
+  while (ms > 0) {
+    const uint32_t step = MIN(ms, 50U);
+    watchdog_feed();
+    psleep(step);
+    ms -= step;
+  }
+}
+
+// Wait until the application is back and idle. Records what was last read.
+static bool prv_loader_probe_wait_app(HRMDevice *dev, RtcTicks start, uint32_t max_ms) {
+  AS7000LoaderProbe *p = &s_loader_probe;
+  const RtcTicks wait_start = rtc_get_ticks();
+
+  while (prv_ms_since(wait_start) < max_ms) {
+    AS7000InfoRecord info;
+    if (prv_read(dev, ADDR_INFO_START, &info, sizeof(info))) {
+      p->app_after = info.application_id;
+      p->info_after = info;
+      if (info.application_id == AS7000AppId_Idle &&
+          info.protocol_version_major == EXPECTED_PROTOCOL_VERSION_MAJOR) {
+        p->back_ms = prv_ms_since(start);
+        return true;
+      }
+    } else {
+      p->app_after = 0xff;
+    }
+    prv_sleep_fed(50);
+  }
+  return false;
+}
+
+// Called with the sensor enabled, booted and idle. Repeats only the first steps stock firmware
+// took before flashing: no records are sent. The enable line stays high until the application is
+// back, since releasing it while the loader boots selects force loader mode.
+static void prv_loader_probe(HRMDevice *dev) {
+  AS7000LoaderProbe *p = &s_loader_probe;
+  *p = (AS7000LoaderProbe){
+    .ran = true,
+    .apps = 0xff,
+    .ready_ms = 0xffff,
+    .app_after = 0xff,
+    .back_ms = 0xffff,
+  };
+
+  const RtcTicks start = rtc_get_ticks();
+  p->write_ok = prv_write_u8(dev, ADDR_APP_IDS, AS7000AppId_Loader);
+
+  while (prv_ms_since(start) < 500) {
+    if (prv_read(dev, ADDR_APP_IDS, &p->apps, 1) && (p->apps & AS7000AppId_Loader)) {
+      break;
+    }
+    watchdog_feed();
+    psleep(5);
+  }
+  p->apps_ms = prv_ms_since(start);
+
+  if (p->apps != 0xff && (p->apps & AS7000AppId_Loader)) {
+    const RtcTicks status_start = rtc_get_ticks();
+    bool first = true;
+    while (prv_ms_since(status_start) < 500) {
+      uint8_t status;
+      if (prv_read(dev, ADDR_LOADER_STATUS, &status, 1)) {
+        if (first) {
+          p->status_first = status;
+          first = false;
+        }
+        p->status_last = status;
+        if (status == AS7000_LOADER_STATUS_READY) {
+          p->ready_ms = prv_ms_since(status_start);
+          break;
+        }
+      }
+      psleep(1);
+    }
+    prv_read(dev, ADDR_LOADER_STATUS, p->loader_regs, sizeof(p->loader_regs));
+  }
+
+  prv_sleep_fed(LOADER_TIMEOUT_MS);
+  bool back = prv_loader_probe_wait_app(dev, start, LOADER_BACK_MAX_MS);
+
+  // Not back on its own: power cycle with the line held low past the loader's boot window
+  while (!back && p->power_cycles < LOADER_POWER_CYCLES) {
+    p->power_cycles++;
+    pbl_gpio_set(&dev->enable, false);
+    prv_sleep_fed(SHUT_DOWN_DELAY_MS);
+    pbl_gpio_set(&dev->enable, true);
+    prv_sleep_fed(LOADER_TIMEOUT_MS);
+    back = prv_loader_probe_wait_app(dev, start, LOADER_BACK_MAX_MS);
+  }
+
+  PBL_LOG_INFO("AS7000 loader probe: w%u a%02x/%u s%02x>%02x r%u", p->write_ok, p->apps, p->apps_ms,
+               p->status_first, p->status_last, p->ready_ms);
+  PBL_LOG_INFO("AS7000 loader regs: %02x%02x%02x%02x%02x%02x", p->loader_regs[0], p->loader_regs[1],
+               p->loader_regs[2], p->loader_regs[3], p->loader_regs[4], p->loader_regs[5]);
+  PBL_LOG_INFO("AS7000 loader exit: t%02x/%u c%u", p->app_after, p->back_ms, p->power_cycles);
+  PBL_LOG_INFO("AS7000 after probe: protocol %u.%u SW %u.%u.%u HW %u app 0x%x",
+               p->info_after.protocol_version_major, p->info_after.protocol_version_minor,
+               p->info_after.sw_version_major >> 6, p->info_after.sw_version_major & 0x3f,
+               p->info_after.sw_version_minor, p->info_after.hw_revision,
+               p->info_after.application_id);
+}
+
+void as7000_get_loader_probe(HRMDevice *dev, AS7000LoaderProbe *probe) {
+  (void)dev;
+  *probe = s_loader_probe;
+}
+#endif
+
 void hrm_init(HRMDevice *dev) {
   HRMDeviceState *state = dev->state;
   AS7000InfoRecord info;
@@ -534,8 +662,25 @@ void hrm_init(HRMDevice *dev) {
   pbl_gpio_stm32_analog(&dev->int_gpio);
   pbl_gpio_configure(&dev->enable, PBL_GPIO_OUTPUT_ACTIVE);
   psleep(BOOT_DELAY_MS);
-  const bool found = prv_read(dev, ADDR_INFO_START, &info, sizeof(info));
+  bool found = prv_read(dev, ADDR_INFO_START, &info, sizeof(info));
+  if (found && info.application_id == AS7000AppId_Loader) {
+    // Give the loader its timeout to return to a valid application. The enable line must stay
+    // high meanwhile, or the loader stays in force loader mode.
+    PBL_LOG_WRN("AS7000 in its loader, waiting for the application");
+    psleep(LOADER_TIMEOUT_MS);
+    found = prv_read(dev, ADDR_INFO_START, &info, sizeof(info));
+  }
+#ifdef CONFIG_HRM_AS7000_LOADER_PROBE
+  if (found && info.application_id == AS7000AppId_Idle &&
+      info.protocol_version_major == EXPECTED_PROTOCOL_VERSION_MAJOR) {
+    prv_loader_probe(dev);
+    if (s_loader_probe.back_ms == 0xffff) {
+      info = s_loader_probe.info_after;
+    }
+  }
+#endif
   pbl_gpio_set(&dev->enable, false);
+  state->power_off_ticks = rtc_get_ticks();
 
   if (!found) {
     // A Pebble 2 SE

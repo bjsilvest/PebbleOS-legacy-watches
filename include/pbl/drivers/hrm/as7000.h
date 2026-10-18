@@ -143,6 +143,40 @@ typedef struct {
 bool as7000_get_probe(HRMDevice *dev, AS7000Probe *probe);
 #endif
 
+#ifdef CONFIG_HRM_AS7000_LOADER_PROBE
+/** @brief Loader probe result, from the boot it ran on. */
+typedef struct {
+  /** The probe ran (the sensor had an idle application at boot). */
+  bool ran;
+  /** Writing the loader application ID was acknowledged. */
+  bool write_ok;
+  /** Application IDs read back after the switch (0xff: unreadable), and the wait in ms. */
+  uint8_t apps;
+  uint16_t apps_ms;
+  /** Loader status register: first and last value read, and ms until ready (0xffff: never). */
+  uint8_t status_first;
+  uint8_t status_last;
+  uint16_t ready_ms;
+  /** Registers 0x00-0x05 read while in the loader. */
+  uint8_t loader_regs[6];
+  /** Application ID after the loader timed out (0xff: unreadable), and ms after the switch. */
+  uint8_t app_after;
+  uint16_t back_ms;
+  /** Enable line power cycles needed to get the application back. */
+  uint8_t power_cycles;
+  /** Sensor information after returning to the application. */
+  AS7000InfoRecord info_after;
+} AS7000LoaderProbe;
+
+/**
+ * @brief Get the loader probe result.
+ *
+ * @param dev HRM device.
+ * @param[out] probe Result.
+ */
+void as7000_get_loader_probe(HRMDevice *dev, AS7000LoaderProbe *probe);
+#endif
+
 /**
  * @brief Get the sensor information read at init.
  *
