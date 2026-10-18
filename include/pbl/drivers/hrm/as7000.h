@@ -56,6 +56,9 @@ typedef struct HRMDeviceState {
   // HRMFeature bits the sensor was last enabled for
   uint32_t features;
   bool accel_skip_next;
+  // Accel samples sent at the last handshake, and whether the sensor said it lacked them
+  uint8_t accel_sent;
+  bool no_accel;
   volatile bool handshake_pending;
   volatile uint8_t missed_seconds;
   RegularTimerInfo watchdog;

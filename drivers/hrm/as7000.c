@@ -225,6 +225,7 @@ static void prv_write_accel(HRMDevice *dev) {
     }
   }
 
+  dev->state->accel_sent = count;
   prv_write_u8(dev, ADDR_NUM_ACCEL_SAMPLES, count);
   for (uint8_t i = 0; i < count; i++) {
     // Accel samples are in mG, the sensor wants 0.5 mG
@@ -294,6 +295,13 @@ static void prv_handle_handshake(void *context) {
     }
   }
 
+  // Log when the sensor starts or stops missing accel data, with what it was sent
+  const bool no_accel = (regs.status & AS7000_STATUS_NO_ACCEL) != 0;
+  if (no_accel != state->no_accel) {
+    state->no_accel = no_accel;
+    PBL_LOG_WRN("AS7000 %s accel data (sent %u, status 0x%x)", no_accel ? "lacks" : "has",
+                state->accel_sent, regs.status);
+  }
   PBL_LOG_DBG("AS7000 BPM %u status 0x%x sqi %u", regs.bpm, regs.status, regs.sqi);
   hrm_manager_new_data_cb(&data);
 }
@@ -492,6 +500,7 @@ static void prv_power_on(HRMDevice *dev) {
   pbl_gpio_set(&dev->enable, true);
   state->power_on_ticks = rtc_get_ticks();
   state->handshake_count = 0;
+  state->no_accel = false;
   state->state = AS7000State_Booting;
   new_timer_start(state->boot_timer, BOOT_DELAY_MS, prv_boot_timer_cb, (void *)dev, 0);
 }
