@@ -297,7 +297,7 @@ static void prv_handle_handshake(void *context) {
 
   // Log when the sensor starts or stops missing accel data, with what it was sent
   const bool no_accel = (regs.status & AS7000_STATUS_NO_ACCEL) != 0;
-  if (no_accel != state->no_accel) {
+  if (no_accel != state->no_accel || (no_accel && state->handshake_count % 30 == 0)) {
     state->no_accel = no_accel;
     PBL_LOG_WRN("AS7000 %s accel data (sent %u, status 0x%x)", no_accel ? "lacks" : "has",
                 state->accel_sent, regs.status);
