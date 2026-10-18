@@ -126,7 +126,7 @@ STM32 drivers are rewritten against the current APIs, using the old drivers
 | Board (`fw/board/boards/board_silk.*`) | done for the above |
 | I2C3, AS3701B PMIC, battery ADC | done (stock charger settings) |
 | Vibe (DRV2603 PWM), backlight PWM, BMA255 accel | done (stock values; QEMU does not emulate the BMA255) |
-| Ambient light (ADC1 ch13, PC0 enable) | done |
+| Ambient light (ADC1 ch13, PC0 enable) | done, stock dark threshold 150 checked on hardware: settled readings are about 20 in the dark, 25 in dim light, 80 indoors and 350 to 480 by a window. In dim light the sensor takes about 3 s to settle after the backlight (up to about 138 while settling), which stays under the threshold |
 | DFSDM mic (DMA2 stream 6) | done |
 | Internal temperature sensor | done |
 | Hardware platform ID (`PebbleSilk`), bundle `hwrev: silk` | done |
