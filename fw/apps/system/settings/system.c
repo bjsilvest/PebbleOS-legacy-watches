@@ -172,7 +172,7 @@ typedef struct SystemInformationData {
   char app_fetch_string[21];
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
-  char hrm_prv_string[56];
+  char hrm_prv_string[64];
   char hrm_changed_string[12];
   // Per handshake: 0x12 and the first read of the 0x2c block as the title, the second read below
   char hrm_history_title[AS7000_PROBE_HISTORY][16];
@@ -484,8 +484,8 @@ static void prv_information_window_push(SettingsSystemData *data) {
     strncpy(info->hrm_prv_string, "no sensor", sizeof(info->hrm_prv_string) - 1);
   } else {
     sniprintf(info->hrm_prv_string, sizeof(info->hrm_prv_string),
-              "%ubpm p%u %u-%u r%02x a%02x%s b%u n%lu m%02x v%u", probe.bpm, probe.ppg_samples,
-              probe.ppg_min, probe.ppg_max, probe.requested, probe.running,
+              "%ubpm q%u s%02x p%u %u-%u r%02x a%02x%s b%u n%lu m%02x v%u", probe.bpm, probe.sqi,
+              probe.status, probe.ppg_samples, probe.ppg_min, probe.ppg_max, probe.requested, probe.running,
               probe.prv_failed ? " F" : "", probe.boots, (unsigned long)probe.handshakes,
               probe.max_2c, probe.advances);
   }

@@ -167,6 +167,8 @@ static void prv_probe_read(HRMDevice *dev, uint8_t bpm, uint8_t status, uint8_t 
     s_probe.regs[i] = regs[i];
   }
   s_probe.bpm = bpm;
+  s_probe.status = status;
+  s_probe.sqi = sqi;
   // The sampling rate, to see whether PRV samples faster than HRM alone
   uint8_t ppg_samples;
   if (prv_read(dev, ADDR_NUM_PPG_SAMPLES, &ppg_samples, 1)) {

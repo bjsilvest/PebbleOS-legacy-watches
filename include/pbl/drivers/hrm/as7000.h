@@ -106,8 +106,10 @@ typedef struct {
   uint16_t boots;
   /** Handshakes sampled. */
   uint32_t handshakes;
-  /** BPM register at the last handshake. */
+  /** BPM, status and signal quality (254 = off wrist) at the last handshake. */
   uint8_t bpm;
+  uint8_t status;
+  uint8_t sqi;
   /** PPG samples the sensor took in the last second, and the range seen. */
   uint8_t ppg_samples;
   uint8_t ppg_min;
