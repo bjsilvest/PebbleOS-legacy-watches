@@ -337,22 +337,31 @@ static uint16_t prv_information_get_num_rows_callback(MenuLayer *menu_layer, uin
 }
 
 #ifdef CONFIG_AMBIENT_LIGHT_STM32_ADC
-//! Time for the backlight to go dark before reading the light sensor.
-#define LIGHT_READ_SETTLE_MS (250)
+//! Times after the backlight goes off to read the light sensor. A phototransistor
+//! can take a long time to settle in the dark after the backlight lit it.
+static const uint32_t s_light_read_ms[] = {250, 1000, 3000};
 
 //! Read the light sensor with the backlight off, for calibrating it.
 static void prv_read_light(SystemInformationData *info) {
+  uint32_t raw[ARRAY_LENGTH(s_light_read_ms)];
+  uint32_t elapsed_ms = 0;
+
   light_allow(false);
-  psleep(LIGHT_READ_SETTLE_MS);
-  const uint32_t raw = ambient_light_get_light_level();
+  for (size_t i = 0; i < ARRAY_LENGTH(s_light_read_ms); i++) {
+    psleep(s_light_read_ms[i] - elapsed_ms);
+    elapsed_ms = s_light_read_ms[i];
+    raw[i] = ambient_light_get_light_level();
+  }
   light_allow(true);
   light_enable_interaction();
 
+  const uint32_t settled = raw[ARRAY_LENGTH(raw) - 1];
   if (ambient_light_lux_available()) {
-    sniprintf(info->light_string, sizeof(info->light_string), "%" PRIu32 " (%" PRIu32 " lux)", raw,
-              ambient_light_level_to_lux(raw));
+    sniprintf(info->light_string, sizeof(info->light_string), "%" PRIu32 " (%" PRIu32 " lux)",
+              settled, ambient_light_level_to_lux(settled));
   } else {
-    sniprintf(info->light_string, sizeof(info->light_string), "%" PRIu32 " raw", raw);
+    sniprintf(info->light_string, sizeof(info->light_string), "%" PRIu32 " %" PRIu32 " %" PRIu32,
+              raw[0], raw[1], raw[2]);
   }
 }
 #endif
