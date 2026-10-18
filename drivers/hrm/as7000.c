@@ -336,6 +336,7 @@ static void prv_power_off(HRMDevice *dev) {
   if (dev->led_supply != nullptr) {
     (void)pbl_regulator_disable(dev->led_supply);
   }
+  state->power_off_ticks = rtc_get_ticks();
   state->state = AS7000State_Off;
   PBL_LOG_DBG("AS7000 off");
 }
@@ -347,7 +348,6 @@ static void prv_watchdog_system_cb(void *context) {
   if (dev->state->state == AS7000State_On && dev->state->missed_seconds >= WATCHDOG_TIMEOUT_S) {
     PBL_LOG_ERR("AS7000 stopped handshaking, power cycling");
     prv_power_off(dev);
-    psleep(SHUT_DOWN_DELAY_MS);
     prv_power_on(dev);
   }
   pbl_mutex_unlock(&dev->state->lock);
@@ -401,8 +401,8 @@ static bool prv_start_hrm_app(HRMDevice *dev) {
 
   uint8_t apps = AS7000AppId_HRM;
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
-  // Ask for PRV too until a boot with it fails, then fall back to HRM alone
-  if (!s_probe.prv_failed) {
+  // Ask for PRV too while an app wants HRV, until a boot with it fails
+  if ((state->features & HRMFeature_HRV) && !s_probe.prv_failed) {
     apps |= AS7000AppId_PRV;
   }
   s_probe.requested = apps;
@@ -476,6 +476,15 @@ static void prv_boot_timer_cb(void *context) {
 // Caller holds the lock
 static void prv_power_on(HRMDevice *dev) {
   HRMDeviceState *state = dev->state;
+
+  // A restart (e.g. for new features) must let the last application tear down first
+  if (state->power_off_ticks != 0) {
+    const uint32_t off_ms =
+        (uint32_t)((rtc_get_ticks() - state->power_off_ticks) * 1000 / RTC_TICKS_HZ);
+    if (off_ms < SHUT_DOWN_DELAY_MS) {
+      psleep(SHUT_DOWN_DELAY_MS - off_ms);
+    }
+  }
 
   if (dev->led_supply != nullptr) {
     (void)pbl_regulator_enable(dev->led_supply);
@@ -552,7 +561,6 @@ bool hrm_enable(HRMDevice *dev, HRMFeature features, bool low_latency) {
   HRMDeviceState *state = dev->state;
   bool ret = true;
 
-  (void)features;
   (void)low_latency;
 
   if (!hrm_is_present(dev)) {
@@ -564,6 +572,7 @@ bool hrm_enable(HRMDevice *dev, HRMFeature features, bool low_latency) {
     if (state->boot_failures >= MAX_BOOT_FAILURES) {
       ret = false;
     } else {
+      state->features = features;
       prv_power_on(dev);
     }
   }

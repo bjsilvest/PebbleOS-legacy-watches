@@ -49,9 +49,12 @@ typedef struct HRMDeviceState {
   struct pbl_mutex lock;
   TimerID boot_timer;
   RtcTicks power_on_ticks;
+  RtcTicks power_off_ticks;
   uint32_t handshake_count;
   uint8_t boot_failures;
   uint8_t pres_detect_thrsh;
+  // HRMFeature bits the sensor was last enabled for
+  uint32_t features;
   bool accel_skip_next;
   volatile bool handshake_pending;
   volatile uint8_t missed_seconds;
