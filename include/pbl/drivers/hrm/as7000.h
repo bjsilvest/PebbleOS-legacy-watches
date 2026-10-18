@@ -108,6 +108,10 @@ typedef struct {
   uint32_t handshakes;
   /** BPM register at the last handshake. */
   uint8_t bpm;
+  /** PPG samples the sensor took in the last second, and the range seen. */
+  uint8_t ppg_samples;
+  uint8_t ppg_min;
+  uint8_t ppg_max;
   /** Register values at the last handshake. */
   uint8_t regs[AS7000_PROBE_NUM_REGS];
   /** Bit n set once register n changed between handshakes. */

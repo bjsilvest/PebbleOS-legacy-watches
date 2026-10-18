@@ -52,6 +52,7 @@ _Static_assert(ACCEL_RATE_MILLIHZ >= 10000 && ACCEL_RATE_MILLIHZ <= 20000,
 // Host time of one sensor second, in 0.1 ms, for clock skew compensation
 #define ADDR_HOST_ONE_SECOND_TIME_MSB 0x0a
 #define ADDR_NUM_ACCEL_SAMPLES 0x0e
+#define ADDR_NUM_PPG_SAMPLES 0x0f
 #define ADDR_ACCEL_SAMPLE_IDX 0x14
 #define ADDR_PRES_DETECT_THRSH 0x26
 #define ADDR_LED_CURRENT_MSB 0x34
@@ -128,9 +129,9 @@ static void prv_probe_app_log(const uint8_t *regs, const uint8_t third[AS7000_PR
   prv_hex(second, sample->second, AS7000_PROBE_BLOCK_LEN);
   prv_hex(third_hex, third, AS7000_PROBE_BLOCK_LEN);
   prv_hex(dump, &regs[4], 20);
-  app_log(APP_LOG_LEVEL_INFO, "as7000", 0, "PRV n%lu b%u s%02x q%u 12=%02x %s %s %s",
-          (unsigned long)s_probe.handshakes, s_probe.bpm, status, sqi, sample->reg12, first,
-          second, third_hex);
+  app_log(APP_LOG_LEVEL_INFO, "as7000", 0, "PRV n%lu b%u p%u s%02x q%u 12=%02x %s %s %s",
+          (unsigned long)s_probe.handshakes, s_probe.bpm, s_probe.ppg_samples, status, sqi,
+          sample->reg12, first, second, third_hex);
   app_log(APP_LOG_LEVEL_INFO, "as7000", 0, "PRV n%lu 20-33 %s", (unsigned long)s_probe.handshakes,
           dump);
 }
@@ -166,6 +167,15 @@ static void prv_probe_read(HRMDevice *dev, uint8_t bpm, uint8_t status, uint8_t 
     s_probe.regs[i] = regs[i];
   }
   s_probe.bpm = bpm;
+  // The sampling rate, to see whether PRV samples faster than HRM alone
+  uint8_t ppg_samples;
+  if (prv_read(dev, ADDR_NUM_PPG_SAMPLES, &ppg_samples, 1)) {
+    s_probe.ppg_samples = ppg_samples;
+    if (s_probe.handshakes == 0 || ppg_samples < s_probe.ppg_min) {
+      s_probe.ppg_min = ppg_samples;
+    }
+    s_probe.ppg_max = MAX(s_probe.ppg_max, ppg_samples);
+  }
   s_probe.handshakes++;
 
   if (app_log_is_bt_enabled()) {
