@@ -144,27 +144,43 @@ bool as7000_get_probe(HRMDevice *dev, AS7000Probe *probe);
 #endif
 
 #ifdef CONFIG_HRM_AS7000_LOADER_PROBE
-/** @brief Loader probe result, from the boot it ran on. */
+/** @brief Changes of the running applications seen while switching to the loader. */
+#define AS7000_LOADER_PROBE_EVENTS 5
+
+/** @brief One change seen while switching to the loader. */
 typedef struct {
-  /** The probe ran (the sensor had an idle application at boot). */
-  bool ran;
-  /** Writing the loader application ID was acknowledged. */
-  bool write_ok;
-  /** Application IDs read back after the switch (0xff: unreadable), and the wait in ms. */
-  uint8_t apps;
-  uint16_t apps_ms;
-  /** Loader status register: first and last value read, and ms until ready (0xffff: never). */
-  uint8_t status_first;
-  uint8_t status_last;
-  uint16_t ready_ms;
-  /** Registers 0x00-0x05 read while in the loader. */
-  uint8_t loader_regs[6];
-  /** Application ID after the loader timed out (0xff: unreadable), and ms after the switch. */
-  uint8_t app_after;
-  uint16_t back_ms;
+  /** Value read from the application IDs register (0xff: unreadable). */
+  uint8_t value;
+  /** Milliseconds after the switch was requested. */
+  uint8_t ms;
+} AS7000LoaderProbeEvent;
+
+/** @brief Loader probe result. Times are in ms; 0xffff means never. */
+typedef struct {
+  /** 'w' waiting, 'r' running, 'd' done, 's' skipped (sensor not idle), 'f' loader never
+   *  showed, 'x' application not back */
+  char state;
+  /** Run A: time until the loader showed, and the changes seen on the way. */
+  uint16_t loader_ms;
+  AS7000LoaderProbeEvent events[AS7000_LOADER_PROBE_EVENTS];
+  uint8_t num_events;
+  /** Run A, no I2C traffic: handshake line level at the start, edges, first and last edge. */
+  bool int_start;
+  uint16_t int_edges;
+  uint16_t int_first_ms;
+  uint16_t int_last_ms;
+  /** Run A: the application was already back at the first read after the silent wait, and
+   *  when it was seen back. */
+  bool a_back_first;
+  uint16_t a_back_ms;
+  /** Run B, polled every 50 ms: time until the loader showed, until the application was back,
+   *  and the reads it took. */
+  uint16_t b_loader_ms;
+  uint16_t b_back_ms;
+  uint16_t b_reads;
   /** Enable line power cycles needed to get the application back. */
   uint8_t power_cycles;
-  /** Sensor information after returning to the application. */
+  /** Sensor information last read. */
   AS7000InfoRecord info_after;
 } AS7000LoaderProbe;
 

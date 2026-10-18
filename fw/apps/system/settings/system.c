@@ -86,8 +86,9 @@ enum {
 #endif
 #ifdef CONFIG_HRM_AS7000_LOADER_PROBE
   SystemInformationItemHrmLoader,
-  SystemInformationItemHrmLoader2,
-  SystemInformationItemHrmLoaderRegs,
+  SystemInformationItemHrmSwitch,
+  SystemInformationItemHrmSilent,
+  SystemInformationItemHrmPolled,
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   SystemInformationItemHrmPrv,
@@ -188,9 +189,10 @@ typedef struct SystemInformationData {
   char hrm_string[32];
 #endif
 #ifdef CONFIG_HRM_AS7000_LOADER_PROBE
-  char hrm_loader_string[40];
-  char hrm_loader2_string[24];
-  char hrm_loader_regs_string[16];
+  char hrm_loader_string[24];
+  char hrm_switch_string[48];
+  char hrm_silent_string[40];
+  char hrm_polled_string[40];
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   char hrm_prv_string[64];
@@ -301,8 +303,9 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
 #endif
 #ifdef CONFIG_HRM_AS7000_LOADER_PROBE
   [SystemInformationItemHrmLoader] = i18n_noop("HRM loader"),
-  [SystemInformationItemHrmLoader2] = i18n_noop("HRM loader 2"),
-  [SystemInformationItemHrmLoaderRegs] = i18n_noop("HRM loader regs"),
+  [SystemInformationItemHrmSwitch] = i18n_noop("HRM switch"),
+  [SystemInformationItemHrmSilent] = i18n_noop("HRM silent"),
+  [SystemInformationItemHrmPolled] = i18n_noop("HRM polled"),
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   [SystemInformationItemHrmPrv] = i18n_noop("HRM PRV"),
@@ -567,25 +570,26 @@ static void prv_information_window_push(SettingsSystemData *data) {
   info->subtitle_text[SystemInformationItemHrm] = info->hrm_string;
 #endif
 #ifdef CONFIG_HRM_AS7000_LOADER_PROBE
-  // w<write ok> a<app ids>/<ms> s<first>><last status> r<ready ms>, then
-  // t<app after>/<ms> c<power cycles>
+  // State and loader switch time; the switch as value@ms; the silent run as
+  // back<ms> i<start level>/<edges> <first>-<last>; the polled run as L<ms> back<ms> r<reads>
   AS7000LoaderProbe lp;
   as7000_get_loader_probe(HRM, &lp);
-  if (!lp.ran) {
-    strncpy(info->hrm_loader_string, "not run", sizeof(info->hrm_loader_string) - 1);
-  } else {
-    sniprintf(info->hrm_loader_string, sizeof(info->hrm_loader_string),
-              "w%u a%02x/%u s%02x>%02x r%u", lp.write_ok, lp.apps, lp.apps_ms, lp.status_first,
-              lp.status_last, lp.ready_ms);
-    sniprintf(info->hrm_loader2_string, sizeof(info->hrm_loader2_string), "t%02x/%u c%u",
-              lp.app_after, lp.back_ms, lp.power_cycles);
-    for (size_t i = 0; i < sizeof(lp.loader_regs); i++) {
-      sniprintf(&info->hrm_loader_regs_string[i * 2], 3, "%02x", lp.loader_regs[i]);
-    }
+  sniprintf(info->hrm_loader_string, sizeof(info->hrm_loader_string), "%c L%u c%u", lp.state,
+            lp.loader_ms, lp.power_cycles);
+  size_t pos = 0;
+  for (int i = 0; i < lp.num_events && pos < sizeof(info->hrm_switch_string); i++) {
+    pos += sniprintf(&info->hrm_switch_string[pos], sizeof(info->hrm_switch_string) - pos,
+                     "%02x@%u ", lp.events[i].value, lp.events[i].ms);
   }
+  sniprintf(info->hrm_silent_string, sizeof(info->hrm_silent_string), "back%s%u i%u/%u %u-%u",
+            lp.a_back_first ? "<=" : " ", lp.a_back_ms, lp.int_start, lp.int_edges, lp.int_first_ms,
+            lp.int_last_ms);
+  sniprintf(info->hrm_polled_string, sizeof(info->hrm_polled_string), "L%u back %u r%u",
+            lp.b_loader_ms, lp.b_back_ms, lp.b_reads);
   info->subtitle_text[SystemInformationItemHrmLoader] = info->hrm_loader_string;
-  info->subtitle_text[SystemInformationItemHrmLoader2] = info->hrm_loader2_string;
-  info->subtitle_text[SystemInformationItemHrmLoaderRegs] = info->hrm_loader_regs_string;
+  info->subtitle_text[SystemInformationItemHrmSwitch] = info->hrm_switch_string;
+  info->subtitle_text[SystemInformationItemHrmSilent] = info->hrm_silent_string;
+  info->subtitle_text[SystemInformationItemHrmPolled] = info->hrm_polled_string;
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   AS7000Probe probe = {};

@@ -39,11 +39,12 @@ config HRM_AS7000_LOADER_PROBE
     bool "AS7000 loader probe (diagnostic)"
     depends on HRM_AS7000
     help
-      Once at boot, switch the sensor to its loader, record whether it
-      runs and reports ready, then wait for the loader to time out back
-      into the application. Never sends firmware records, so the sensor
-      flash is not written. Results are shown in Settings > System >
-      Information and logged.
+      Once, a minute after boot while the HRM is off, switch the sensor
+      to its loader twice: first with no I2C traffic while it times out
+      back into the application, then polling it every 50 ms, to measure
+      the loader timeout and whether accesses restart it. Never sends
+      firmware records, so the sensor flash is not written. Results are
+      shown in Settings > System > Information and logged.
 
 config HRM_SPO2
     bool
