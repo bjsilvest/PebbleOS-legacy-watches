@@ -1130,10 +1130,10 @@ void shell_prefs_init(void) {
     s_backlight_preset = BacklightPreset_Advanced;
   }
 
-#if defined(CONFIG_AMBIENT_LIGHT_W1160)
-  // One-time: the W1160 scale rework left old-scale ambient thresholds far below
-  // current readings (backlight stuck off). Drop any stored override so the
-  // device follows the new board default.
+#if defined(CONFIG_AMBIENT_LIGHT_W1160) || defined(CONFIG_AMBIENT_LIGHT_THRESHOLD_LOCAL)
+  // One-time: the W1160 scale rework, or a threshold synced from another watch
+  // model, can leave the stored threshold far below current readings (backlight
+  // stuck off). Drop any stored override so the device follows the board default.
   if (!s_als_threshold_migrated_v1) {
     s_backlight_ambient_threshold = BOARD_CONFIG.ambient_light_dark_threshold;
     SettingsFile mfile = {};
@@ -1145,7 +1145,9 @@ void shell_prefs_init(void) {
     const bool migrated = true;
     prv_pref_set(PREF_KEY_ALS_THRESHOLD_MIGRATED_V1, &migrated, sizeof(migrated));
   }
+#endif
 
+#if defined(CONFIG_AMBIENT_LIGHT_W1160)
   // One-time: the ALS pipeline switched from raw counts to lux, so stored
   // threshold overrides are in the wrong unit (~5x too high). Drop them so
   // the device follows the new lux board defaults.
