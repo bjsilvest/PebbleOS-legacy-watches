@@ -231,8 +231,16 @@ bool pbl_bt_start(struct pbl_bt_config *config) {
   ble_svc_dis_software_revision_set(s_dis_info.sw_revision);
   ble_svc_dis_manufacturer_name_set(s_dis_info.manufacturer);
 
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+  // GATT first, as the stock firmware and recovery have it: Service Changed
+  // then sits at the stock handle (0x0003), which phones that cached the stock
+  // layout honor, so they rediscover ours.
+  ble_svc_gatt_init();
+  ble_svc_gap_init();
+#else
   ble_svc_gap_init();
   ble_svc_gatt_init();
+#endif
   ble_svc_dis_init();
   pebble_pairing_service_init();
   ble_svc_bas_init();
