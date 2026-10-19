@@ -132,7 +132,7 @@ STM32 drivers are rewritten against the current APIs, using the old drivers
 | Hardware platform ID (`PebbleSilk`), bundle `hwrev: silk` | done |
 | DMA for display, QSPI, UART RX | todo (polled for now) |
 | Bluetooth (DA14681, H4 over UART, NimBLE host) | done, untested on hardware; needs the Dialog SDK, see below |
-| Heart rate (AS7000 on I2C3, Pebble 2 HR only) | done, BPM and LED pulsing tested on hardware: probed at boot (the SE runs the same image), runs the ams application already in the sensor flash and never enters its loader or reflashes it (the update image was not released); BPM only, no SpO2/HRV; QEMU does not emulate it |
+| Heart rate (AS7000 on I2C3, Pebble 2 HR only) | done, BPM and LED pulsing tested on hardware: probed at boot (the SE runs the same image), runs the ams application in the sensor flash; BPM only, no SpO2; optional sensor firmware update for personal builds, see [Heart rate sensor](#heart-rate-sensor); QEMU does not emulate it |
 | Motion sensitivity setting (`ACCEL_SENSITIVITY`; default "Medium" keeps the stock threshold) | on, untested on hardware |
 | Left-handed wear (`ORIENTATION_MANAGER`: display, buttons, BMA255 rotate 180°) | on; display checked in QEMU |
 
@@ -178,6 +178,42 @@ Pin map (from the stock board file):
 | Accel ints | PA6, PA3 |
 | ADC1 | ALS ch13 (PC3, enable PC0), battery ch5 (PA5), temperature |
 | Mic | DFSDM1 ch2, CK PC2, SD PB14 |
+
+## Heart rate sensor
+
+The AS7000 runs an ams application from its own flash. Settings > System >
+Information shows its version as "HRM sensor" (e.g. `1.13.16 HW 4 p2.0`).
+
+**Stock firmware never updated many sensors.** Every stock release from 4.2
+to 4.4.3-rbl carries application 1.14.4 and reflashes the sensor at boot on
+any version mismatch. Factory watches shipped with 1.13.16, which the stock
+v4.0-prf4 recovery firmware also carries. Asked to switch to its loader, a
+1.13.16 sensor stops answering I2C for 36 to 75 ms, but stock read the
+running applications once, 35 ms after asking. It gave up before sending
+any record, on every boot, so such watches stayed on 1.13.16 without harm.
+The loader returns to a valid application by itself about 12.7 s after it
+was entered, whether or not it is polled.
+
+`CONFIG_HRM_AS7000_FW_UPDATE` fixes this for personal builds: at boot it
+flashes the `AS7000_FW_IMAGE` resource when the sensor runs another version
+or has no application, waiting up to 300 ms for the loader. The image's last
+segment is the valid application marker, so an interrupted update leaves the
+sensor in its loader and the next boot flashes again. Once the versions
+match, boot skips it. "HRM update" in Information shows the outcome. The
+image is not redistributable, so never enable this in a published build; to
+go back to a version, build with that version's image. Tested on hardware:
+1.13.16 to 1.14.4. If a 1.14.4 sensor boots the stock PRF, PRF may try to
+flash 1.13.16 back, which either fails harmlessly or succeeds.
+
+`AS7000_FW_IMAGE` is a builtin resource, so every silk build carries 30 KB
+of 1.14.4 in internal flash even without the update option. TODO: drop it
+from builds that do not update the sensor.
+
+**HRV is not available to apps.** The sensor also runs its undocumented PRV
+(pulse rate variability) application next to HRM when asked
+(`CONFIG_HRM_AS7000_PRV_PROBE`, diagnostic, off by default), but its results
+are not decoded, and the Health service API is frozen for Pebble 2 apps, so
+no SDK app on silk can request or read HRV.
 
 ## Resources
 
