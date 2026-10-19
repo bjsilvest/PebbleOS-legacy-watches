@@ -25,7 +25,8 @@ Everything below follows from three hard limits:
 Current sizes: firmware ev2_4 507,419 B, v1_5 507,579 B, v2_0 507,707 B and
 bb2 507,803 B (101 B left on bb2, the largest); resources 258,525 B (3.6 KiB
 left); static kernel RAM 66,592 B, which leaves about 19 KiB for the kernel
-heap by the linker map (not measured on hardware since the RAM pass).
+heap by the linker map. No out-of-memory or other crash on hardware with a
+phone connected since -312 (notifications, watchface installs, reconnects).
 
 ## Features removed
 
@@ -57,7 +58,7 @@ heap by the linker map (not measured on hardware since the RAM pass).
 | Built-in fallback font | Hex digits only, as stock firmware had it (it only draws error codes). Applies to all boards. | `204422d73` |
 | Launcher | The 4.x glance launcher (`SERVICE_APP_GLANCES=y`), which stock aplite never had. The legacy list launcher stays in the tree for builds without glances. `app_glance_reload` allocates its glance only while it runs, so apps keep the full runtime RAM. | `LAUNCHER_LEGACY`, `app_state_set_glance` |
 | Per-app runtime RAM | 6,816 bytes instead of 6,820, so the 32 KiB app region is aligned for the MPU. AppState leaves out touch and health state the board lacks, and holds the app glance as a pointer, allocated only while an app reloads it. | `APP_RAM_APLITE_RUNTIME_SIZE`, `e9f29d8ec` |
-| Task timer pool | 96 slots instead of 192 (24 in use after boot). Running out is fatal, so the peak with a phone connected still needs checking on hardware. | `TASK_TIMER_POOL_SIZE=96` |
+| Task timer pool | 96 slots instead of 192 (24 in use after boot). Running out is fatal; it has not happened on hardware with a phone connected. | `TASK_TIMER_POOL_SIZE=96` |
 | App cache | Keeps 300 KiB free instead of 4 MiB (the filesystem is 2.1 MiB; the 4 MiB buffer evicted every downloaded app). | `7bd5fb94d` |
 | Bluetooth controller | TI CC2564A. Its init script stays unmodified in the system resources instead of the firmware. Uses the chip's factory address, as stock did, and deep sleep (eHCILL). | `BT_CC2564_BTS_RESOURCE`, `fb10c17cd` |
 | Bluetooth GATT client | Only the seven procedures the firmware uses: discover services, characteristics and descriptors; read, read by UUID; write, write without response. | `aef42ad11` |
@@ -119,6 +120,3 @@ spalding carry the same three changes.
 
 - The retail watch (v1_5) and the Steel (v2_0) have not run on hardware.
 - Not tested with an iPhone (ANCS, AMS, pairing).
-- Not measured on hardware: the task timer peak and kernel heap use with a
-  phone connected.
-- 101 B of flash left on bb2; the next feature needs another trade.
