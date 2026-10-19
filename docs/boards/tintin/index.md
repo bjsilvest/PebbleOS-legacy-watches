@@ -3,7 +3,7 @@
 Port of PebbleOS to the original Pebble ("tintin", the `aplite` platform):
 the Kickstarter watch (`tintin@ev2_4`), the retail watch (`tintin@v1_5`), the
 Pebble Steel (`tintin@v2_0`) and the bigboard QEMU emulates (`tintin@bb2`).
-Stock firmware stopped at 3.x for these watches; this branch, `aplite-lite`,
+Stock firmware stopped at 3.x for these watches; this branch, `tintin-lite-fork`,
 runs the current firmware on them with a cut-down feature set. The
 Kickstarter watch runs it; the retail watch and the Steel build but have not
 run on hardware yet.
@@ -22,9 +22,10 @@ Everything below follows from three hard limits:
 | Kernel RAM | about 86 KiB | 128 KiB SRAM, less the aplite app region (32 KiB) and the worker region (12 KiB) |
 | System resources | 256 KiB | The stock firmware and the stock recovery firmware install resource packs only into the stock 256 KiB banks |
 
-Current sizes: ev2_4 firmware 506,112 B and bb2 506,240 B (about 1.7 KiB
-left); resources 258,525 B (3.6 KiB left); kernel heap 13 KiB (about 11 KiB
-free when idle, measured in QEMU with Bluetooth off).
+Current sizes: firmware ev2_4 507,419 B, v1_5 507,579 B, v2_0 507,707 B and
+bb2 507,803 B (101 B left on bb2, the largest); resources 258,525 B (3.6 KiB
+left); static kernel RAM 66,592 B, which leaves about 19 KiB for the kernel
+heap by the linker map (not measured on hardware since the RAM pass).
 
 ## Features removed
 
@@ -55,7 +56,7 @@ free when idle, measured in QEMU with Bluetooth off).
 | Resources kept in the filesystem | The timezone database, the emoji fonts, every font except the Gothic text fonts, Gothic 9 and the golf app are stored deflated in the resource pack. The first boot after an install inflates them into the filesystem file `sysres` (about 0.3 s); later boots check and skip it. If the file were lost, those resources would be missing until the next boot rebuilds it; Gothic, images and the Bluetooth init script never depend on it. | `"files"` entry with `"unpack": true` in `resources/normal/tintin/resource_map.json`, `fw/resource/resource_unpack.c` |
 | Built-in fallback font | Hex digits only, as stock firmware had it (it only draws error codes). Applies to all boards. | `204422d73` |
 | Launcher | The 4.x glance launcher (`SERVICE_APP_GLANCES=y`), which stock aplite never had. The legacy list launcher stays in the tree for builds without glances. `app_glance_reload` allocates its glance only while it runs, so apps keep the full runtime RAM. | `LAUNCHER_LEGACY`, `app_state_set_glance` |
-| Per-app runtime RAM | 6,816 bytes instead of 6,820, so the 32 KiB app region is aligned for the MPU. AppState leaves out glance, touch and health state the board lacks. | `APP_RAM_APLITE_RUNTIME_SIZE`, `e9f29d8ec` |
+| Per-app runtime RAM | 6,816 bytes instead of 6,820, so the 32 KiB app region is aligned for the MPU. AppState leaves out touch and health state the board lacks, and holds the app glance as a pointer, allocated only while an app reloads it. | `APP_RAM_APLITE_RUNTIME_SIZE`, `e9f29d8ec` |
 | Task timer pool | 96 slots instead of 192 (24 in use after boot). Running out is fatal, so the peak with a phone connected still needs checking on hardware. | `TASK_TIMER_POOL_SIZE=96` |
 | App cache | Keeps 300 KiB free instead of 4 MiB (the filesystem is 2.1 MiB; the 4 MiB buffer evicted every downloaded app). | `7bd5fb94d` |
 | Bluetooth controller | TI CC2564A. Its init script stays unmodified in the system resources instead of the firmware. Uses the chip's factory address, as stock did, and deep sleep (eHCILL). | `BT_CC2564_BTS_RESOURCE`, `fb10c17cd` |
@@ -78,17 +79,46 @@ free when idle, measured in QEMU with Bluetooth off).
 - **Resources** stay within the stock 256 KiB banks, so the stock recovery
   firmware can still install them.
 
+## Pairing after installing from recovery
+
+The usual install goes through the stock recovery firmware: factory reset,
+pair the phone with recovery, install. Recovery's pairing cannot be carried
+over: its key is not derivable from what it stores in its shared storage
+(the EDIV matches, the key does not), so the phone's first encryption fails.
+Then:
+
+1. Open Settings, Bluetooth on the watch. While it is open, the watch accepts
+   a pairing request from a phone it already has a bond with, deletes the old
+   keys and pairs again (`2e7b31616`). Outside it, such requests are still
+   ignored, so another device cannot quietly replace the phone's bond.
+2. Enter the code the watch shows on the phone (legacy passkey entry; the
+   CC2564A has no LE Secure Connections).
+3. The watch reconnects once by itself about a second later (`d0b3111cc`).
+
+The reconnect is needed because Android keeps recovery's attribute cache even
+after pairing again, and the Core app keeps the attributes it found when the
+link came up. The GATT service is registered before GAP, as stock does, so
+Service Changed sits at the stock handle (0x0003). When the phone enables it
+after pairing, the watch indicates that every handle changed (`4629dd1b9`),
+and the next link uses ours. Without this the app connects but subscribes to
+stock handles: no battery level, and stalls after a reconnect.
+
+Recovery advertises from a different (random) address than this firmware
+(the chip's public address), so Android may still list "Pebble-LE ####", the
+recovery's pairing, next to "Pebble ####". It can be forgotten. Snowy and
+spalding carry the same three changes.
+
 ## Temporary diagnostics
 
-- **BT Name** row in Settings, Information (ev2_4 only, `843bde541`): traces
-  reading and storing the phone's name. Remove once names show correctly.
 - **BT Radio, HCI, Pair, Reset, SMP, Rx, Chip** rows: Bluetooth bring-up
   diagnostics shared with silk and snowy.
+- The **Light** calibration row in Settings, Information is gone on tintin
+  (`e3b664261`); silk, snowy and spalding still have theirs.
 
 ## Open items
 
-- Confirm on hardware: phone names, watchfaces starting, the model shown in
-  the Core app, the task timer peak, and kernel heap use with a phone
-  connected.
-- No stock pairing import (snowy imports its stock pairing).
-- About 1.7 KiB of flash left; the next feature needs another trade.
+- The retail watch (v1_5) and the Steel (v2_0) have not run on hardware.
+- Not tested with an iPhone (ANCS, AMS, pairing).
+- Not measured on hardware: the task timer peak and kernel heap use with a
+  phone connected.
+- 101 B of flash left on bb2; the next feature needs another trade.
