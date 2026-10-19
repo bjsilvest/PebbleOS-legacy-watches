@@ -194,20 +194,24 @@ any record, on every boot, so such watches stayed on 1.13.16 without harm.
 The loader returns to a valid application by itself about 12.7 s after it
 was entered, whether or not it is polled.
 
-`CONFIG_HRM_AS7000_FW_UPDATE` fixes this for personal builds: at boot it
-flashes the `AS7000_FW_IMAGE` resource when the sensor runs another version
-or has no application, waiting up to 300 ms for the loader. The image's last
-segment is the valid application marker, so an interrupted update leaves the
-sensor in its loader and the next boot flashes again. Once the versions
-match, boot skips it. "HRM update" in Information shows the outcome. The
-image is not redistributable, so never enable this in a published build; to
-go back to a version, build with that version's image. Tested on hardware:
-1.13.16 to 1.14.4. If a 1.14.4 sensor boots the stock PRF, PRF may try to
-flash 1.13.16 back, which either fails harmlessly or succeeds.
+`CONFIG_HRM_AS7000_FW_UPDATE` (on in the silk defconfig) fixes this. The
+sensor application is not redistributable, so builds never carry it: users
+extract it from a stock firmware they obtained themselves and send it to the
+watch as the `as7000fw` file:
 
-`AS7000_FW_IMAGE` is a builtin resource, so every silk build carries 30 KB
-of 1.14.4 in internal flash even without the update option. TODO: drop it
-from builds that do not update the sensor.
+    pbl-watch install-hrm-fw --phone <ip> Pebble-4.4.3-rbl-silk.pbz
+
+The command also takes a stock `system_resources.pbpack` or a raw image, and
+`--output FILE` saves the image instead of sending it. At boot, if the file
+exists and the sensor runs another version or has no application, the driver
+checks the image structure and flashes it, waiting up to 300 ms for the
+loader. The image's last segment is the valid application marker, so an
+interrupted update leaves the sensor in its loader and the next boot flashes
+again. Once the versions match, boot skips it. The file is kept, so a sensor
+reverted by the stock PRF (which may flash 1.13.16 back) is updated again;
+send another version's image to go back. "HRM update" in Information shows
+the outcome ("no image" without the file). Tested on hardware from a
+built-in image: 1.13.16 to 1.14.4.
 
 **HRV is not available to apps.** The sensor also runs its undocumented PRV
 (pulse rate variability) application next to HRM when asked
