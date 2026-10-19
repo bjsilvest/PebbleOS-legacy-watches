@@ -11,6 +11,14 @@
 
 static PBL_MUTEX_DEFINE(s_adc_mutex);
 
+#ifdef CONFIG_SOC_STM32F205
+//! The tintin battery divider (750k || 470k, ~290k) is at the 144-cycle limit
+//! with a 12 MHz ADC clock; 480 cycles allow ~1M source impedance.
+#define ADC_SAMPLE_TIME ADC_SampleTime_480Cycles
+#else
+#define ADC_SAMPLE_TIME ADC_SampleTime_144Cycles
+#endif
+
 //! A conversion pair takes ~12 us; if we are busy longer, ADC1 overruns.
 //! On overrun, clear OVR and EOC and restart the group.
 static bool prv_wait_for_conversion(void) {
@@ -53,11 +61,11 @@ void pbl_adc_stm32_read(uint8_t channel, const struct pbl_gpio *pin, uint32_t *v
   init.ADC_NbrOfConversion = 2;
   ADC_Init(ADC1, &init);
 
-  ADC_RegularChannelConfig(ADC1, ADC_Channel_Vrefint, 1, ADC_SampleTime_144Cycles);
-  ADC_RegularChannelConfig(ADC1, channel, 2, ADC_SampleTime_144Cycles);
+  ADC_RegularChannelConfig(ADC1, ADC_Channel_Vrefint, 1, ADC_SAMPLE_TIME);
+  ADC_RegularChannelConfig(ADC1, channel, 2, ADC_SAMPLE_TIME);
   ADC_EOCOnEachRegularChannelCmd(ADC1, ENABLE);
   ADC_Cmd(ADC1, ENABLE);
-  delay_us(3); // tSTAB
+  delay_us(10); // tSTAB is 3 us, VREFINT tSTART 10 us
 
   uint32_t vref_sum = 0;
   uint32_t vmon_sum = 0;
