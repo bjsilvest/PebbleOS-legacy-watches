@@ -301,3 +301,7 @@ bool new_timer_scheduled(TimerID timer, uint32_t *expire_ms_p) {
   s_num_new_timer_schedule_calls++;
   return stub_new_timer_is_scheduled(timer);
 }
+
+void *new_timer_debug_get_current_callback(void) {
+  return nullptr;
+}
