@@ -35,16 +35,15 @@ config HRM_AS7000_PRV_PROBE
       to see flicker, so they look solid. Apps get no HRV data: the PRV
       results are not decoded.
 
-config HRM_AS7000_LOADER_PROBE
-    bool "AS7000 loader probe (diagnostic)"
+config HRM_AS7000_FW_UPDATE
+    bool "AS7000 firmware update (personal builds only)"
     depends on HRM_AS7000
     help
-      Once, a minute after boot while the HRM is off, switch the sensor
-      to its loader twice: first with no I2C traffic while it times out
-      back into the application, then polling it every 50 ms, to measure
-      the loader timeout and whether accesses restart it. Never sends
-      firmware records, so the sensor flash is not written. Results are
-      shown in Settings > System > Information and logged.
+      At boot, flash the AS7000_FW_IMAGE system resource onto the sensor
+      when it runs another version or has no application, like the stock
+      firmware did, but waiting long enough for the loader. The image is
+      not redistributable, so never enable this in a published build. To
+      go back to a version, build with that version's image.
 
 config HRM_SPO2
     bool

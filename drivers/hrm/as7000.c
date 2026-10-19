@@ -2,14 +2,14 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 //! ams AS7000 heart rate sensor on the Pebble 2 HR. Runs the HRM application already in the
-//! sensor's flash: nothing is ever written to the sensor flash. Only the diagnostic loader probe
-//! enters the loader, and it sends no firmware records.
+//! sensor's flash. Only personal builds with CONFIG_HRM_AS7000_FW_UPDATE write it.
 
 #include <string.h>
 
 #include <pbl/drivers/gpio/stm32.h>
 #include <pbl/drivers/hrm.h>
 #include <pbl/drivers/hrm/as7000.h>
+#include <pbl/drivers/watchdog.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/hrm/hrm_manager.h>
 #include <pbl/services/system_task.h>
@@ -20,6 +20,10 @@
 #include <board/board.h>
 #include <kernel/util/sleep.h>
 #include <mfg/mfg_info.h>
+#ifdef CONFIG_HRM_AS7000_FW_UPDATE
+#include <resource/resource.h>
+#include <resource/resource_ids.auto.h>
+#endif
 
 PBL_LOG_MODULE_DEFINE(driver_hrm_as7000, CONFIG_DRIVER_HRM_LOG_LEVEL);
 
@@ -32,8 +36,9 @@ PBL_LOG_MODULE_DEFINE(driver_hrm_as7000, CONFIG_DRIVER_HRM_LOG_LEVEL);
 #define WARMUP_HANDSHAKES 2
 // Seconds without a handshake before the sensor is power cycled
 #define WATCHDOG_TIMEOUT_S 5
-// The loader reboots into a valid application after about a second without records
-#define LOADER_TIMEOUT_MS 1250
+// The loader returns to a valid application about 12.7 s after it was entered, whether or not
+// it is polled meanwhile
+#define LOADER_TIMEOUT_MS 15000
 // Failed boots before hrm_enable() gives up until reboot
 #define MAX_BOOT_FAILURES 3
 
@@ -525,232 +530,204 @@ static uint8_t prv_pres_detect_thrsh(void) {
   }
 }
 
-#ifdef CONFIG_HRM_AS7000_LOADER_PROBE
-// Runs once, this long after boot, while the HRM is off
-#define LOADER_PROBE_DELAY_MS (60 * 1000)
-#define LOADER_PROBE_RETRY_MS (60 * 1000)
-#define LOADER_SWITCH_MAX_MS  200
-// No I2C traffic at all for this long after the first switch
-#define LOADER_SILENT_MS    20000
-#define LOADER_BACK_MAX_MS  30000
-#define LOADER_POWER_CYCLES 2
-
-static AS7000LoaderProbe s_loader_probe = {.state = 'w'};
-static void prv_loader_probe_timer_cb(void *context);
-static TimerID s_loader_probe_timer;
-// Set under the lock while the probe owns the sensor; hrm_enable() refuses meanwhile
-static bool s_loader_probe_busy;
-
-static uint32_t prv_ms_since(RtcTicks start) {
-  return (uint32_t)((rtc_get_ticks() - start) * 1000 / RTC_TICKS_HZ);
-}
-
-static uint16_t prv_ms16(uint32_t ms) {
-  return (uint16_t)MIN(ms, 0xfffeU);
-}
-
 static void prv_sleep_fed(uint32_t ms) {
   while (ms > 0) {
     const uint32_t step = MIN(ms, 50U);
-    system_task_watchdog_feed();
+    watchdog_feed();
     psleep(step);
     ms -= step;
   }
 }
 
-// Ask for the loader and poll the running applications every millisecond until it shows.
-// Records each change of the value read when events is set. Returns the ms it took, or 0xffff.
-static uint16_t prv_loader_switch(HRMDevice *dev, bool events) {
-  AS7000LoaderProbe *p = &s_loader_probe;
-  const RtcTicks start = rtc_get_ticks();
-  uint16_t last = 0x100;
-
-  if (!prv_write_u8(dev, ADDR_APP_IDS, AS7000AppId_Loader)) {
-    return 0xffff;
-  }
-  while (prv_ms_since(start) < LOADER_SWITCH_MAX_MS) {
-    uint8_t apps;
-    if (!prv_read(dev, ADDR_APP_IDS, &apps, 1)) {
-      apps = 0xff;
-    }
-    const uint32_t ms = prv_ms_since(start);
-    if (events && apps != last && p->num_events < AS7000_LOADER_PROBE_EVENTS) {
-      p->events[p->num_events++] = (AS7000LoaderProbeEvent){.value = apps, .ms = MIN(ms, 0xffU)};
-    }
-    last = apps;
-    if (apps != 0xff && (apps & AS7000AppId_Loader)) {
-      return prv_ms16(ms);
-    }
-    psleep(1);
-  }
-  return 0xffff;
-}
-
-static bool prv_app_back(HRMDevice *dev) {
-  AS7000InfoRecord info;
-  if (!prv_read(dev, ADDR_INFO_START, &info, sizeof(info))) {
-    return false;
-  }
-  s_loader_probe.info_after = info;
-  return info.application_id == AS7000AppId_Idle &&
-         info.protocol_version_major == EXPECTED_PROTOCOL_VERSION_MAJOR;
-}
-
-// Poll every 50 ms until the application is back. Returns ms since start, or 0xffff.
-static uint16_t prv_poll_back(HRMDevice *dev, RtcTicks start, uint32_t max_ms, uint16_t *reads) {
-  const RtcTicks poll_start = rtc_get_ticks();
-  while (prv_ms_since(poll_start) < max_ms) {
-    if (reads != nullptr) {
-      (*reads)++;
-    }
-    if (prv_app_back(dev)) {
-      return prv_ms16(prv_ms_since(start));
-    }
-    prv_sleep_fed(50);
-  }
-  return 0xffff;
-}
-
-// Last resort when the loader keeps running: power cycle with the enable line held low well
-// past the loader's boot window
-static bool prv_power_cycle_back(HRMDevice *dev) {
-  while (s_loader_probe.power_cycles < LOADER_POWER_CYCLES) {
-    s_loader_probe.power_cycles++;
-    pbl_gpio_set(&dev->enable, false);
-    prv_sleep_fed(SHUT_DOWN_DELAY_MS);
-    pbl_gpio_set(&dev->enable, true);
-    prv_sleep_fed(LOADER_TIMEOUT_MS);
-    if (prv_poll_back(dev, rtc_get_ticks(), LOADER_BACK_MAX_MS, nullptr) != 0xffff) {
+// At init, with the enable line high: wait until the sensor runs an idle application
+static bool prv_wait_app(HRMDevice *dev, uint32_t max_ms, AS7000InfoRecord *info) {
+  for (uint32_t waited = 0; waited < max_ms; waited += 100) {
+    if (prv_read(dev, ADDR_INFO_START, info, sizeof(*info)) &&
+        info->application_id == AS7000AppId_Idle &&
+        info->protocol_version_major == EXPECTED_PROTOCOL_VERSION_MAJOR) {
       return true;
     }
+    prv_sleep_fed(100);
   }
   return false;
 }
 
-// Run A: enter the loader, then no I2C at all for LOADER_SILENT_MS while watching the handshake
-// line. Run B: enter it again and poll every 50 ms. Comparing the two tells a fixed loader
-// timeout from one that every access restarts. No firmware records are ever sent.
-static void prv_loader_probe(HRMDevice *dev) {
-  AS7000LoaderProbe *p = &s_loader_probe;
+#ifdef CONFIG_HRM_AS7000_FW_UPDATE
+// The sensor stops answering for 36 to 75 ms while it switches to the loader. Stock firmware read
+// once after 35 ms, so its updates never started on such sensors.
+#define LOADER_SWITCH_MAX_MS 300
+#define LOADER_READY_MAX_MS  500
+#define LOADER_STATUS_BUSY1  0x3a
+#define LOADER_STATUS_BUSY2  0xff
+// Data bytes per record; the loader takes records of up to 256 characters
+#define HEX_DATA_MAX      96
+#define HEX_RECORD_LEN(n) ((n) * 2 + 11)
+#define HEX_TYPE_DATA     0x00
+#define HEX_TYPE_EOF      0x01
 
-  p->loader_ms = 0xffff;
-  p->a_back_ms = 0xffff;
-  p->b_loader_ms = 0xffff;
-  p->b_back_ms = 0xffff;
-  pbl_gpio_configure(&dev->int_gpio, PBL_GPIO_INPUT | PBL_GPIO_PULL_UP);
+// The image starts with the application version (two bytes, as in the information registers),
+// followed by segments of {address, length - 1, data}
+typedef struct PBL_PACKED {
+  uint16_t address;
+  uint16_t len_minus_1;
+} AS7000FwSegment;
 
-  // Run A
-  const RtcTicks a_start = rtc_get_ticks();
-  p->loader_ms = prv_loader_switch(dev, true);
-  if (p->loader_ms == 0xffff) {
-    p->state = 'f';
-    prv_power_cycle_back(dev);
-    goto done;
+static AS7000FwUpdate s_fw_update;
+
+static char *prv_hex_put(char *out, uint32_t value, int num_bytes) {
+  static const char digits[] = "0123456789ABCDEF";
+  for (int i = num_bytes * 2 - 1; i >= 0; i--) {
+    *out++ = digits[(value >> (4 * i)) & 0xf];
   }
-  bool level = pbl_gpio_get_raw(&dev->int_gpio) > 0;
-  p->int_start = level;
-  const RtcTicks silent_start = rtc_get_ticks();
-  for (uint32_t i = 0; prv_ms_since(silent_start) < LOADER_SILENT_MS; i++) {
-    const bool now = pbl_gpio_get_raw(&dev->int_gpio) > 0;
-    if (now != level) {
-      level = now;
-      const uint16_t ms = prv_ms16(prv_ms_since(a_start));
-      if (p->int_edges == 0) {
-        p->int_first_ms = ms;
+  return out;
+}
+
+// Intel HEX record, without a terminator
+static size_t prv_hex_record(char *out, uint8_t type, uint16_t address, const uint8_t *data,
+                             uint8_t len) {
+  uint8_t sum = len + (address >> 8) + (address & 0xff) + type;
+  char *pos = out;
+  *pos++ = ':';
+  pos = prv_hex_put(pos, len, 1);
+  pos = prv_hex_put(pos, address, 2);
+  pos = prv_hex_put(pos, type, 1);
+  for (uint8_t i = 0; i < len; i++) {
+    sum += data[i];
+    pos = prv_hex_put(pos, data[i], 1);
+  }
+  pos = prv_hex_put(pos, (uint8_t)(~sum + 1), 1);
+  return pos - out;
+}
+
+static bool prv_loader_ready(HRMDevice *dev) {
+  for (int i = 0; i < LOADER_READY_MAX_MS; i++) {
+    uint8_t status;
+    if (prv_read(dev, ADDR_LOADER_STATUS, &status, 1)) {
+      if (status == AS7000_LOADER_STATUS_READY) {
+        return true;
+      } else if (status != LOADER_STATUS_BUSY1 && status != LOADER_STATUS_BUSY2) {
+        s_fw_update.status = status;
+        return false;
       }
-      p->int_last_ms = ms;
-      p->int_edges++;
-    }
-    if (i % 64 == 0) {
-      system_task_watchdog_feed();
     }
     psleep(1);
   }
-  p->a_back_first = prv_app_back(dev);
-  if (p->a_back_first) {
-    p->a_back_ms = prv_ms16(prv_ms_since(a_start));
-  } else {
-    p->a_back_ms = prv_poll_back(dev, a_start, LOADER_BACK_MAX_MS, nullptr);
-  }
-  if (p->a_back_ms == 0xffff && !prv_power_cycle_back(dev)) {
-    p->state = 'x';
-    goto done;
-  }
-
-  // Run B
-  prv_sleep_fed(2000);
-  const RtcTicks b_start = rtc_get_ticks();
-  p->b_loader_ms = prv_loader_switch(dev, false);
-  if (p->b_loader_ms != 0xffff) {
-    p->b_back_ms = prv_poll_back(dev, b_start, LOADER_BACK_MAX_MS, &p->b_reads);
-  }
-  if (p->b_back_ms == 0xffff && !prv_app_back(dev) && !prv_power_cycle_back(dev)) {
-    p->state = 'x';
-    goto done;
-  }
-  p->state = 'd';
-
-done:
-  pbl_gpio_stm32_analog(&dev->int_gpio);
-  PBL_LOG_INFO("AS7000 probe2 %c: L%u events %u", p->state, p->loader_ms, p->num_events);
-  PBL_LOG_INFO("AS7000 probe2 switch: %02x@%u %02x@%u %02x@%u", p->events[0].value, p->events[0].ms,
-               p->events[1].value, p->events[1].ms, p->events[2].value, p->events[2].ms);
-  PBL_LOG_INFO("AS7000 probe2 switch: %02x@%u %02x@%u", p->events[3].value, p->events[3].ms,
-               p->events[4].value, p->events[4].ms);
-  PBL_LOG_INFO("AS7000 probe2 silent: back%s %u int%u edges %u %u-%u", p->a_back_first ? "<=" : "",
-               p->a_back_ms, p->int_start, p->int_edges, p->int_first_ms, p->int_last_ms);
-  PBL_LOG_INFO("AS7000 probe2 polled: L%u back %u reads %u cycles %u", p->b_loader_ms, p->b_back_ms,
-               p->b_reads, p->power_cycles);
-  PBL_LOG_INFO("AS7000 probe2 after: protocol %u.%u SW %u.%u.%u HW %u app 0x%x",
-               p->info_after.protocol_version_major, p->info_after.protocol_version_minor,
-               p->info_after.sw_version_major >> 6, p->info_after.sw_version_major & 0x3f,
-               p->info_after.sw_version_minor, p->info_after.hw_revision,
-               p->info_after.application_id);
+  return false;
 }
 
-static void prv_loader_probe_system_cb(void *context) {
-  HRMDevice *dev = context;
-  HRMDeviceState *state = dev->state;
+static bool prv_enter_loader(HRMDevice *dev) {
+  uint8_t apps;
+  if (prv_read(dev, ADDR_APP_IDS, &apps, 1) && (apps & AS7000AppId_Loader)) {
+    return true;
+  }
+  if (!prv_write_u8(dev, ADDR_APP_IDS, AS7000AppId_Loader)) {
+    return false;
+  }
+  for (int i = 0; i < LOADER_SWITCH_MAX_MS; i++) {
+    if (prv_read(dev, ADDR_APP_IDS, &apps, 1) && (apps & AS7000AppId_Loader)) {
+      return true;
+    }
+    psleep(1);
+  }
+  return false;
+}
 
-  pbl_mutex_lock(&state->lock, PBL_FOREVER);
-  if (state->state != AS7000State_Off) {
-    // In use: try again later
-    pbl_mutex_unlock(&state->lock);
-    new_timer_start(s_loader_probe_timer, LOADER_PROBE_RETRY_MS, prv_loader_probe_timer_cb, context,
-                    0);
+// Send the image record by record. The valid application marker is its last segment, so an
+// interrupted update leaves the sensor in its loader, to be flashed again at the next boot.
+static AS7000FwUpdateResult prv_flash(HRMDevice *dev, uint32_t image_len) {
+  if (!prv_enter_loader(dev)) {
+    return AS7000FwUpdateResult_NoLoader;
+  }
+  if (!prv_loader_ready(dev)) {
+    return AS7000FwUpdateResult_NotReady;
+  }
+
+  char record[HEX_RECORD_LEN(HEX_DATA_MAX)];
+  uint32_t cursor = 2;
+  while (cursor + sizeof(AS7000FwSegment) < image_len) {
+    AS7000FwSegment segment;
+    if (resource_load_byte_range_system(SYSTEM_APP, RESOURCE_ID_AS7000_FW_IMAGE, cursor,
+                                        (uint8_t *)&segment, sizeof(segment)) != sizeof(segment)) {
+      return AS7000FwUpdateResult_BadImage;
+    }
+    cursor += sizeof(segment);
+    uint16_t address = segment.address;
+    uint32_t remaining = segment.len_minus_1 + 1;
+    while (remaining > 0) {
+      uint8_t chunk[HEX_DATA_MAX];
+      const uint8_t len = MIN(remaining, HEX_DATA_MAX);
+      if (resource_load_byte_range_system(SYSTEM_APP, RESOURCE_ID_AS7000_FW_IMAGE, cursor, chunk,
+                                          len) != len) {
+        return AS7000FwUpdateResult_BadImage;
+      }
+      const size_t record_len = prv_hex_record(record, HEX_TYPE_DATA, address, chunk, len);
+      if (!prv_write(dev, ADDR_LOADER_STATUS, record, record_len)) {
+        return AS7000FwUpdateResult_WriteFailed;
+      }
+      if (!prv_loader_ready(dev)) {
+        return AS7000FwUpdateResult_NotReady;
+      }
+      s_fw_update.records++;
+      watchdog_feed();
+      cursor += len;
+      address += len;
+      remaining -= len;
+    }
+  }
+
+  const size_t eof_len = prv_hex_record(record, HEX_TYPE_EOF, 0, nullptr, 0);
+  if (!prv_write(dev, ADDR_LOADER_STATUS, record, eof_len)) {
+    return AS7000FwUpdateResult_WriteFailed;
+  }
+  return AS7000FwUpdateResult_Flashed;
+}
+
+// At init, with the enable line high. Flashes the image in the system resources when the sensor
+// runs another version or has no application, then waits for the new application.
+static void prv_fw_update(HRMDevice *dev, AS7000InfoRecord *info) {
+  AS7000FwUpdate *u = &s_fw_update;
+  const uint32_t image_len = resource_size(SYSTEM_APP, RESOURCE_ID_AS7000_FW_IMAGE);
+  uint8_t version[2];
+
+  if (image_len <= 2 + sizeof(AS7000FwSegment) ||
+      resource_load_byte_range_system(SYSTEM_APP, RESOURCE_ID_AS7000_FW_IMAGE, 0, version,
+                                      sizeof(version)) != sizeof(version)) {
+    u->result = AS7000FwUpdateResult_BadImage;
     return;
   }
-  s_loader_probe_busy = true;
-  s_loader_probe.state = 'r';
-  pbl_mutex_unlock(&state->lock);
+  u->image_major = version[0];
+  u->image_minor = version[1];
+  u->from = *info;
 
-  // Wait out the last application's tear down, then boot it like prv_power_on()
-  const uint32_t off_ms = prv_ms_since(state->power_off_ticks);
-  if (off_ms < SHUT_DOWN_DELAY_MS) {
-    prv_sleep_fed(SHUT_DOWN_DELAY_MS - off_ms);
+  const bool has_app = info->application_id != AS7000AppId_Loader &&
+                       info->protocol_version_major == EXPECTED_PROTOCOL_VERSION_MAJOR;
+  if (has_app && info->sw_version_major == version[0] && info->sw_version_minor == version[1]) {
+    u->result = AS7000FwUpdateResult_Current;
+    return;
   }
-  pbl_gpio_set(&dev->enable, true);
-  prv_sleep_fed(BOOT_DELAY_MS);
-  if (prv_app_back(dev)) {
-    prv_loader_probe(dev);
-  } else {
-    s_loader_probe.state = 's';
-  }
-  pbl_gpio_set(&dev->enable, false);
 
-  pbl_mutex_lock(&state->lock, PBL_FOREVER);
-  state->power_off_ticks = rtc_get_ticks();
-  s_loader_probe_busy = false;
-  pbl_mutex_unlock(&state->lock);
+  PBL_LOG_WRN("AS7000 flashing %u.%u.%u over %u.%u.%u app 0x%x", version[0] >> 6, version[0] & 0x3f,
+              version[1], info->sw_version_major >> 6, info->sw_version_major & 0x3f,
+              info->sw_version_minor, info->application_id);
+  u->result = prv_flash(dev, image_len);
+
+  // The loader starts the new application, or returns to the old one after its timeout. The
+  // enable line must stay high until then.
+  const bool back = prv_wait_app(dev, LOADER_TIMEOUT_MS, info);
+  if (u->result == AS7000FwUpdateResult_Flashed) {
+    u->result =
+        (back && info->sw_version_major == version[0] && info->sw_version_minor == version[1])
+            ? AS7000FwUpdateResult_Updated
+            : AS7000FwUpdateResult_NotRunning;
+  }
+  PBL_LOG_WRN("AS7000 update result %u after %u records (status 0x%x), now %u.%u.%u app 0x%x",
+              u->result, u->records, u->status, info->sw_version_major >> 6,
+              info->sw_version_major & 0x3f, info->sw_version_minor, info->application_id);
 }
 
-static void prv_loader_probe_timer_cb(void *context) {
-  system_task_add_callback(prv_loader_probe_system_cb, context);
-}
-
-void as7000_get_loader_probe(HRMDevice *dev, AS7000LoaderProbe *probe) {
+void as7000_get_fw_update(HRMDevice *dev, AS7000FwUpdate *update) {
   (void)dev;
-  *probe = s_loader_probe;
+  *update = s_fw_update;
 }
 #endif
 
@@ -769,14 +746,18 @@ void hrm_init(HRMDevice *dev) {
   pbl_gpio_stm32_analog(&dev->int_gpio);
   pbl_gpio_configure(&dev->enable, PBL_GPIO_OUTPUT_ACTIVE);
   psleep(BOOT_DELAY_MS);
-  bool found = prv_read(dev, ADDR_INFO_START, &info, sizeof(info));
+  const bool found = prv_read(dev, ADDR_INFO_START, &info, sizeof(info));
   if (found && info.application_id == AS7000AppId_Loader) {
     // Give the loader its timeout to return to a valid application. The enable line must stay
     // high meanwhile, or the loader stays in force loader mode.
     PBL_LOG_WRN("AS7000 in its loader, waiting for the application");
-    psleep(LOADER_TIMEOUT_MS);
-    found = prv_read(dev, ADDR_INFO_START, &info, sizeof(info));
+    prv_wait_app(dev, LOADER_TIMEOUT_MS, &info);
   }
+#ifdef CONFIG_HRM_AS7000_FW_UPDATE
+  if (found) {
+    prv_fw_update(dev, &info);
+  }
+#endif
   pbl_gpio_set(&dev->enable, false);
   state->power_off_ticks = rtc_get_ticks();
 
@@ -795,18 +776,13 @@ void hrm_init(HRMDevice *dev) {
 
   if (info.application_id == AS7000AppId_Loader ||
       info.protocol_version_major != EXPECTED_PROTOCOL_VERSION_MAJOR) {
-    // No usable application in the sensor flash, and it is never reflashed
+    // No usable application in the sensor flash
     PBL_LOG_ERR("AS7000 has no usable firmware");
     state->state = AS7000State_Absent;
     return;
   }
 
   state->state = AS7000State_Off;
-#ifdef CONFIG_HRM_AS7000_LOADER_PROBE
-  s_loader_probe_timer = new_timer_create();
-  new_timer_start(s_loader_probe_timer, LOADER_PROBE_DELAY_MS, prv_loader_probe_timer_cb,
-                  (void *)dev, 0);
-#endif
 }
 
 bool hrm_is_present(HRMDevice *dev) {
@@ -825,12 +801,6 @@ bool hrm_enable(HRMDevice *dev, HRMFeature features, bool low_latency) {
   }
 
   pbl_mutex_lock(&state->lock, PBL_FOREVER);
-#ifdef CONFIG_HRM_AS7000_LOADER_PROBE
-  if (s_loader_probe_busy) {
-    pbl_mutex_unlock(&state->lock);
-    return false;
-  }
-#endif
   if (state->state == AS7000State_Off) {
     if (state->boot_failures >= MAX_BOOT_FAILURES) {
       ret = false;

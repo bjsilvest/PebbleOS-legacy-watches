@@ -20,8 +20,9 @@
  * @ingroup drivers_hrm
  * @brief @ref drivers_hrm implementation for the ams AS7000 (Pebble 2 HR).
  *
- * Runs the HRM application already in the sensor's flash; the driver never writes the sensor
- * firmware. The sensor reports heart rate only. Whether it is fitted is probed at init.
+ * Runs the HRM application already in the sensor's flash; only personal builds with
+ * CONFIG_HRM_AS7000_FW_UPDATE write the sensor firmware. The sensor reports heart rate only.
+ * Whether it is fitted is probed at init.
  * @{
  */
 
@@ -143,54 +144,49 @@ typedef struct {
 bool as7000_get_probe(HRMDevice *dev, AS7000Probe *probe);
 #endif
 
-#ifdef CONFIG_HRM_AS7000_LOADER_PROBE
-/** @brief Changes of the running applications seen while switching to the loader. */
-#define AS7000_LOADER_PROBE_EVENTS 5
+#ifdef CONFIG_HRM_AS7000_FW_UPDATE
+/** @brief Outcome of the sensor firmware update at init. */
+typedef enum {
+  AS7000FwUpdateResult_None,
+  /** The sensor already runs the image's version. */
+  AS7000FwUpdateResult_Current,
+  /** Flashed, and the new version runs. */
+  AS7000FwUpdateResult_Updated,
+  /** The sensor never switched to its loader. Nothing was written. */
+  AS7000FwUpdateResult_NoLoader,
+  /** The loader did not report ready, or reported an error. */
+  AS7000FwUpdateResult_NotReady,
+  /** A record could not be written. */
+  AS7000FwUpdateResult_WriteFailed,
+  /** The image resource is missing or unreadable. */
+  AS7000FwUpdateResult_BadImage,
+  /** All records were sent; still waiting to verify. */
+  AS7000FwUpdateResult_Flashed,
+  /** All records were sent, but the new version did not start. */
+  AS7000FwUpdateResult_NotRunning,
+} AS7000FwUpdateResult;
 
-/** @brief One change seen while switching to the loader. */
+/** @brief Sensor firmware update record. */
 typedef struct {
-  /** Value read from the application IDs register (0xff: unreadable). */
-  uint8_t value;
-  /** Milliseconds after the switch was requested. */
-  uint8_t ms;
-} AS7000LoaderProbeEvent;
-
-/** @brief Loader probe result. Times are in ms; 0xffff means never. */
-typedef struct {
-  /** 'w' waiting, 'r' running, 'd' done, 's' skipped (sensor not idle), 'f' loader never
-   *  showed, 'x' application not back */
-  char state;
-  /** Run A: time until the loader showed, and the changes seen on the way. */
-  uint16_t loader_ms;
-  AS7000LoaderProbeEvent events[AS7000_LOADER_PROBE_EVENTS];
-  uint8_t num_events;
-  /** Run A, no I2C traffic: handshake line level at the start, edges, first and last edge. */
-  bool int_start;
-  uint16_t int_edges;
-  uint16_t int_first_ms;
-  uint16_t int_last_ms;
-  /** Run A: the application was already back at the first read after the silent wait, and
-   *  when it was seen back. */
-  bool a_back_first;
-  uint16_t a_back_ms;
-  /** Run B, polled every 50 ms: time until the loader showed, until the application was back,
-   *  and the reads it took. */
-  uint16_t b_loader_ms;
-  uint16_t b_back_ms;
-  uint16_t b_reads;
-  /** Enable line power cycles needed to get the application back. */
-  uint8_t power_cycles;
-  /** Sensor information last read. */
-  AS7000InfoRecord info_after;
-} AS7000LoaderProbe;
+  AS7000FwUpdateResult result;
+  /** Version of the image in the system resources. */
+  uint8_t image_major;
+  uint8_t image_minor;
+  /** Sensor information before the update. */
+  AS7000InfoRecord from;
+  /** Records the loader accepted. */
+  uint16_t records;
+  /** Unexpected loader status, if any. */
+  uint8_t status;
+} AS7000FwUpdate;
 
 /**
- * @brief Get the loader probe result.
+ * @brief Get the sensor firmware update record.
  *
  * @param dev HRM device.
- * @param[out] probe Result.
+ * @param[out] update Record.
  */
-void as7000_get_loader_probe(HRMDevice *dev, AS7000LoaderProbe *probe);
+void as7000_get_fw_update(HRMDevice *dev, AS7000FwUpdate *update);
 #endif
 
 /**

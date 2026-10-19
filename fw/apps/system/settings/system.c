@@ -84,11 +84,8 @@ enum {
 #ifdef CONFIG_HRM_AS7000
   SystemInformationItemHrm,
 #endif
-#ifdef CONFIG_HRM_AS7000_LOADER_PROBE
-  SystemInformationItemHrmLoader,
-  SystemInformationItemHrmSwitch,
-  SystemInformationItemHrmSilent,
-  SystemInformationItemHrmPolled,
+#ifdef CONFIG_HRM_AS7000_FW_UPDATE
+  SystemInformationItemHrmUpdate,
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   SystemInformationItemHrmPrv,
@@ -188,11 +185,8 @@ typedef struct SystemInformationData {
 #ifdef CONFIG_HRM_AS7000
   char hrm_string[32];
 #endif
-#ifdef CONFIG_HRM_AS7000_LOADER_PROBE
-  char hrm_loader_string[24];
-  char hrm_switch_string[48];
-  char hrm_silent_string[40];
-  char hrm_polled_string[40];
+#ifdef CONFIG_HRM_AS7000_FW_UPDATE
+  char hrm_update_string[40];
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   char hrm_prv_string[64];
@@ -301,11 +295,8 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
 #ifdef CONFIG_HRM_AS7000
   [SystemInformationItemHrm] = i18n_noop("HRM sensor"),
 #endif
-#ifdef CONFIG_HRM_AS7000_LOADER_PROBE
-  [SystemInformationItemHrmLoader] = i18n_noop("HRM loader"),
-  [SystemInformationItemHrmSwitch] = i18n_noop("HRM switch"),
-  [SystemInformationItemHrmSilent] = i18n_noop("HRM silent"),
-  [SystemInformationItemHrmPolled] = i18n_noop("HRM polled"),
+#ifdef CONFIG_HRM_AS7000_FW_UPDATE
+  [SystemInformationItemHrmUpdate] = i18n_noop("HRM update"),
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   [SystemInformationItemHrmPrv] = i18n_noop("HRM PRV"),
@@ -569,27 +560,19 @@ static void prv_information_window_push(SettingsSystemData *data) {
   }
   info->subtitle_text[SystemInformationItemHrm] = info->hrm_string;
 #endif
-#ifdef CONFIG_HRM_AS7000_LOADER_PROBE
-  // State and loader switch time; the switch as value@ms; the silent run as
-  // back<ms> i<start level>/<edges> <first>-<last>; the polled run as L<ms> back<ms> r<reads>
-  AS7000LoaderProbe lp;
-  as7000_get_loader_probe(HRM, &lp);
-  sniprintf(info->hrm_loader_string, sizeof(info->hrm_loader_string), "%c L%u c%u", lp.state,
-            lp.loader_ms, lp.power_cycles);
-  size_t pos = 0;
-  for (int i = 0; i < lp.num_events && pos < sizeof(info->hrm_switch_string); i++) {
-    pos += sniprintf(&info->hrm_switch_string[pos], sizeof(info->hrm_switch_string) - pos,
-                     "%02x@%u ", lp.events[i].value, lp.events[i].ms);
-  }
-  sniprintf(info->hrm_silent_string, sizeof(info->hrm_silent_string), "back%s%u i%u/%u %u-%u",
-            lp.a_back_first ? "<=" : " ", lp.a_back_ms, lp.int_start, lp.int_edges, lp.int_first_ms,
-            lp.int_last_ms);
-  sniprintf(info->hrm_polled_string, sizeof(info->hrm_polled_string), "L%u back %u r%u",
-            lp.b_loader_ms, lp.b_back_ms, lp.b_reads);
-  info->subtitle_text[SystemInformationItemHrmLoader] = info->hrm_loader_string;
-  info->subtitle_text[SystemInformationItemHrmSwitch] = info->hrm_switch_string;
-  info->subtitle_text[SystemInformationItemHrmSilent] = info->hrm_silent_string;
-  info->subtitle_text[SystemInformationItemHrmPolled] = info->hrm_polled_string;
+#ifdef CONFIG_HRM_AS7000_FW_UPDATE
+  // <result> <image version> from <version before> r<records>
+  static const char *const s_update_results[] = {
+    "none",         "current",   "UPDATED", "no loader",   "not ready",
+    "write failed", "bad image", "flashed", "not running",
+  };
+  AS7000FwUpdate update;
+  as7000_get_fw_update(HRM, &update);
+  sniprintf(info->hrm_update_string, sizeof(info->hrm_update_string), "%s %u.%u.%u<%u.%u.%u r%u",
+            s_update_results[update.result], update.image_major >> 6, update.image_major & 0x3f,
+            update.image_minor, update.from.sw_version_major >> 6,
+            update.from.sw_version_major & 0x3f, update.from.sw_version_minor, update.records);
+  info->subtitle_text[SystemInformationItemHrmUpdate] = info->hrm_update_string;
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   AS7000Probe probe = {};
