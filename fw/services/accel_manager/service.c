@@ -507,27 +507,51 @@ static PBL_ALWAYS_INLINE void prv_assert_state_from_user(const AccelManagerState
   }
 }
 
+// Remove a subscriber and free its state. Caller holds s_accel_manager_mutex and reconfigures.
+static bool prv_unsubscribe_locked(AccelManagerState *state) {
+  const bool event_outstanding = state->event_posted;
+  pbl_shared_cbuf_remove_subsampled_client(&s_buffer, &state->buffer_client);
+  list_remove(&state->list_node, &s_data_subscribers /* &head */, nullptr /* &tail */);
+  kernel_free(state);
+
+  if (!s_data_subscribers) {
+    // If no one left using the data subscription, disable it
+    sys_vibe_history_stop_collecting();
+  }
+  return event_outstanding;
+}
+
 DEFINE_SYSCALL(bool, sys_accel_manager_data_unsubscribe, AccelManagerState *state) {
   prv_assert_state_from_user(state);
   bool event_outstanding;
   pbl_mutex_lock(&s_accel_manager_mutex, PBL_FOREVER);
   {
-    event_outstanding = state->event_posted;
-    // Remove this subscriber and free up its state variables
-    pbl_shared_cbuf_remove_subsampled_client(&s_buffer, &state->buffer_client);
-    list_remove(&state->list_node, &s_data_subscribers /* &head */, nullptr /* &tail */);
-    kernel_free(state);
-
-    if (!s_data_subscribers) {
-      // If no one left using the data subscription, disable it
-      sys_vibe_history_stop_collecting();
-    }
-
+    event_outstanding = prv_unsubscribe_locked(state);
     // reconfig for the common subset of requirements among remaining subscribers
     prv_update_driver_config();
   }
   pbl_mutex_unlock(&s_accel_manager_mutex);
   return event_outstanding;
+}
+
+void accel_manager_cleanup_task(PebbleTask task) {
+  pbl_mutex_lock(&s_accel_manager_mutex, PBL_FOREVER);
+  {
+    bool removed = false;
+    ListNode *node = s_data_subscribers;
+    while (node != nullptr) {
+      AccelManagerState *state = (AccelManagerState *)node;
+      node = node->next;
+      if (state->task == task) {
+        prv_unsubscribe_locked(state);
+        removed = true;
+      }
+    }
+    if (removed) {
+      prv_update_driver_config();
+    }
+  }
+  pbl_mutex_unlock(&s_accel_manager_mutex);
 }
 
 DEFINE_SYSCALL(int, sys_accel_manager_set_sampling_rate, AccelManagerState *state,

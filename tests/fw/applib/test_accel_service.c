@@ -105,6 +105,15 @@ bool sys_accel_manager_data_unsubscribe(AccelManagerState *state) {
   return state->event_posted;
 }
 
+// Every fake subscription belongs to the task under test
+void accel_manager_cleanup_task(PebbleTask task) {
+  for (int slot = 0; slot < FAKE_SUBSCRIPTION_SLOTS; slot++) {
+    if (s_slot_used[slot]) {
+      sys_accel_manager_data_unsubscribe(&s_slots[slot]);
+    }
+  }
+}
+
 uint32_t sys_accel_manager_get_max_samples_per_update(void) {
   return 25;
 }

@@ -58,11 +58,10 @@ AccelServiceState *accel_service_private_get_session(PebbleTask task) {
 }
 
 void accel_service_cleanup_task_session(PebbleTask task) {
-  AccelServiceState *state = accel_service_private_get_session(task);
-  if (state->manager_state) {
-    sys_accel_manager_data_unsubscribe(state->manager_state);
-    state->manager_state = nullptr;
-  }
+  // The session lives in the process's memory, so its subscription pointer can't be trusted:
+  // remove whatever the kernel holds for the task instead
+  accel_manager_cleanup_task(task);
+  accel_service_private_get_session(task)->manager_state = nullptr;
 }
 
 // ----------------------------------------------------------------------------------------------

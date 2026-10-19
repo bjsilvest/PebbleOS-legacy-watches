@@ -108,6 +108,16 @@ AccelManagerState *sys_accel_manager_data_subscribe(AccelSamplingRate rate,
 bool sys_accel_manager_data_unsubscribe(AccelManagerState *state);
 
 /**
+ * @brief Remove and free every subscription whose data callback runs on a task.
+ *
+ * For process cleanup: finds the subscriptions in the kernel's own list instead of trusting a
+ * pointer kept in the process's memory, which the process can overwrite.
+ *
+ * @param task Task whose subscriptions to remove, App or Worker.
+ */
+void accel_manager_cleanup_task(PebbleTask task);
+
+/**
  * @brief Change the sampling rate of a subscription.
  *
  * Jitter-inducing subsampling may be used to reach the requested rate.

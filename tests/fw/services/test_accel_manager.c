@@ -470,3 +470,35 @@ void test_accel_manager__a_consume_on_new_timers_hands_over_a_waiting_batch(void
   cl_assert(result);
   cl_assert_equal_i(s_posted_events, 1);
 }
+
+//! Process cleanup removes the task's subscriptions from the kernel's list, without a pointer
+//! from the process's memory, and leaves other tasks' subscriptions alone
+void test_accel_manager__cleanup_task_removes_only_that_tasks_subscriptions(void) {
+  AccelRawData buffer[2];
+  AccelManagerState *kernel = prv_subscribe_on_new_timers();
+  sys_accel_manager_set_sample_buffer(kernel, buffer, 2);
+  stub_pebble_tasks_set_current(PebbleTask_Worker);
+  sys_accel_manager_data_subscribe(ACCEL_SAMPLING_100HZ, prv_noop_sample_handler, nullptr,
+                                   PebbleTask_Worker);
+  cl_assert_equal_i(s_sampling_interval_us, 1000000 / ACCEL_SAMPLING_100HZ);
+
+  stub_pebble_tasks_set_current(PebbleTask_KernelMain);
+  accel_manager_cleanup_task(PebbleTask_Worker);
+
+  cl_assert_equal_i(s_sampling_interval_us, 1000000 / ACCEL_SAMPLING_25HZ);
+  prv_feed(2);
+  cl_assert_equal_i(s_posted_events, 1);
+}
+
+//! Cleaning up a task with no subscriptions changes nothing
+void test_accel_manager__cleanup_task_without_subscriptions(void) {
+  AccelRawData buffer[2];
+  AccelManagerState *state = prv_subscribe_on_new_timers();
+  sys_accel_manager_set_sample_buffer(state, buffer, 2);
+
+  stub_pebble_tasks_set_current(PebbleTask_KernelMain);
+  accel_manager_cleanup_task(PebbleTask_Worker);
+  prv_feed(2);
+
+  cl_assert_equal_i(s_posted_events, 1);
+}
