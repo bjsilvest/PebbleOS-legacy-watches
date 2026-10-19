@@ -564,14 +564,20 @@ static void prv_information_window_push(SettingsSystemData *data) {
   // <result> <image version> from <version before> r<records>
   static const char *const s_update_results[] = {
     "none",         "current",   "UPDATED", "no loader",   "not ready",
-    "write failed", "bad image", "flashed", "not running",
+    "write failed", "bad image", "flashed", "not running", "no image",
   };
   AS7000FwUpdate update;
   as7000_get_fw_update(HRM, &update);
-  sniprintf(info->hrm_update_string, sizeof(info->hrm_update_string), "%s %u.%u.%u<%u.%u.%u r%u",
-            s_update_results[update.result], update.image_major >> 6, update.image_major & 0x3f,
-            update.image_minor, update.from.sw_version_major >> 6,
-            update.from.sw_version_major & 0x3f, update.from.sw_version_minor, update.records);
+  if (update.result == AS7000FwUpdateResult_NoImage) {
+    strncpy(info->hrm_update_string, s_update_results[update.result],
+            sizeof(info->hrm_update_string) - 1);
+  } else {
+    sniprintf(info->hrm_update_string, sizeof(info->hrm_update_string),
+              "%s %u.%u.%u<%u.%u.%u r%u", s_update_results[update.result],
+              update.image_major >> 6, update.image_major & 0x3f, update.image_minor,
+              update.from.sw_version_major >> 6, update.from.sw_version_major & 0x3f,
+              update.from.sw_version_minor, update.records);
+  }
   info->subtitle_text[SystemInformationItemHrmUpdate] = info->hrm_update_string;
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE

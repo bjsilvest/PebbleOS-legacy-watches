@@ -36,14 +36,15 @@ config HRM_AS7000_PRV_PROBE
       results are not decoded.
 
 config HRM_AS7000_FW_UPDATE
-    bool "AS7000 firmware update (personal builds only)"
+    bool "AS7000 firmware update from a user-supplied image"
     depends on HRM_AS7000
     help
-      At boot, flash the AS7000_FW_IMAGE system resource onto the sensor
-      when it runs another version or has no application, like the stock
-      firmware did, but waiting long enough for the loader. The image is
-      not redistributable, so never enable this in a published build. To
-      go back to a version, build with that version's image.
+      At boot, flash the "as7000fw" file onto the sensor when it runs
+      another version or has no application, like the stock firmware did,
+      but waiting long enough for the loader. The image is not
+      redistributable and is never built in: users extract it from a stock
+      Pebble firmware and send it with "pbl-watch install-hrm-fw". Without
+      the file, nothing happens.
 
 config HRM_SPO2
     bool

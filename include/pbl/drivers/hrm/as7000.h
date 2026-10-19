@@ -158,18 +158,20 @@ typedef enum {
   AS7000FwUpdateResult_NotReady,
   /** A record could not be written. */
   AS7000FwUpdateResult_WriteFailed,
-  /** The image resource is missing or unreadable. */
+  /** The image file is malformed, or could not be read. */
   AS7000FwUpdateResult_BadImage,
   /** All records were sent; still waiting to verify. */
   AS7000FwUpdateResult_Flashed,
   /** All records were sent, but the new version did not start. */
   AS7000FwUpdateResult_NotRunning,
+  /** No image file on the watch. Nothing was done. */
+  AS7000FwUpdateResult_NoImage,
 } AS7000FwUpdateResult;
 
 /** @brief Sensor firmware update record. */
 typedef struct {
   AS7000FwUpdateResult result;
-  /** Version of the image in the system resources. */
+  /** Version of the image file. */
   uint8_t image_major;
   uint8_t image_minor;
   /** Sensor information before the update. */
