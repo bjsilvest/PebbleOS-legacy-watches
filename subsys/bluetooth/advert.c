@@ -18,6 +18,11 @@
 #include <pbl/util/math.h>
 
 #include <host/ble_gap.h>
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+#include <host/ble_gatt.h>
+#include <host/ble_uuid.h>
+#include <services/gatt/ble_svc_gatt.h>
+#endif
 #include <kernel/pbl_malloc.h>
 #include <os/os_mbuf.h>
 #include <system/passert.h>
@@ -357,6 +362,21 @@ static void prv_handle_subscription_event(struct ble_gap_event *event) {
               event->subscribe.conn_handle, event->subscribe.attr_handle,
               event->subscribe.prev_notify, event->subscribe.cur_notify,
               event->subscribe.prev_indicate, event->subscribe.cur_indicate);
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+  // A phone enables Service Changed right after pairing. It may still hold the
+  // attribute cache of another firmware (the stock recovery it paired with),
+  // so tell it every handle changed and it rediscovers ours.
+  if (event->subscribe.reason == BLE_GAP_SUBSCRIBE_REASON_WRITE &&
+      event->subscribe.cur_indicate && !event->subscribe.prev_indicate) {
+    const ble_uuid16_t svc_uuid = BLE_UUID16_INIT(PBL_BT_GATT_SERVICE_UUID);
+    const ble_uuid16_t chr_uuid = BLE_UUID16_INIT(BLE_SVC_GATT_CHR_SERVICE_CHANGED_UUID16);
+    uint16_t val_handle;
+    if (ble_gatts_find_chr(&svc_uuid.u, &chr_uuid.u, nullptr, &val_handle) == 0 &&
+        event->subscribe.attr_handle == val_handle) {
+      ble_svc_gatt_changed(0x0001, 0xFFFF);
+    }
+  }
+#endif
 }
 
 static void prv_handle_notification_rx_event(struct ble_gap_event *event) {
