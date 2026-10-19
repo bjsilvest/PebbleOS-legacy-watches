@@ -21,6 +21,8 @@
 #ifdef CONFIG_BT_CONTROLLER_CC2564
 #include <host/ble_gatt.h>
 #include <host/ble_uuid.h>
+#include <nimble/nimble_port.h>
+#include <pbl/services/new_timer/new_timer.h>
 #include <services/gatt/ble_svc_gatt.h>
 #endif
 #include <kernel/pbl_malloc.h>
@@ -357,6 +359,20 @@ static void prv_handle_mtu_change_event(struct ble_gap_event *event) {
 
 extern int pebble_pairing_service_get_connectivity_send_notification(uint16_t conn_handle,
                                                                      uint16_t attr_handle);
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+// Phone apps keep the attributes they found at connect for the whole link,
+// so drop the link a little after Service Changed: the reconnect uses ours.
+#define SVC_CHANGED_RECONNECT_MS 1000
+
+static struct ble_npl_callout s_svc_changed_reconnect;
+static uint16_t s_svc_changed_conn = BLE_HS_CONN_HANDLE_NONE;
+
+static void prv_svc_changed_reconnect_cb(struct ble_npl_event *ev) {
+  (void)ble_gap_terminate(s_svc_changed_conn, BLE_ERR_REM_USER_CONN_TERM);
+  s_svc_changed_conn = BLE_HS_CONN_HANDLE_NONE;
+}
+#endif
+
 static void prv_handle_subscription_event(struct ble_gap_event *event) {
   PBL_LOG_DBG("prv_handle_subscription_event: connhandle: %d attr:%d notify:%d/%d indicate:%d/%d",
               event->subscribe.conn_handle, event->subscribe.attr_handle,
@@ -374,6 +390,13 @@ static void prv_handle_subscription_event(struct ble_gap_event *event) {
     if (ble_gatts_find_chr(&svc_uuid.u, &chr_uuid.u, nullptr, &val_handle) == 0 &&
         event->subscribe.attr_handle == val_handle) {
       ble_svc_gatt_changed(0x0001, 0xFFFF);
+      if (s_svc_changed_reconnect.handle == TIMER_INVALID_ID) {
+        ble_npl_callout_init(&s_svc_changed_reconnect, nimble_port_get_dflt_eventq(),
+                             prv_svc_changed_reconnect_cb, nullptr);
+      }
+      s_svc_changed_conn = event->subscribe.conn_handle;
+      ble_npl_callout_reset(&s_svc_changed_reconnect,
+                            ble_npl_time_ms_to_ticks32(SVC_CHANGED_RECONNECT_MS));
     }
   }
 #endif
