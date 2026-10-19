@@ -37,8 +37,8 @@ class PebbleTransportPULSE(pebble_tool.commands.base.PebbleTransportConfiguratio
         return (link,)
 
     @classmethod
-    def add_argument_handler(cls, parser):
-        parser.add_argument(
+    def add_argument_handler(cls, group, parser):
+        group.add_argument(
             "--pulse",
             type=str,
             help="Use this option to connect to your Pebble via"
