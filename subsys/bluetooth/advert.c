@@ -413,10 +413,18 @@ static int prv_handle_pairing_request_event(struct ble_gap_event *event) {
 
 static int prv_handle_repeat_pairing_event(struct ble_gap_event *event) {
   // In recovery mode there is no UI that allows to manually delete a pairing,
-  // so we unconditionally enable repeat pairing. In main firmware, only allow
-  // repeat pairing if using secure connections and we support user confirmation.
-#if defined(CONFIG_RECOVERY_FW) || \
-    (MYNEWT_VAL(BLE_SM_SC_ONLY) && (MYNEWT_VAL(BLE_SM_IO_CAP) == BLE_HS_IO_DISPLAY_YESNO))
+  // so we unconditionally enable repeat pairing. In main firmware, allow it if
+  // using secure connections and we support user confirmation; otherwise only
+  // while the user has made the watch pairable (Bluetooth settings open), so a
+  // phone whose keys no longer match (e.g. paired in the stock recovery) can
+  // pair again without forgetting the watch on both sides.
+#if !defined(CONFIG_RECOVERY_FW) && \
+    !(MYNEWT_VAL(BLE_SM_SC_ONLY) && (MYNEWT_VAL(BLE_SM_IO_CAP) == BLE_HS_IO_DISPLAY_YESNO))
+  if (!pairability_is_enabled()) {
+    PBL_LOG_WRN("BLE_GAP_EVENT_REPEAT_PAIRING ignored");
+    return BLE_GAP_REPEAT_PAIRING_IGNORE;
+  }
+#endif
   struct ble_gap_conn_desc desc;
   int ret;
 
@@ -429,10 +437,6 @@ static int prv_handle_repeat_pairing_event(struct ble_gap_event *event) {
   ble_store_util_delete_peer(&desc.peer_id_addr);
 
   return BLE_GAP_REPEAT_PAIRING_RETRY;
-#else
-  PBL_LOG_WRN("BLE_GAP_EVENT_REPEAT_PAIRING ignored");
-  return BLE_GAP_REPEAT_PAIRING_IGNORE;
-#endif
 }
 
 static void prv_handle_phy_update_event(struct ble_gap_event *event) {
