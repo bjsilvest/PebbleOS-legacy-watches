@@ -22,9 +22,9 @@ Everything below follows from three hard limits:
 | Kernel RAM | about 86 KiB | 128 KiB SRAM, less the aplite app region (32 KiB) and the worker region (12 KiB) |
 | System resources | 256 KiB | The stock firmware and the stock recovery firmware install resource packs only into the stock 256 KiB banks |
 
-Current sizes: firmware ev2_4 507,419 B, v1_5 507,579 B, v2_0 507,707 B and
-bb2 507,803 B (101 B left on bb2, the largest); resources 258,525 B (3.6 KiB
-left); static kernel RAM 66,592 B, which leaves about 19 KiB for the kernel
+Current sizes: firmware ev2_4 507,411 B, v1_5 507,571 B, v2_0 507,699 B and
+bb2 507,763 B (141 B left on bb2, the largest); resources 258,525 B (3.6 KiB
+left); static kernel RAM 66,400 B, which leaves about 19 KiB for the kernel
 heap by the linker map. No out-of-memory or other crash on hardware with a
 phone connected since -312 (notifications, watchface installs, reconnects).
 
@@ -35,7 +35,8 @@ phone connected since -312 (notifications, watchface installs, reconnects).
 | Health and activity tracking (steps, sleep, heart rate, workouts, KickStart, Health settings) | `SERVICE_ACTIVITY=n`; the health API is a stub returning no data (`health_service_stub.c`) | Never on stock aplite; about 49 KB. |
 | Weather | `SERVICE_WEATHER=n`, weather images left out of resources | Never on stock aplite; about 43 KB |
 | Sports app (PebbleKit Sports) | `APP_SPORTS=n`; the app is left out of the system app registry along with the workout screens only it used | About 5 KB. Phone apps that drive it, such as RunKeeper in 2013, are long gone; the Core app and the current store apps do not use it. |
-| Right-to-left text (Hebrew, Arabic) | `TEXT_RTL=n`; `bidi.h` and `arabic_shaping.h` become left-to-right stand-ins | About 4.9 KB. The fonts have no Hebrew or Arabic glyphs and the board defines no extended fonts, so such text only ever drew as boxes. |
+| Smart Alarm | Built only with `SERVICE_ACTIVITY`: no Basic/Smart menu (a new alarm opens the time picker), no Convert to Smart Alarm action, no first use dialog | About 0.9 KB. It needs sleep tracking, so on tintin it only ever showed "requires Pebble Health". |
+| Bluetooth bring-up rows under Settings, System, Information (BT Radio, HCI, Pair, Reset, SMP, Chip, App Fetch, Last reboot) and the traces behind them | `BT_CONTROLLER_DIAGNOSTICS=n` | About 1.9 KB. Diagnostics from bringing up the ports; upstream has none of them. Information now lists what upstream lists. |
 | Timeline Quick View (peek) and its settings page | `TIMELINE_PEEK=n`, `peek_stub.c` | About 4 KB. The timeline itself stays. |
 | Voice: dictation, voice replies, the Reminders app | No microphone (`MIC=n`); the voice service is built only with one | The hardware has no microphone |
 | Heart rate sensor | No `HRM` | The hardware has none |
@@ -55,6 +56,7 @@ phone connected since -312 (notifications, watchface installs, reconnects).
 |---|---|---|
 | System fonts | Smaller glyph hash tables, and RLE4-encoded glyphs where that is smaller. Same glyphs. | `RESOURCES_COMPACT_FONTS=y` (`tools/font/pbf_compact.py`) |
 | Resources kept in the filesystem | The timezone database, the emoji fonts, every font except the Gothic text fonts, Gothic 9 and the golf app are stored deflated in the resource pack. The first boot after an install inflates them into the filesystem file `sysres` (about 0.3 s); later boots check and skip it. If the file were lost, those resources would be missing until the next boot rebuilds it; Gothic, images and the Bluetooth init script never depend on it. | `"files"` entry with `"unpack": true` in `resources/normal/tintin/resource_map.json`, `fw/resource/resource_unpack.c` |
+| Right-to-left text (Hebrew, Arabic) | Back on (`TEXT_RTL`): the fonts have no such glyphs, but a language pack brings its own extended fonts. Tested on ev2_4 with the Arabic pack. Paid for by the Smart Alarm and diagnostics cuts, a smaller BiDi classifier and text layout path, shorter app developer log messages, and no per-app launcher color on black and white boards. | `452984284` |
 | Built-in fallback font | Hex digits only, as stock firmware had it (it only draws error codes). Applies to all boards. | `204422d73` |
 | Launcher | The 4.x glance launcher (`SERVICE_APP_GLANCES=y`), which stock aplite never had. The legacy list launcher stays in the tree for builds without glances. `app_glance_reload` allocates its glance only while it runs, so apps keep the full runtime RAM. | `LAUNCHER_LEGACY`, `app_state_set_glance` |
 | Per-app runtime RAM | 6,816 bytes instead of 6,820, so the 32 KiB app region is aligned for the MPU. AppState leaves out touch and health state the board lacks, and holds the app glance as a pointer, allocated only while an app reloads it. | `APP_RAM_APLITE_RUNTIME_SIZE`, `e9f29d8ec` |
@@ -111,8 +113,8 @@ spalding carry the same three changes.
 
 ## Temporary diagnostics
 
-- **BT Radio, HCI, Pair, Reset, SMP, Rx, Chip** rows: Bluetooth bring-up
-  diagnostics shared with silk and snowy.
+- The Bluetooth bring-up rows are off on tintin (`BT_CONTROLLER_DIAGNOSTICS=n`);
+  silk, snowy and spalding still have them until they are removed for good.
 - The **Light** calibration row in Settings, Information is gone on tintin
   (`e3b664261`); silk, snowy and spalding still have theirs.
 
