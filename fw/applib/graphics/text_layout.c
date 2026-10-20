@@ -618,6 +618,39 @@ static int prv_shaped_glyph_advance(GContext *ctx, const TextBoxParams *text_box
   return prv_codepoint_get_horizontal_advance(&ctx->font_cache, text_box_params->font, width_cp);
 }
 
+// One step of the pair folding shared by the BiDi width and draw passes.
+// Returns the codepoint to measure and draw, or 0 when @p cp was folded into
+// the previous pair and so adds nothing.
+static PBL_NOINLINE Codepoint prv_bidi_fold(utf8_t *pos, const utf8_t *end, Codepoint prev_cp,
+                                            Codepoint cp, bool *skip_member) {
+  if (arabic_is_transparent(cp)) {
+    // A mark keeps its own width and glyph.
+    return cp;
+  }
+  if (*skip_member) {
+    *skip_member = false;
+    return 0;
+  }
+  return prv_shape_pair(prev_cp, cp, prv_peek_next_letter(pos, end), skip_member);
+}
+
+// Draw @p cp @p x px into the line and return its advance.
+static PBL_NOINLINE int prv_bidi_draw_glyph(GContext *ctx, const Line *line, GFont font,
+                                            Codepoint cp, int x) {
+  const int width = prv_codepoint_get_horizontal_advance(&ctx->font_cache, font, cp);
+  GRect cursor = {
+    .origin = line->origin,
+    .size.w = width,
+    .size.h = fonts_get_font_height(font),
+  };
+  cursor.origin.x += x;
+  if (!codepoint_is_zero_width(cp)) {
+    text_resources_get_glyph(&ctx->font_cache, cp, font, nullptr);
+    render_glyph(ctx, cp, font, cursor);
+  }
+  return width;
+}
+
 //! Call char_visitor_cb on each character in the line
 //! Used to update line dimensions and render characters
 //! Traverse until end of line->width_px if rendering chars, else text_box_params width
@@ -719,20 +752,9 @@ utf8_t *walk_line(GContext *ctx, Line *line, const TextBoxParams *const text_box
           continue;
         }
 
-        if (skip_ligature_member && !arabic_is_transparent(seg_cp)) {
-          // Folded into the preceding pair: already counted.
-          skip_ligature_member = false;
-        } else {
-          Codepoint width_cp;
-          if (arabic_is_transparent(seg_cp)) {
-            // A mark keeps its own width but is not reshaped.
-            width_cp = seg_cp;
-          } else {
-            Codepoint next_seg_cp = prv_peek_next_letter(segment_end, run_end);
-            bool consumed_next = false;
-            width_cp = prv_shape_pair(prev_seg_cp, seg_cp, next_seg_cp, &consumed_next);
-            skip_ligature_member = consumed_next;
-          }
+        Codepoint width_cp =
+            prv_bidi_fold(segment_end, run_end, prev_seg_cp, seg_cp, &skip_ligature_member);
+        if (width_cp != 0) {
           if (segment_is_rtl) {
             width_cp = bidi_mirror_codepoint(width_cp);
           }
@@ -872,22 +894,8 @@ utf8_t *walk_line(GContext *ctx, Line *line, const TextBoxParams *const text_box
               }
             }
 
-            int glyph_width =
-                prv_codepoint_get_horizontal_advance(&ctx->font_cache, text_box_params->font, rcp);
-
-            GRect cursor = {
-              .origin = line->origin,
-              .size.w = glyph_width,
-              .size.h = fonts_get_font_height(text_box_params->font)
-            };
-            cursor.origin.x += walked_width_px;
-
-            if (!codepoint_is_zero_width(rcp)) {
-              text_resources_get_glyph(&ctx->font_cache, rcp, text_box_params->font, nullptr);
-              render_glyph(ctx, rcp, text_box_params->font, cursor);
-            }
-
-            walked_width_px += glyph_width;
+            walked_width_px +=
+                prv_bidi_draw_glyph(ctx, line, text_box_params->font, rcp, walked_width_px);
             rptr = rnext;
           }
         }
@@ -907,37 +915,11 @@ utf8_t *walk_line(GContext *ctx, Line *line, const TextBoxParams *const text_box
             continue;
           }
 
-          if (skip_pair_member && !arabic_is_transparent(scp)) {
-            // Folded into the preceding pair: already drawn, adds no width.
-            skip_pair_member = false;
-          } else {
-            Codepoint draw_cp;
-            if (arabic_is_transparent(scp)) {
-              // A mark keeps its own width and glyph.
-              draw_cp = scp;
-            } else {
-              Codepoint next_seg_cp = prv_peek_next_letter(sptr, seg->end);
-              bool consumed_next = false;
-              draw_cp = prv_shape_pair(prev_seg_cp, scp, next_seg_cp, &consumed_next);
-              skip_pair_member = consumed_next;
-            }
-
-            int glyph_width = prv_codepoint_get_horizontal_advance(&ctx->font_cache,
-                                                                   text_box_params->font, draw_cp);
-
-            GRect cursor = {
-              .origin = line->origin,
-              .size.w = glyph_width,
-              .size.h = fonts_get_font_height(text_box_params->font)
-            };
-            cursor.origin.x += walked_width_px;
-
-            if (!codepoint_is_zero_width(draw_cp)) {
-              text_resources_get_glyph(&ctx->font_cache, draw_cp, text_box_params->font, nullptr);
-              render_glyph(ctx, draw_cp, text_box_params->font, cursor);
-            }
-
-            walked_width_px += glyph_width;
+          const Codepoint draw_cp =
+              prv_bidi_fold(sptr, seg->end, prev_seg_cp, scp, &skip_pair_member);
+          if (draw_cp != 0) {
+            walked_width_px +=
+                prv_bidi_draw_glyph(ctx, line, text_box_params->font, draw_cp, walked_width_px);
           }
 
           if (!arabic_is_transparent(scp)) {
@@ -955,15 +937,8 @@ utf8_t *walk_line(GContext *ctx, Line *line, const TextBoxParams *const text_box
 
     // Handle suffix if present
     if (line->suffix_codepoint) {
-      GRect cursor = {
-        .origin = line->origin,
-        .size.w = suffix_width_px,
-        .size.h = fonts_get_font_height(text_box_params->font)
-      };
-      cursor.origin.x += walked_width_px;
-      text_resources_get_glyph(&ctx->font_cache, line->suffix_codepoint, text_box_params->font,
-                               nullptr);
-      render_glyph(ctx, line->suffix_codepoint, text_box_params->font, cursor);
+      prv_bidi_draw_glyph(ctx, line, text_box_params->font, line->suffix_codepoint,
+                          walked_width_px);
     }
 
     return last_visited_char;
