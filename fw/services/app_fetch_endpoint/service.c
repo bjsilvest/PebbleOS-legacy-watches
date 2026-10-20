@@ -132,6 +132,7 @@ static uint8_t prv_compute_progress_percent(PutBytesObjectType type, unsigned in
 }
 
 //! Cleans up the state of the app fetch endpoint. Always called from the system task
+#ifdef CONFIG_BT_CONTROLLER_DIAGNOSTICS
 // Trace of the last fetches for diagnostics, one character per step, oldest
 // dropped: R request sent, S phone starting, a/w/r app/worker/resources done,
 // F put_bytes failed, T timeout, C added to the app cache, then '=' and the
@@ -155,6 +156,7 @@ void app_fetch_trace_note(char c) {
 const char *app_fetch_trace(void) {
   return s_trace;
 }
+#endif
 
 static void prv_cleanup(AppFetchResult result) {
   app_fetch_trace_note('=');

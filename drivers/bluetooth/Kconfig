@@ -33,3 +33,12 @@ config BT_DA1468X_HCI_BAUD
       Baud rate of the controller image's H4 UART.
 
 endif
+
+config BT_CONTROLLER_DIAGNOSTICS
+    bool "Controller bring-up diagnostics"
+    depends on BT_CONTROLLER_DA1468X
+    default y
+    help
+      Keep pairing, SMP, app fetch and controller start-up traces and show
+      them in Settings > System > Information, along with the last reboot
+      reason. For bringing up a port; not something to ship upstream.

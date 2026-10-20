@@ -14,7 +14,7 @@
 #include <string.h>
 
 #include <pbl/drivers/als.h>
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#ifdef CONFIG_BT_CONTROLLER_DIAGNOSTICS
 #include <pbl/bluetooth/advert.h>
 #include <pbl/bluetooth/hci_uart.h>
 #include <pbl/drivers/bluetooth/da1468x.h>
@@ -70,7 +70,7 @@
 
 enum {
   SystemInformationItemBtAddress = 0,
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#ifdef CONFIG_BT_CONTROLLER_DIAGNOSTICS
   SystemInformationItemBtRadio,
   SystemInformationItemBtHci,
   SystemInformationItemBtPair,
@@ -176,7 +176,7 @@ typedef struct SystemInformationData {
   char serial_string[MFG_SERIAL_NUMBER_SIZE + 1];
   char hw_version_string[MFG_HW_VERSION_SIZE + 1];
   char uptime_string[16]; // "xxd xxh xxm xxs"
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#ifdef CONFIG_BT_CONTROLLER_DIAGNOSTICS
   char bt_radio_string[32];
   char bt_hci_string[32];
   char bt_pair_string[24];
@@ -281,7 +281,7 @@ static ConfirmationDialog *prv_settings_confirm(const char *title, const char *t
 
 static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemBtAddress] = i18n_noop("BT Address"),
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#ifdef CONFIG_BT_CONTROLLER_DIAGNOSTICS
   [SystemInformationItemBtRadio] = i18n_noop("BT Radio"),
   [SystemInformationItemBtHci] = i18n_noop("BT HCI"),
   [SystemInformationItemBtPair] = i18n_noop("BT Pair"),
@@ -512,7 +512,7 @@ static void prv_information_window_push(SettingsSystemData *data) {
             i18n_get_version());
 
   info->subtitle_text[SystemInformationItemBtAddress] = info->bt_mac_addr;
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#ifdef CONFIG_BT_CONTROLLER_DIAGNOSTICS
   strncpy(info->bt_radio_string, da1468x_status(), sizeof(info->bt_radio_string) - 1);
   pbl_bt_hci_uart_copy_status(info->bt_hci_string, sizeof(info->bt_hci_string));
   info->subtitle_text[SystemInformationItemBtRadio] = info->bt_radio_string;
