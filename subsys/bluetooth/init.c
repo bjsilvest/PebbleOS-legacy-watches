@@ -91,7 +91,7 @@ static void prv_reset_cb(int reason) {
     PBL_LOG_WRN("NimBLE host reset %lu (reason: 0x%04x)", (unsigned long)s_resets,
                 (uint16_t)reason);
   }
-#if defined(CONFIG_BT_CONTROLLER_DA1468X) || defined(CONFIG_BT_CONTROLLER_CC2564)
+#ifdef CONFIG_BT_CONTROLLER_DIAGNOSTICS
   pbl_bt_hci_uart_snapshot();
   if (s_resets == 1U) {
     char status[32];

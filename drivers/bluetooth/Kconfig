@@ -67,6 +67,15 @@ config BT_CC2564_SLEEP
       and the host enter STOP mode meanwhile. Without it the controller
       never sleeps and STOP is blocked while Bluetooth runs.
 
+config BT_CONTROLLER_DIAGNOSTICS
+    bool "Controller bring-up diagnostics"
+    depends on BT_CONTROLLER_DA1468X || BT_CONTROLLER_CC2564
+    default y
+    help
+      Keep pairing, SMP, app fetch and controller start-up traces and show
+      them in Settings > System > Information, along with the last reboot
+      reason. For bringing up a port; not something to ship upstream.
+
 config BT_CC2564_SLEEP_NO_STOP
     bool "Keep the host out of STOP while the controller sleeps"
     depends on BT_CC2564_SLEEP

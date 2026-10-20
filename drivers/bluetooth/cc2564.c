@@ -79,15 +79,19 @@ static const uint32_t SHUTDOWN_PULSE_MS[] = {100U, 1000U, 3000U};
 #define BOOT_ATTEMPTS       3
 
 static char s_status[32] = "Not started";
+#ifdef CONFIG_BT_CONTROLLER_DIAGNOSTICS
 static char s_chip_id[32] = "?";
+#endif
 
 // Start-up diagnostics: CTS while shut down and after the settle time, bytes
 // received per attempt and the first few of attempt 1.
 static int s_cts_shut;
 static int s_cts_up;
 static uint32_t s_rx_count[BOOT_ATTEMPTS];
+#ifdef CONFIG_BT_CONTROLLER_DIAGNOSTICS
 static uint8_t s_rx_first[4];
 static uint32_t s_rx_first_len;
+#endif
 
 // Boot-time receive: the UART interrupt fills a ring, the boot thread
 // assembles events from it.
@@ -234,9 +238,11 @@ static bool prv_read_version(void) {
   // LMP subversion (2)
   const uint16_t manufacturer = ret[5] | (ret[6] << 8);
   const uint16_t subversion = ret[7] | (ret[8] << 8);
+#ifdef CONFIG_BT_CONTROLLER_DIAGNOSTICS
   sniprintf(s_chip_id, sizeof(s_chip_id), "HCI %u mfr %04x sub %04x", ret[1], manufacturer,
             subversion);
-  PBL_LOG_INFO("CC2564: %s", s_chip_id);
+#endif
+  PBL_LOG_INFO("CC2564: HCI %u mfr %04x sub %04x", ret[1], manufacturer, subversion);
   return true;
 }
 
@@ -349,7 +355,7 @@ bool cc2564_boot(void) {
   // STOP mode may stop MCO1, the chip's slow clock, while it starts. Held
   // while the controller is awake; the transport's eHCILL releases it.
   soc_stm32_stop_block();
-  const uint32_t stops_before = soc_stm32_stop_entries();
+  [[maybe_unused]] const uint32_t stops_before = soc_stm32_stop_entries();
 
   pbl_gpio_configure(&BOARD_BT_SHUTDOWN, PBL_GPIO_OUTPUT_ACTIVE);
   prv_slow_clock_enable();
@@ -365,13 +371,16 @@ bool cc2564_boot(void) {
     if (!prv_read_version()) {
       // None received means the chip is silent, others a baud rate mismatch.
       s_rx_count[attempt - 1] = s_rx_head;
+#ifdef CONFIG_BT_CONTROLLER_DIAGNOSTICS
       if (attempt == 1) {
         s_rx_first_len = MIN(s_rx_head, sizeof(s_rx_first));
         memcpy(s_rx_first, s_rx_ring, s_rx_first_len);
       }
+#endif
       sniprintf(s_status, sizeof(s_status), "No version t%d rx %lu,%lu,%lu c%d%d", attempt,
                 (unsigned long)s_rx_count[0], (unsigned long)s_rx_count[1],
                 (unsigned long)s_rx_count[2], s_cts_shut, s_cts_up);
+#ifdef CONFIG_BT_CONTROLLER_DIAGNOSTICS
       char *p = s_chip_id;
       const char *end = s_chip_id + sizeof(s_chip_id);
       p += sniprintf(p, end - p, "a1");
@@ -394,6 +403,7 @@ bool cc2564_boot(void) {
                 (unsigned long)((RCC->CFGR >> 21) & 3U),
                 (unsigned long)(((GPIOA->MODER >> 16) & 3U) == 2U),
                 (unsigned long)(soc_stm32_stop_entries() - stops_before));
+#endif
       continue;
     }
     if (!prv_run_bts()) {
@@ -474,6 +484,8 @@ const char *cc2564_status(void) {
   return s_status;
 }
 
+#ifdef CONFIG_BT_CONTROLLER_DIAGNOSTICS
 const char *cc2564_chip_id(void) {
   return s_chip_id;
 }
+#endif
