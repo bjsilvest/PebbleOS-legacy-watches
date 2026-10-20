@@ -145,6 +145,15 @@ static void prv_day_picker_callback(DayPickerResult result, void *context) {
 static void prv_time_picker_window_unload(Window *window) {
   AlarmEditorData *data = (AlarmEditorData *)window_get_user_data(window);
   if (data->creating_alarm) {
+#ifndef CONFIG_SERVICE_ACTIVITY
+    // No type menu: the time picker is the first window and owns the editor
+    if (data->alarm_id == ALARM_INVALID_ID) {
+      prv_call_complete_cancelled_if_no_alarm(data);
+      time_selection_window_deinit(&data->time_picker_window);
+      i18n_free_all(data);
+      task_free(data);
+    }
+#endif
     return;
   }
 
@@ -225,6 +234,7 @@ static void prv_setup_time_picker_window(AlarmEditorData *data) {
   }
 }
 
+#ifdef CONFIG_SERVICE_ACTIVITY
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //! Type Picker
 
@@ -268,6 +278,7 @@ static void prv_setup_type_menu_window(AlarmEditorData *data) {
   data->alarm_type_menu = option_menu;
   option_menu_set_highlight_colors(option_menu, ALARMS_APP_HIGHLIGHT_COLOR, GColorWhite);
 }
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //! Public API
@@ -283,8 +294,13 @@ Window *alarm_editor_create_new_alarm(AlarmEditorCompleteCallback complete_callb
   };
 
   prv_setup_time_picker_window(data);
+#ifdef CONFIG_SERVICE_ACTIVITY
+  // Smart alarms need Health, so without it there is no type to pick
   prv_setup_type_menu_window(data);
   return &data->alarm_type_menu->window;
+#else
+  return &data->time_picker_window.window;
+#endif
 }
 
 void alarm_editor_update_alarm_time(AlarmId alarm_id, AlarmType alarm_type,

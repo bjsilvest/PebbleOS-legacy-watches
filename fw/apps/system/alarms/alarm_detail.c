@@ -37,7 +37,9 @@ typedef enum DetailMenuItemIndex {
   DetailMenuItemIndexDelete,
   DetailMenuItemIndexChangeTime,
   DetailMenuItemIndexChangeDays,
+#ifdef CONFIG_SERVICE_ACTIVITY
   DetailMenuItemIndexConvertSmart,
+#endif
 #ifdef CONFIG_SPEAKER
   DetailMenuItemIndexSound,
 #endif
@@ -86,6 +88,7 @@ static void prv_toggle_enable_alarm_handler(ActionMenu *action_menu, const Actio
   }
 }
 
+#ifdef CONFIG_SERVICE_ACTIVITY
 static void prv_toggle_smart_alarm_handler(ActionMenu *action_menu, const ActionMenuItem *item,
                                            void *context) {
   AlarmDetailData *data = context;
@@ -101,6 +104,7 @@ static void prv_toggle_smart_alarm_handler(ActionMenu *action_menu, const Action
     data->alarm_editor_callback(EDITED, data->alarm_id, data->callback_context);
   }
 }
+#endif
 
 static void prv_edit_time_handler(ActionMenu *action_menu, const ActionMenuItem *item,
                                   void *context) {
@@ -289,12 +293,14 @@ void alarm_detail_window_push(AlarmId alarm_id, AlarmInfo *alarm_info,
     .perform_action = prv_edit_day_handler,
     .action_data = data,
   };
+#ifdef CONFIG_SERVICE_ACTIVITY
   main_menu->items[DetailMenuItemIndexConvertSmart] = (ActionMenuItem){
     .label = data->alarm_info.is_smart ? i18n_get("Convert to Basic Alarm", data)
                                        : i18n_get("Convert to Smart Alarm", data),
     .perform_action = prv_toggle_smart_alarm_handler,
     .action_data = data,
   };
+#endif
 #ifdef CONFIG_SPEAKER
   main_menu->items[DetailMenuItemIndexSound] = (ActionMenuItem){
     .label = i18n_get("Sound", data),

@@ -328,6 +328,7 @@ static void prv_alarm_list_selection_changed_callback(MenuLayer *menu_layer, Men
   }
 }
 
+#ifdef CONFIG_SERVICE_ACTIVITY
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //! Smart Alarm first use dialog
 
@@ -361,6 +362,7 @@ static void prv_push_alarms_app_opened_dialog(AlarmsAppData *data) {
   // Show immediately since this is the first window and there is already a compositor animation
   app_window_stack_push(&expandable_dialog->dialog.window, false /* animated */);
 }
+#endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //! App boilerplate
@@ -439,10 +441,13 @@ static void prv_handle_init(void) {
     app_window_stack_insert_next(&data->window);
   }
 
+#ifdef CONFIG_SERVICE_ACTIVITY
+  // The first use dialog introduces Smart Alarm, which needs Health
   uint32_t version = alarm_prefs_get_alarms_app_opened();
   if (version == 0) {
     prv_push_alarms_app_opened_dialog(data);
   }
+#endif
   alarm_prefs_set_alarms_app_opened(CURRENT_ALARMS_APP_VERSION);
 }
 
