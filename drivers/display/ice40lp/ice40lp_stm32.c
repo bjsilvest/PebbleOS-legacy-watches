@@ -36,6 +36,11 @@
 
 #define CMD_FRAME_BEGIN 0x5
 
+// Commands of the bootloader's FPGA configuration.
+#define BOOT_CMD_DISPLAY_ON 3
+#define BOOT_CMD_DRAW_SCENE 4
+#define BOOT_SCENE_SPLASH   1
+
 // The panel is scanned in columns: each line is one framebuffer column,
 // bottom to top.
 #define DISP_LINES  PBL_DISPLAY_WIDTH
@@ -71,6 +76,7 @@ static struct {
   uint32_t frames;
   uint16_t busy_at_start;
   uint16_t black_busy;
+  uint16_t splash_busy;
   uint16_t timeouts;
   int16_t last_timeout_line;
 } s_stats;
@@ -194,6 +200,31 @@ static void prv_mco1_enable(void) {
   RCC_MCO1Config(RCC_MCO1Source_LSE, RCC_MCO1Div_1);
 }
 
+//! Has the bootloader's FPGA configuration redraw its logo and turn the
+//! panel on, as the stock firmware did; the panel keeps it until our first
+//! frame.
+static void prv_show_boot_splash(void) {
+  const struct pbl_gpio *scs = &BOARD_CONFIG_DISPLAY.scs;
+  const uint8_t draw_splash[] = {BOOT_CMD_DRAW_SCENE, BOOT_SCENE_SPLASH};
+  const uint8_t display_on = BOOT_CMD_DISPLAY_ON;
+
+  prv_spi_configure(BOARD_CONFIG_DISPLAY.base_spi_frequency);
+
+  prv_wait_not_busy();
+  pbl_gpio_set(scs, true);
+  prv_spi_write(draw_splash, sizeof(draw_splash));
+  pbl_gpio_set(scs, false);
+
+  // Don't turn the panel on before the logo is drawn.
+  if (!prv_wait_not_busy()) {
+    s_stats.splash_busy++;
+    return;
+  }
+  pbl_gpio_set(scs, true);
+  prv_spi_write(&display_on, 1);
+  pbl_gpio_set(scs, false);
+}
+
 //! Polled all-black frame; the line buffers must not be in use.
 static void prv_send_black_frame(void) {
   memset(s_line, 0, sizeof(s_line));
@@ -224,18 +255,16 @@ void display_init(void) {
   pbl_gpio_configure(&cfg->creset, PBL_GPIO_OUTPUT_ACTIVE);
   pbl_gpio_configure(&cfg->cdone, PBL_GPIO_INPUT);
   pbl_gpio_configure(&cfg->busy, PBL_GPIO_INPUT);
-  pbl_gpio_configure(&cfg->rail_6v6, PBL_GPIO_OUTPUT_INACTIVE);
-  pbl_gpio_configure(&cfg->rail_4v5, PBL_GPIO_OUTPUT_INACTIVE);
+  // Keep the rails as the bootloader left them: dropping them under its logo
+  // brings back a stale inverted image.
+  pbl_gpio_configure(&cfg->rail_6v6, PBL_GPIO_OUTPUT);
+  pbl_gpio_configure(&cfg->rail_4v5, PBL_GPIO_OUTPUT);
 
   exti_configure_pin(pbl_exti_stm32_config(&cfg->busy), ExtiTrigger_Falling, prv_busy_isr);
 
+  prv_show_boot_splash();
   s_programmed = prv_program();
   prv_power_enable();
-
-  // Don't leave the bootloader's logo, or garbage, up until the first frame.
-  if (s_programmed) {
-    prv_send_black_frame();
-  }
 }
 
 //! One panel line: the MSBs of every pixel's color channels, then the LSBs.
@@ -480,6 +509,7 @@ void display_update_boot_frame(uint8_t *framebuffer) {
 }
 
 void display_copy_stats(char *buf, size_t len) {
-  snprintf(buf, len, "f%" PRIu32 " b%u k%u t%u l%d", s_stats.frames, s_stats.busy_at_start,
-           s_stats.black_busy, s_stats.timeouts, s_stats.last_timeout_line);
+  snprintf(buf, len, "f%" PRIu32 " b%u k%u s%u t%u l%d", s_stats.frames,
+           s_stats.busy_at_start, s_stats.black_busy, s_stats.splash_busy, s_stats.timeouts,
+           s_stats.last_timeout_line);
 }
