@@ -413,9 +413,6 @@ static void prv_start_dma_frame(const uint8_t *fb) {
   pbl_irq_unlock();
 }
 
-//! Time for the panel to scan out a frame.
-#define CLEAR_SETTLE_MS 100
-
 void display_clear(void) {
   if (!s_programmed) {
     return;
@@ -426,13 +423,8 @@ void display_clear(void) {
     delay_us(1000);
   }
 
-  // Send black twice so the panel is driven to black again after the first refresh.
-  for (int pass = 0; pass < 2; pass++) {
-    prv_send_black_frame();
-    for (int ms = 0; ms < CLEAR_SETTLE_MS; ms++) {
-      delay_us(1000);
-    }
-  }
+  // One black frame, as on the stock firmware; the PMIC cuts the rails later.
+  prv_send_black_frame();
 }
 
 //! The rails are left to the PMIC power-off, as on the stock firmware.
