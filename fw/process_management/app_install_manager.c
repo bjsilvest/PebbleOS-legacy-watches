@@ -610,7 +610,8 @@ static GColor prv_hard_coded_color_for_3rd_party_apps(Uuid *uuid) {
 }
 
 static GColor prv_valid_color_from_uuid(GColor color, Uuid *uuid) {
-#ifdef CONFIG_BOARD_ASTERIX
+#if PBL_BW
+  // Black and white launchers never draw the app color
   return GColorClear;
 #endif
 
