@@ -79,101 +79,61 @@ static BidiClass prv_ascii_class(Codepoint cp) {
   }
 }
 
-//! Non-spacing marks across every block this engine can meet. A mark must never
-//! resolve on its own: W1 gives it the class of its base, and the reversal keeps
-//! it behind that base. Kept in one place so a new block cannot be half-covered.
-static bool prv_is_combining_mark(Codepoint cp) {
-  return (cp >= 0x0300 &&
-          cp <=
-              0x036F) || // Combining diacritical marks
-                         // Hebrew points and cantillation, minus the punctuation sharing the range
-         (cp >= 0x0591 && cp <= 0x05C7 && cp != 0x05BE && cp != 0x05C0 && cp != 0x05C3 &&
-          cp != 0x05C6) ||
-         (cp >= 0x0610 && cp <= 0x061A) || // Arabic honorifics
-         (cp >= 0x064B && cp <= 0x065F) || // Arabic harakat
-         (cp == 0x0670) || (cp >= 0x06D6 && cp <= 0x06DC) || (cp >= 0x06DF && cp <= 0x06E4) ||
-         (cp >= 0x06E7 && cp <= 0x06E8) || (cp >= 0x06EA && cp <= 0x06ED) ||
-         (cp >= 0x0730 && cp <= 0x074A) ||                   // Syriac points
-         (cp >= 0x07A6 && cp <= 0x07B0) ||                   // Thaana vowel signs
-         (cp >= 0x07EB && cp <= 0x07F3) || (cp == 0x07FD) || // NKo marks
-         (cp >= 0x0898 && cp <= 0x089F) ||                   // Arabic Extended-B marks
-         (cp >= 0x08CA && cp <= 0x08E1) || (cp >= 0x08E3 && cp <= 0x08FF) ||
-         (cp >= 0x1AB0 && cp <= 0x1AFF) || // Combining marks extended
-         (cp >= 0x1DC0 && cp <= 0x1DFF) || // Combining marks supplement
-         (cp >= 0x20D0 && cp <= 0x20FF) || // Combining marks for symbols
-         (cp >= 0xFE00 && cp <= 0xFE0F) || // Variation selectors
-         (cp >= 0xFE20 && cp <= 0xFE2F);   // Combining half marks
-}
+//! Classes of every codepoint from U+0080 to U+FFFF as runs: s_class_run_starts[i]
+//! begins a run of s_class_run_classes[i] that ends where the next run starts.
+//! Generated from the Hebrew, Arabic, Syriac, Thaana, NKo, combining mark,
+//! punctuation and presentation form blocks this engine knows about; anything
+//! else is L.
+static const uint16_t s_class_run_starts[] = {
+  0x0080, 0x00A0, 0x00A1, 0x00B0, 0x00B2, 0x00C0, 0x0300, 0x0370, 0x0590, 0x0591, 0x05BE, 0x05BF,
+  0x05C0, 0x05C1, 0x05C3, 0x05C4, 0x05C6, 0x05C7, 0x05C8, 0x0600, 0x0606, 0x0609, 0x060B, 0x060C,
+  0x060D, 0x0610, 0x061B, 0x064B, 0x0660, 0x066A, 0x066B, 0x066D, 0x0670, 0x0671, 0x06D6, 0x06DD,
+  0x06DE, 0x06DF, 0x06E5, 0x06E7, 0x06E9, 0x06EA, 0x06EE, 0x06F0, 0x06FA, 0x0730, 0x074B, 0x07A6,
+  0x07B1, 0x07C0, 0x07EB, 0x07F4, 0x07FD, 0x07FE, 0x0860, 0x0890, 0x0892, 0x0898, 0x08A0, 0x08CA,
+  0x08E2, 0x08E3, 0x0900, 0x1AB0, 0x1B00, 0x1DC0, 0x1E00, 0x2000, 0x200E, 0x200F, 0x2010, 0x20AC,
+  0x20AD, 0x20D0, 0x2100, 0x2212, 0x2213, 0x2C00, 0xFB1D, 0xFB50, 0xFE00, 0xFE10, 0xFE20, 0xFE30,
+  0xFE70, 0xFEFD
+};
+
+static const uint8_t s_class_run_classes[] = {
+  BidiClassL, BidiClassCS, BidiClassON, BidiClassET, BidiClassON, BidiClassL, BidiClassNSM,
+  BidiClassL, BidiClassR, BidiClassNSM, BidiClassR, BidiClassNSM, BidiClassR, BidiClassNSM,
+  BidiClassR, BidiClassNSM, BidiClassR, BidiClassNSM, BidiClassR, BidiClassAN, BidiClassAL,
+  BidiClassET, BidiClassAL, BidiClassCS, BidiClassAL, BidiClassNSM, BidiClassAL, BidiClassNSM,
+  BidiClassAN, BidiClassET, BidiClassAN, BidiClassAL, BidiClassNSM, BidiClassAL, BidiClassNSM,
+  BidiClassAN, BidiClassAL, BidiClassNSM, BidiClassAL, BidiClassNSM, BidiClassAL, BidiClassNSM,
+  BidiClassAL, BidiClassEN, BidiClassAL, BidiClassNSM, BidiClassAL, BidiClassNSM, BidiClassAL,
+  BidiClassR, BidiClassNSM, BidiClassR, BidiClassNSM, BidiClassR, BidiClassAL, BidiClassAN,
+  BidiClassAL, BidiClassNSM, BidiClassAL, BidiClassNSM, BidiClassAN, BidiClassNSM, BidiClassL,
+  BidiClassNSM, BidiClassL, BidiClassNSM, BidiClassL, BidiClassON, BidiClassL, BidiClassR,
+  BidiClassON, BidiClassET, BidiClassON, BidiClassNSM, BidiClassON, BidiClassES, BidiClassON,
+  BidiClassL, BidiClassR, BidiClassAL, BidiClassNSM, BidiClassL, BidiClassNSM, BidiClassL,
+  BidiClassAL, BidiClassL
+};
 
 static BidiClass prv_class(Codepoint cp) {
   if (cp < 0x0080) {
     return prv_ascii_class(cp);
   }
-  if (prv_is_combining_mark(cp)) {
-    return BidiClassNSM;
-  }
-  if (cp >= 0x0590 && cp <= 0x05FF) { // Hebrew
-    return BidiClassR;
-  }
-  if (cp >= 0x0600 && cp <= 0x06FF) { // Arabic
-    if ((cp >= 0x0600 && cp <= 0x0605) || (cp >= 0x0660 && cp <= 0x0669) || cp == 0x066B ||
-        cp == 0x066C || cp == 0x06DD) {
-      return BidiClassAN;
+  BidiClass cls = BidiClassL;
+  if (cp <= 0xFFFF) {
+    // Last run starting at or before cp
+    size_t lo = 0;
+    size_t hi = ARRAY_LENGTH(s_class_run_starts);
+    while (hi - lo > 1) {
+      const size_t mid = (lo + hi) / 2;
+      if (s_class_run_starts[mid] <= cp) {
+        lo = mid;
+      } else {
+        hi = mid;
+      }
     }
-    if (cp >= 0x06F0 && cp <= 0x06F9) { // Extended Arabic-Indic digits
-      return BidiClassEN;
-    }
-    if (cp == 0x060C) { // Arabic comma
-      return BidiClassCS;
-    }
-    if (cp == 0x0609 || cp == 0x060A || cp == 0x066A) { // Per mille, per ten thousand, percent
-      return BidiClassET;
-    }
-    return BidiClassAL;
+    cls = s_class_run_classes[lo];
   }
-  if (cp >= 0x0700 && cp <= 0x08FF) { // Syriac, Thaana, NKo, Arabic Extended-A/B
-    // These blocks carry Arabic number signs among their letters.
-    if (cp == 0x0890 || cp == 0x0891 || cp == 0x08E2) {
-      return BidiClassAN;
-    }
-    // NKo, Samaritan and Mandaic are R; the rest are Arabic-script letters.
-    if (cp >= 0x07C0 && cp <= 0x085F) {
-      return BidiClassR;
-    }
-    return BidiClassAL;
-  }
-  if (cp >= 0xFB1D && cp <= 0xFB4F) {
-    return BidiClassR; // Hebrew presentation forms
-  }
-  if ((cp >= 0xFB50 && cp <= 0xFDFF) || (cp >= 0xFE70 && cp <= 0xFEFC)) {
-    return BidiClassAL; // Arabic presentation forms
-  }
-  switch (cp) {
-    case 0x00A0: // No-break space
-      return BidiClassCS;
-    case 0x00B0: // Degree sign
-    case 0x00B1: // Plus-minus sign
-    case 0x20AC: // Euro sign
-      return BidiClassET;
-    case 0x2212: // Minus sign
-      return BidiClassES;
-    case 0x200E: // Left-to-right mark
-      return BidiClassL;
-    case 0x200F: // Right-to-left mark
-      return BidiClassR;
-    default:
-      break;
-  }
-  if (cp >= 0x00A1 && cp <= 0x00BF) { // Latin-1 punctuation and symbols
+  if ((cls == BidiClassL) && (codepoint_is_emoji(cp) || codepoint_is_regional_indicator(cp))) {
     return BidiClassON;
   }
-  if (cp >= 0x2000 && cp <= 0x2BFF) { // Punctuation, symbols, arrows, math
-    return BidiClassON;
-  }
-  if (codepoint_is_emoji(cp) || codepoint_is_regional_indicator(cp)) {
-    return BidiClassON;
-  }
-  return BidiClassL;
+  return cls;
 }
 
 //! Decode the codepoint at @p pos and return its class, setting @p next to the
