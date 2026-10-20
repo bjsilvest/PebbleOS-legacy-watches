@@ -108,6 +108,7 @@ static volatile uint32_t s_acl_completed;
 static volatile uint8_t s_last_reply_len;
 static char s_reset_snapshot[32];
 
+#ifdef CONFIG_BT_CONTROLLER_DIAGNOSTICS
 // SMP opcodes seen on the link, oldest first: '<' received, '>' sent, then the
 // opcode in hex, for Pairing Failed its reason, and for Pairing Request and
 // Response the IO capability and the AuthReq byte (bit 2 MITM, bit 3 SC).
@@ -181,6 +182,11 @@ static void prv_note_smp(char dir, struct os_mbuf *om) {
 const char *pbl_bt_hci_uart_smp_trace(void) {
   return s_smp_trace;
 }
+#else
+static inline void prv_trace_append(const char *entry) {}
+static inline void prv_note_completed(uint16_t count) {}
+static inline void prv_note_smp(char dir, struct os_mbuf *om) {}
+#endif
 
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
 // The DA1468x controller reports more completed ACL packets than were sent
@@ -574,8 +580,10 @@ static void prv_note_evt(struct ble_hci_ev *ev) {
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
   if (ev->opcode == BLE_HCI_EVCODE_DISCONN_CMP && ev->length >= 3U) {
     prv_acl_track_forget((ev->data[1] | (ev->data[2] << 8)) & 0x0fffU);
+#ifdef CONFIG_BT_CONTROLLER_DIAGNOSTICS
     prv_trace_append("x");
     s_smp_completions_left = 0U;
+#endif
     return;
   }
 #endif
