@@ -381,9 +381,14 @@ static void prv_handle_subscription_event(struct ble_gap_event *event) {
 #ifdef CONFIG_BT_CONTROLLER_CC2564
   // A phone enables Service Changed right after pairing. It may still hold the
   // attribute cache of another firmware (the stock recovery it paired with),
-  // so tell it every handle changed and it rediscovers ours.
+  // so tell it every handle changed and it rediscovers ours. Only on an
+  // encrypted link: iOS subscribes before pairing, and the reconnect below
+  // would cut its pairing short.
+  struct ble_gap_conn_desc desc;
   if (event->subscribe.reason == BLE_GAP_SUBSCRIBE_REASON_WRITE &&
-      event->subscribe.cur_indicate && !event->subscribe.prev_indicate) {
+      event->subscribe.cur_indicate && !event->subscribe.prev_indicate &&
+      ble_gap_conn_find(event->subscribe.conn_handle, &desc) == 0 &&
+      desc.sec_state.encrypted) {
     const ble_uuid16_t svc_uuid = BLE_UUID16_INIT(PBL_BT_GATT_SERVICE_UUID);
     const ble_uuid16_t chr_uuid = BLE_UUID16_INIT(BLE_SVC_GATT_CHR_SERVICE_CHANGED_UUID16);
     uint16_t val_handle;
