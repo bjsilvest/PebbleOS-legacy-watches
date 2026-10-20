@@ -120,5 +120,6 @@ spalding carry the same three changes.
 
 ## Open items
 
-- The retail watch (v1_5) and the Steel (v2_0) have not run on hardware.
-- Not tested with an iPhone (ANCS, AMS, pairing).
+- The retail watch (v1_5) and the Steel (v2_0) have not run on hardware. On
+  the Steel, also check the charging LED: dim orange while charging, dim green
+  when full (IS31FL3196, `af207288d`).
