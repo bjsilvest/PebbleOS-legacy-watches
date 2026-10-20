@@ -49,7 +49,8 @@ CONFIG_AMBIENT_LIGHT_THRESHOLD_LOCAL=y
 
 # What the original Pebble never had, or has no room for: Health, weather,
 # timeline Quick View, analytics heartbeats, the debug shell, the Sports
-# app, and right-to-left text (the fonts have no Hebrew or Arabic glyphs).
+# app, right-to-left text (the fonts have no Hebrew or Arabic glyphs), and
+# the Bluetooth bring-up rows under Information.
 CONFIG_SERVICE_ACTIVITY=n
 CONFIG_SERVICE_WEATHER=n
 CONFIG_TIMELINE_PEEK=n
@@ -58,6 +59,7 @@ CONFIG_TEXT_RTL=n
 CONFIG_SERVICE_ANALYTICS_NATIVE=n
 CONFIG_SHELL=n
 CONFIG_PULSE_EVERYWHERE=n
+CONFIG_BT_CONTROLLER_DIAGNOSTICS=n
 
 # TI CC2564A on USART1. Its 24 KB init script stays unmodified in the
 # system resources (third_party/ti_bt_sp/bluetooth_init_cc2564_2.14.bts).
