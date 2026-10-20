@@ -11,7 +11,7 @@
 
 #define PNG_DECODE_ERROR "PNG decoding failed"
 #define PNG_MEMORY_ERROR "PNG memory allocation failed"
-#define PNG_FORMAT_ERROR "Unsupported PNG format, only PNG8 is supported!"
+#define PNG_FORMAT_ERROR "Only PNG8 is supported"
 #define PNG_LOAD_ERROR   "Failed to load PNG"
 
 static GBitmapFormat prv_get_format_for_bpp(uint8_t bits_per_pixel) {

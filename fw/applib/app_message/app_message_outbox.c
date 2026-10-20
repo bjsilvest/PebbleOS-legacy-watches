@@ -67,9 +67,7 @@ AppMessageResult app_message_outbox_open(AppMessageCtxOutbox *outbox, size_t siz
     // Truncate if it's more than the max:
     size_outbound = size_maximum;
   } else if (size_outbound == size_maximum) {
-    APP_LOG(LOG_LEVEL_INFO, "app_message_open() called with app_message_outbox_size_maximum().");
-    APP_LOG(LOG_LEVEL_INFO,
-            "This consumes %" PRIu32 " bytes of heap memory, potentially more in the future!",
+    APP_LOG(LOG_LEVEL_INFO, "app_message_open() %s size maximum: %" PRIu32 " B of heap", "outbox",
             (uint32_t)size_maximum);
   }
   if (size_outbound == 0) {

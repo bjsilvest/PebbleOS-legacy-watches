@@ -337,8 +337,7 @@ int pbl_snprintf(char *str, size_t n, const char *format, ...) {
   // Return error message if we detected floating point
   if (has_fp) {
     APP_LOG(APP_LOG_LEVEL_DEBUG,
-            "Floating point is not supported by snprintf: "
-            "it was called with format string '%s'",
+            "snprintf has no floating point: '%s'",
             format);
     strncpy(str, fp_msg, n - 1);
     str[n - 1] = 0;

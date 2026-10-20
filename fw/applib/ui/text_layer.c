@@ -231,7 +231,7 @@ void text_layer_enable_screen_text_flow_and_paging(TextLayer *text_layer, uint8_
     return;
   }
   if (text_layer->layer.window == nullptr) {
-    APP_LOG(APP_LOG_LEVEL_ERROR, "Before calling %s, layer must be attached to view hierarchy.",
+    APP_LOG(APP_LOG_LEVEL_ERROR, "%s: layer not in view hierarchy",
             __func__);
     return;
   }

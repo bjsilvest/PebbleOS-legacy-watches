@@ -638,8 +638,7 @@ GBitmap *graphics_capture_frame_buffer_format(GContext *ctx, GBitmapFormat forma
   PBL_ASSERTN(ctx);
   if (ctx->lock) {
     APP_LOG(APP_LOG_LEVEL_WARNING,
-            "Frame buffer has already been captured; it cannot be captured again until "
-            "graphics_release_frame_buffer has been called.");
+            "Frame buffer already captured");
     return nullptr;
   }
   ctx->lock = true;

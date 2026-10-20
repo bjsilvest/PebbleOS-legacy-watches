@@ -240,8 +240,7 @@ void layer_render_tree(Layer *node, GContext *ctx) {
       if (ctx->lock) {
         graphics_release_frame_buffer(ctx, &ctx->dest_bitmap);
         APP_LOG(APP_LOG_LEVEL_WARNING,
-                "Frame buffer was not released. "
-                "Make sure to call graphics_release_frame_buffer before leaving update_proc.");
+                "update_proc must call graphics_release_frame_buffer");
       }
       descend = true;
     }

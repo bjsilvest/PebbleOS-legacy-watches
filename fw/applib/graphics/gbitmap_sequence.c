@@ -17,12 +17,12 @@
 
 #define APNG_DECODE_ERROR    "APNG decoding failed"
 #define APNG_MEMORY_ERROR    "APNG memory allocation failed"
-#define APNG_FORMAT_ERROR    "Unsupported APNG format, only APNG8 is supported!"
+#define APNG_FORMAT_ERROR    "Only APNG8 is supported"
 #define APNG_LOAD_ERROR      "Failed to load APNG"
 #define APNG_UPDATE_ERROR    "gbitmap_sequence failed to update bitmap"
-#define APNG_ELAPSED_WARNING "invalid elapsed_ms for gbitmap_sequence, forward progression only"
+#define APNG_ELAPSED_WARNING "gbitmap_sequence elapsed_ms can only grow"
 #define APNG_DISPOSE_PREVIOUS_WARNING \
-  "APNG dispose op PREVIOUS unsupported, treated as NONE; re-encode without it"
+  "APNG dispose PREVIOUS drawn as NONE"
 
 static bool prv_gbitmap_sequence_restart(GBitmapSequence *bitmap_sequence, bool reset_elapsed) {
   if (bitmap_sequence == nullptr) {
