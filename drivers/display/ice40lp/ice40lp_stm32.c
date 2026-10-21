@@ -4,7 +4,8 @@
 
 //! Snowy and spalding display: an iCE40 FPGA framebuffer on an STM32F4 SPI.
 //!
-//! The FPGA is programmed with its bitstream at init, then takes frames: SCS
+//! The FPGA is programmed at init with its bitstream, which is stored
+//! deflated and inflated on the way out. It then takes frames: SCS
 //! low, CMD_FRAME_BEGIN, then one line per panel line: a framebuffer column on
 //! snowy, a row of the circular framebuffer on spalding (shifted by the
 //! factory display offsets). BUSY is high while
@@ -33,8 +34,10 @@
 
 #include <board/board.h>
 #include <kernel/events.h>
+#include <kernel/pbl_malloc.h>
 #include <kernel/util/delay.h>
 #include <stm32f4xx.h>
+#include <uzlib.h>
 #if PBL_ROUND
 #include <mfg/mfg_info.h>
 #endif
@@ -63,7 +66,10 @@
 #define FRAME_TIMEOUT_MS 200U
 //! Typical NVCM configuration time is 56 ms.
 #define CDONE_TIMEOUT_US 100000
+//! The bitstream's DEFLATE window (tools/deflate_raw.py default).
+#define BITSTREAM_WINDOW 512
 
+//! Raw DEFLATE stream of the bitstream.
 extern const uint8_t ice40lp_bitstream_start[];
 extern const uint8_t ice40lp_bitstream_end[];
 
@@ -162,6 +168,40 @@ static bool prv_wait_not_busy(void) {
   return false;
 }
 
+//! Inflate the bitstream to the FPGA, a line buffer at a time; they are not
+//! in use yet. @return false if it did not inflate to the end.
+static bool prv_write_bitstream(void) {
+  struct {
+    TINF_DATA d;
+    uint8_t dict[BITSTREAM_WINDOW];
+  } *s = kernel_malloc(sizeof(*s));
+  if (!s) {
+    PBL_LOG_ERR("No memory to inflate the FPGA bitstream");
+    return false;
+  }
+
+  uzlib_uncompress_init(&s->d, s->dict, sizeof(s->dict));
+  s->d.source = ice40lp_bitstream_start;
+  s->d.source_limit = ice40lp_bitstream_end;
+  s->d.source_read_cb = nullptr;
+  int res;
+  do {
+    uint8_t *chunk = s_lines[0];
+    s->d.dest_start = chunk;
+    s->d.dest = chunk;
+    s->d.dest_limit = chunk + sizeof(s_lines[0]);
+    res = uzlib_uncompress(&s->d);
+    prv_spi_write(chunk, s->d.dest - chunk);
+  } while (res == TINF_OK);
+  kernel_free(s);
+
+  if (res != TINF_DONE) {
+    PBL_LOG_ERR("FPGA bitstream inflate failed: %d", res);
+    return false;
+  }
+  return true;
+}
+
 static bool prv_program(void) {
   const struct pbl_gpio *creset = &BOARD_CONFIG_DISPLAY.creset;
   const struct pbl_gpio *scs = &BOARD_CONFIG_DISPLAY.scs;
@@ -177,7 +217,7 @@ static bool prv_program(void) {
   // The iCE40 needs 800 us of housekeeping after reset.
   delay_us(1000);
 
-  prv_spi_write(ice40lp_bitstream_start, ice40lp_bitstream_end - ice40lp_bitstream_start);
+  const bool written = prv_write_bitstream();
 
   // SCS high so these clocks are not taken as commands; 49+ clocks finish
   // the configuration.
@@ -198,7 +238,7 @@ static bool prv_program(void) {
   }
 
   prv_spi_configure(BOARD_CONFIG_DISPLAY.fast_spi_frequency);
-  return done;
+  return written && done;
 }
 
 static void prv_power_enable(void) {
