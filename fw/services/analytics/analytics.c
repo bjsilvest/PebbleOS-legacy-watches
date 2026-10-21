@@ -68,10 +68,12 @@ static void prv_heartbeat_system_task_cb(void *data) {
 
   pbl_analytics_external_collect_battery();
   pbl_analytics_external_collect_cpu_stats();
+#ifdef CONFIG_SERVICE_ANALYTICS_SYSTEM_STATS
   pbl_analytics_external_collect_task_cpu_stats();
   pbl_analytics_external_collect_stack_free();
   pbl_analytics_external_collect_pfs_stats();
   pbl_analytics_external_collect_kernel_heap_stats();
+#endif
   pbl_analytics_external_collect_backlight_stats();
   pbl_analytics_external_collect_vibe_stats();
   pbl_analytics_external_collect_speaker_stats();

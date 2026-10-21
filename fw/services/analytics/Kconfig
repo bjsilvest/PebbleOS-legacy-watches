@@ -15,6 +15,14 @@ config SERVICE_ANALYTICS_NATIVE
       Hourly heartbeats collected and logged by the firmware. Without a
       backend every analytics call is a no-op.
 
+config SERVICE_ANALYTICS_SYSTEM_STATS
+    bool "Task, stack, heap and filesystem statistics"
+    depends on SERVICE_ANALYTICS_NATIVE
+    default y
+    help
+      Collect per-task CPU time, free stack, kernel heap and filesystem
+      usage in the heartbeat. Without it those metrics are left at 0.
+
 module = SERVICE_ANALYTICS
 module-str = Analytics
 source "subsys/logging/Kconfig.template.log_level"
