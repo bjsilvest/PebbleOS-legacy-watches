@@ -120,9 +120,14 @@ UnobstructedAreaState *app_state_get_unobstructed_area_state(void) {
 }
 
 AppGlance s_app_glance;
+static AppGlance *s_app_glance_ptr = &s_app_glance;
 
 AppGlance *app_state_get_glance(void) {
-  return &s_app_glance;
+  return s_app_glance_ptr;
+}
+
+void app_state_set_glance(AppGlance *glance) {
+  s_app_glance_ptr = glance;
 }
 
 static bool s_text_perimeter_debugging_enabled;
