@@ -271,6 +271,25 @@ class MyTestCase(unittest.TestCase):
         commands, _ = svg2commands.get_commands((0, 0), rect_element_none, precise=True)
         self.assertEqual(len(commands), 0)
 
+    def test_attributes_do_not_leak_to_siblings(self):
+        root = create_root(
+            '<g fill="none">'
+            '<g fill="#00FF00"><rect x="0" y="0" width="4" height="4"/></g>'
+            '<rect x="0" y="0" width="4" height="4" stroke="#FF0000" stroke-width="3"/>'
+            '<path d="M0,0 L4,0 L4,4 Z" fill="#00FF00"/>'
+            '<path d="M0,0 L4,0 L4,4 Z" stroke="#FF0000" stroke-width="3"/>'
+            "</g>"
+        )
+        commands, _ = svg2commands.get_commands((0, 0), root, precise=False)
+        self.assertEqual(len(commands), 4)
+        green = pebble_commands.convert_color(0x00, 0xFF, 0x00, 0xFF)
+        # The group's fill reaches its child, but not the following sibling.
+        self.assertEqual(commands[0].fill_color, green)
+        self.assertEqual(commands[1].fill_color, 0)
+        # An element's own fill doesn't reach the following sibling either.
+        self.assertEqual(commands[2].fill_color, green)
+        self.assertEqual(commands[3].fill_color, 0)
+
     def test_create_command(self):
         element = create_element(
             '<polyline fill="#AAFF00" stroke="#0055FF" stroke-width="3" '

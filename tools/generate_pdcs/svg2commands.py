@@ -330,7 +330,8 @@ def create_command(
 ):
     if inherited_values is None:
         inherited_values = {}
-    values = overwrite_inherited(element, inherited_values)
+    # Copy, so this element's own attributes don't leak into its siblings.
+    values = overwrite_inherited(element, dict(inherited_values))
     try:
         stroke_width = int(values.get("stroke-width"))
     except TypeError:
@@ -459,7 +460,8 @@ def get_commands(
         # traverse tree of nested layers or groups
         if tag == "layer" or tag == "g":
             translate += get_translate(child)
-            inherited_values = overwrite_inherited(child, inherited_values)
+            # Copy, so the group's attributes reach only its own children.
+            group_values = overwrite_inherited(child, dict(inherited_values))
             cmd_list, err = get_commands(
                 translate,
                 child,
@@ -467,7 +469,7 @@ def get_commands(
                 precise,
                 raise_error,
                 truncate_color,
-                inherited_values,
+                group_values,
             )
             commands += cmd_list
             if err:
