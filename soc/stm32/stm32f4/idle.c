@@ -8,7 +8,9 @@
 #include <pbl/drivers/rtc.h>
 #include <pbl/kernel/compiler.h>
 #include <pbl/kernel/idle.h>
+#include <pbl/services/analytics/analytics.h>
 #include <pbl/soc/stm32/sleep.h>
+#include <pbl/util/math.h>
 
 #include <kernel/util/idle.h>
 #include <stm32f4xx.h>
@@ -34,6 +36,10 @@ static PBL_NOINLINE PBL_NAKED void prv_do_wfi(void) {
       "nop      \n"
       "nop      \n");
 }
+
+//! CPU analytics: core clock cycles spent in WFI, RTC ticks spent in STOP.
+static uint64_t s_analytics_wfi_cycles;
+static uint32_t s_analytics_stop_ticks;
 
 static void prv_enter_stop(void) {
   flash_power_down_for_stop_mode();
@@ -72,9 +78,14 @@ void pbl_soc_idle(pbl_tick_t max_ticks) {
 
   if (pbl_idle_confirm()) {
     if (max_ticks < MIN_STOP_TICKS || !rtc_alarm_is_initialized() || !soc_stm32_stop_is_allowed()) {
+      // SysTick keeps counting core clocks in WFI and its interrupt ends the
+      // WFI, so at most one reload happens in between.
+      uint32_t start = SysTick->VAL;
       __DSB();
       prv_do_wfi();
       __ISB();
+      uint32_t end = SysTick->VAL;
+      s_analytics_wfi_cycles += (start >= end) ? start - end : start + SysTick->LOAD + 1 - end;
     } else {
       pbl_tick_t sleep_ticks = max_ticks - EARLY_WAKEUP_TICKS;
       if (sleep_ticks > MAX_STOP_TICKS) {
@@ -87,7 +98,9 @@ void pbl_soc_idle(pbl_tick_t max_ticks) {
 
       prv_enter_stop();
 
-      pbl_idle_slept(rtc_alarm_get_elapsed_ticks());
+      RtcTicks elapsed_ticks = rtc_alarm_get_elapsed_ticks();
+      pbl_idle_slept(elapsed_ticks);
+      s_analytics_stop_ticks += elapsed_ticks;
       SysTick->VAL = 0;
       SysTick->CTRL |= SysTick_CTRL_ENABLE_Msk;
     }
@@ -101,4 +114,30 @@ bool pbl_soc_tick_enable(void) {
 }
 
 void pbl_analytics_external_collect_cpu_stats(void) {
+  static RtcTicks s_last_ticks;
+
+  __disable_irq();
+  uint64_t wfi_cycles = s_analytics_wfi_cycles;
+  uint32_t stop_ticks = s_analytics_stop_ticks;
+  s_analytics_wfi_cycles = 0;
+  s_analytics_stop_ticks = 0;
+  __enable_irq();
+
+  RtcTicks now_ticks = rtc_get_ticks();
+  uint32_t total_ticks = (uint32_t)(now_ticks - s_last_ticks);
+  s_last_ticks = now_ticks;
+  if (total_ticks == 0) {
+    return;
+  }
+
+  uint32_t wfi_ticks = (uint32_t)((wfi_cycles * RTC_TICKS_HZ) / SystemCoreClock);
+  uint32_t sleep_ticks = MIN(wfi_ticks + stop_ticks, total_ticks);
+  uint32_t wfi_pct = (uint32_t)((wfi_ticks * 10000ULL) / total_ticks);
+  uint32_t stop_pct = (uint32_t)((stop_ticks * 10000ULL) / total_ticks);
+  uint32_t running_pct = (uint32_t)(((total_ticks - sleep_ticks) * 10000ULL) / total_ticks);
+
+  PBL_ANALYTICS_SET_UNSIGNED(cpu_running_pct, running_pct);
+  PBL_ANALYTICS_SET_UNSIGNED(cpu_sleep0_pct, wfi_pct);
+  PBL_ANALYTICS_SET_UNSIGNED(cpu_sleep1_pct, stop_pct);
+  PBL_ANALYTICS_SET_UNSIGNED(cpu_sleep2_pct, 0);
 }
