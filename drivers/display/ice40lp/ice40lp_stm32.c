@@ -16,9 +16,7 @@
 //! Nothing here asserts on a misbehaving FPGA: a crash loop before the
 //! firmware is marked stable ends in the stock bootloader starting PRF.
 
-#include <inttypes.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <string.h>
 
 #include <pbl/drivers/display/display.h>
@@ -76,16 +74,6 @@ static volatile int s_sent;
 static volatile bool s_frame_active;
 static volatile bool s_waiting_busy;
 static RtcTicks s_frame_start;
-
-//! Diagnostics for Settings > Information.
-static struct {
-  uint32_t frames;
-  uint16_t busy_at_start;
-  uint16_t black_busy;
-  uint16_t splash_busy;
-  uint16_t timeouts;
-  int16_t last_timeout_line;
-} s_stats;
 
 static void prv_busy_isr(void);
 
@@ -257,7 +245,6 @@ static void prv_show_boot_splash(void) {
 
   // Don't turn the panel on before the logo is drawn.
   if (!prv_wait_not_busy()) {
-    s_stats.splash_busy++;
     return;
   }
   pbl_gpio_set(scs, true);
@@ -275,7 +262,6 @@ static void prv_send_black_frame(void) {
   prv_spi_write(&cmd, 1);
   for (int i = 0; i < DISP_LINES; i++) {
     if (!prv_wait_not_busy()) {
-      s_stats.black_busy++;
       break;
     }
     prv_spi_write(s_line, sizeof(s_line));
@@ -428,10 +414,8 @@ static void prv_dma_done(void *context, bool is_complete) {
 static void prv_start_dma_frame(const uint8_t *fb) {
   const BoardConfigIce40Display *cfg = &BOARD_CONFIG_DISPLAY;
 
-  s_stats.frames++;
   if (!prv_wait_not_busy()) {
     // A new frame (SCS falling edge) resets the FPGA's frame logic.
-    s_stats.busy_at_start++;
     PBL_LOG_WRN("Display busy before frame");
   }
 
@@ -525,8 +509,6 @@ bool display_update_in_progress(void) {
     }
     pbl_irq_unlock();
     if (ended) {
-      s_stats.timeouts++;
-      s_stats.last_timeout_line = s_sent;
       PBL_LOG_WRN("Display frame timed out at line %d", s_sent);
       prv_post_terminate();
     }
@@ -538,10 +520,4 @@ void display_update_boot_frame(uint8_t *framebuffer) {
   if (s_programmed) {
     prv_send_frame(framebuffer);
   }
-}
-
-void display_copy_stats(char *buf, size_t len) {
-  snprintf(buf, len, "f%" PRIu32 " b%u k%u s%u t%u l%d", s_stats.frames,
-           s_stats.busy_at_start, s_stats.black_busy, s_stats.splash_busy, s_stats.timeouts,
-           s_stats.last_timeout_line);
 }
