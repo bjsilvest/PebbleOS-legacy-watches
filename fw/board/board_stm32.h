@@ -32,6 +32,12 @@ static inline ExtiConfig pbl_exti_stm32_config(const struct pbl_gpio *gpio) {
   };
 }
 
+//! A calibration point of CONFIG_AMBIENT_LIGHT_LUX_TABLE.
+typedef struct {
+  uint16_t level;
+  uint16_t lux;
+} AmbientLightLuxPoint;
+
 typedef struct {
   // Ambient Light Configuration
   /////////////////////////////////////////////////////////////////////////////
@@ -42,6 +48,12 @@ typedef struct {
   const uint32_t ambient_light_lux_dark_offset;
   const uint32_t ambient_light_lux_num;
   const uint32_t ambient_light_lux_den;
+#ifdef CONFIG_AMBIENT_LIGHT_LUX_TABLE
+  //! Raw level -> lux points by rising level, interpolated between; levels
+  //! outside them take the end points.
+  const AmbientLightLuxPoint *ambient_light_lux_table;
+  const uint8_t ambient_light_lux_table_len;
+#endif
   const struct pbl_gpio photo_en;
   const bool als_always_on;
   //! ADC channel and input pin of an analog light sensor.
