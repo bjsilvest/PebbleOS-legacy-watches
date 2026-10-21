@@ -47,6 +47,9 @@ CONFIG_BACKLIGHT_PWM=y
 CONFIG_AMBIENT_LIGHT=y
 CONFIG_AMBIENT_LIGHT_STM32_ADC=y
 CONFIG_AMBIENT_LIGHT_THRESHOLD_LOCAL=y
+# Backlight brightness follows the light sensor (Settings > Display). Its lux
+# conversion in board_snowy.h is provisional until calibrated.
+CONFIG_DYNAMIC_BACKLIGHT=y
 
 CONFIG_ACCEL_BMI160=y
 

@@ -15,12 +15,20 @@
 #define BT_VENDOR_NAME "Pebble Technology"
 
 static const BoardConfig BOARD_CONFIG = {
+  // PROVISIONAL lux conversion, until the sensor is calibrated against a lux
+  // meter: the dark floor read ~200 and a phone flashlight ~2900, taken here
+  // as about 1000 lux. The dynamic backlight ramp works in lux. The dark
+  // thresholds are the stock raw ones (3130, 3220) and the k delta (96)
+  // converted with the same factor, so the backlight switches where it did.
+  .ambient_light_lux_dark_offset = 200,
+  .ambient_light_lux_num = 10,
+  .ambient_light_lux_den = 27,
 #ifdef CONFIG_BOARD_SNOWY_S3
-  .ambient_light_dark_threshold = 3220,
+  .ambient_light_dark_threshold = 1118,
 #else
-  .ambient_light_dark_threshold = 3130,
+  .ambient_light_dark_threshold = 1085,
 #endif
-  .ambient_k_delta_threshold = 96,
+  .ambient_k_delta_threshold = 35,
   .photo_en = PBL_GPIO(STM32_GPIOA, 3, 0),
   .als_adc_channel = ADC_Channel_2,
   .als_adc_pin = PBL_GPIO(STM32_GPIOA, 2, 0),
