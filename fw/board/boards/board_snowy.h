@@ -10,25 +10,33 @@
 #include <pbl/drivers/backlight/pwm.h>
 #include <pbl/drivers/i2c.h>
 #include <pbl/services/imu/units.h>
+#include <pbl/util/size.h>
 
 #define BT_VENDOR_ID   0x0154
 #define BT_VENDOR_NAME "Pebble Technology"
 
+// Light sensor readings (3 s after the backlight went off) on a Pebble Time
+// in eight lighting conditions, against the middle of each condition's usual
+// lux range: the phototransistor rises steeply up to room light, then
+// flattens out. Not measured on a Steel.
+static const AmbientLightLuxPoint s_ambient_light_lux_table[] = {
+  {201, 0},      // closet, near pitch dark
+  {216, 2},      // dark room, light from a doorway
+  {403, 10},     // dim room, one small lamp
+  {1600, 45},    // evening living room
+  {2603, 175},   // normal indoor light
+  {2854, 550},   // bright room, desk lamp
+  {2957, 3000},  // outdoors in shade
+  {3030, 10000}, // direct sunlight
+};
+
 static const BoardConfig BOARD_CONFIG = {
-  // PROVISIONAL lux conversion, until the sensor is calibrated against a lux
-  // meter: the dark floor read ~200 and a phone flashlight ~2900, taken here
-  // as about 1000 lux. The dynamic backlight ramp works in lux. The dark
-  // thresholds are the stock raw ones (3130, 3220) and the k delta (96)
-  // converted with the same factor, so the backlight switches where it did.
-  .ambient_light_lux_dark_offset = 200,
-  .ambient_light_lux_num = 10,
-  .ambient_light_lux_den = 27,
-#ifdef CONFIG_BOARD_SNOWY_S3
-  .ambient_light_dark_threshold = 1118,
-#else
-  .ambient_light_dark_threshold = 1085,
-#endif
-  .ambient_k_delta_threshold = 35,
+  .ambient_light_lux_table = s_ambient_light_lux_table,
+  .ambient_light_lux_table_len = ARRAY_LENGTH(s_ambient_light_lux_table),
+  // As the lux-calibrated Core watches: the backlight stops coming on in
+  // light brighter than a desk lamp.
+  .ambient_light_dark_threshold = 800,
+  .ambient_k_delta_threshold = 100,
   .photo_en = PBL_GPIO(STM32_GPIOA, 3, 0),
   .als_adc_channel = ADC_Channel_2,
   .als_adc_pin = PBL_GPIO(STM32_GPIOA, 2, 0),
