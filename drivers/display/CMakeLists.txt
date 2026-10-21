@@ -18,10 +18,16 @@ elseif(CONFIG_DISPLAY_SHARP_LS013B7DH01_STM32)
   list(APPEND sources sharp_ls013b7dh01/sharp_ls013b7dh01_stm32.c)
 elseif(CONFIG_DISPLAY_ICE40LP_STM32)
   set(bitstream ${CMAKE_CURRENT_SOURCE_DIR}/ice40lp/snowy_framebuffer.fpga)
+  # Embedded deflated: mostly zeros, it shrinks to under a quarter.
+  set(deflated ${CMAKE_CURRENT_BINARY_DIR}/ice40lp_bitstream.deflate)
+  add_custom_command(OUTPUT ${deflated}
+    COMMAND ${Python3_EXECUTABLE} ${PBL_BASE}/tools/deflate_raw.py ${bitstream} ${deflated}
+    DEPENDS ${bitstream} ${PBL_BASE}/tools/deflate_raw.py
+    COMMENT "Deflating the FPGA bitstream")
   list(APPEND sources ice40lp/ice40lp_stm32.c ice40lp/ice40lp_bitstream.c)
   set_source_files_properties(ice40lp/ice40lp_bitstream.c PROPERTIES
-    OBJECT_DEPENDS ${bitstream}
-    COMPILE_DEFINITIONS "ICE40LP_BITSTREAM_PATH=\"${bitstream}\"")
+    OBJECT_DEPENDS ${deflated}
+    COMPILE_DEFINITIONS "ICE40LP_BITSTREAM_PATH=\"${deflated}\"")
 endif()
 pbl_library()
 pbl_library_sources(${sources})
