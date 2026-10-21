@@ -385,8 +385,10 @@ static void prv_read_light(SystemInformationData *info) {
 
   const uint32_t settled = raw[ARRAY_LENGTH(raw) - 1];
   if (ambient_light_lux_available()) {
-    sniprintf(info->light_string, sizeof(info->light_string), "%" PRIu32 " (%" PRIu32 " lux)",
-              settled, ambient_light_level_to_lux(settled));
+    // Keep the raw readings: the lux conversion may still need calibrating.
+    sniprintf(info->light_string, sizeof(info->light_string),
+              "%" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 "lx", raw[0], raw[1], raw[2],
+              ambient_light_level_to_lux(settled));
   } else {
     sniprintf(info->light_string, sizeof(info->light_string), "%" PRIu32 " %" PRIu32 " %" PRIu32,
               raw[0], raw[1], raw[2]);

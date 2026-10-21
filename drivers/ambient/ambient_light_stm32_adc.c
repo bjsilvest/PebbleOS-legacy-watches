@@ -2,7 +2,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 //! Analog ambient light sensor read through the STM32 ADC (silk), as the
-//! stock firmware did it. Levels are 12-bit; there is no lux calibration.
+//! stock firmware did it. Levels are 12-bit; boards may convert them to lux.
 
 #include <inttypes.h>
 
@@ -75,8 +75,10 @@ void ambient_light_set_dark_threshold(uint32_t new_threshold) {
 }
 
 bool ambient_light_is_light(void) {
-  // If the sensor is not enabled, always report dark.
-  return s_initialized && ambient_light_get_light_level() > s_dark_threshold;
+  // If the sensor is not enabled, always report dark. The threshold lives in
+  // the lux domain (see ambient_light_level_to_lux).
+  return s_initialized &&
+         ambient_light_level_to_lux(ambient_light_get_light_level()) > s_dark_threshold;
 }
 
 AmbientLightLevel ambient_light_level_to_enum(uint32_t light_level) {
