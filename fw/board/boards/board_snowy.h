@@ -11,17 +11,41 @@
 #include <pbl/drivers/backlight/pwm.h>
 #include <pbl/drivers/i2c.h>
 #include <pbl/services/imu/units.h>
+#include <pbl/util/size.h>
 
 #define BT_VENDOR_ID   0x0154
 #define BT_VENDOR_NAME "Pebble Technology"
 
+#ifdef CONFIG_BOARD_SPALDING
+// Light sensor readings (3 s after the backlight went off) on a Pebble Time
+// Round in seven lighting conditions, against the middle of each condition's
+// usual lux range: the phototransistor jumps from the dark floor in the
+// faintest light, then rises slowly up to sunlight.
+static const AmbientLightLuxPoint s_ambient_light_lux_table[] = {
+  {236, 0},      // closet, near pitch dark
+  {2861, 2},     // dark room, light from a doorway
+  {2995, 10},    // dim room, one small lamp
+  {3589, 175},   // normal indoor light
+  {3636, 550},   // bright room, desk lamp
+  {3822, 3000},  // outdoors in shade
+  {4006, 10000}, // direct sunlight
+};
+#endif
+
 static const BoardConfig BOARD_CONFIG = {
+#ifdef CONFIG_BOARD_SPALDING
+  .ambient_light_lux_table = s_ambient_light_lux_table,
+  .ambient_light_lux_table_len = ARRAY_LENGTH(s_ambient_light_lux_table),
+  // As the lux-calibrated Core watches: the backlight stops coming on in
+  // light brighter than a desk lamp.
+  .ambient_light_dark_threshold = 800,
+  .ambient_k_delta_threshold = 100,
+#else
   // PROVISIONAL lux conversion, until the sensor is calibrated against a lux
   // meter: the snowy dark floor read ~200 and a phone flashlight ~2900, taken
-  // here as about 1000 lux (spalding not measured yet). The dynamic backlight
-  // ramp works in lux. The dark thresholds are the stock raw ones (3130,
-  // 3220) and the k delta (96) converted with the same factor, so the
-  // backlight switches where it did.
+  // here as about 1000 lux. The dynamic backlight ramp works in lux. The dark
+  // thresholds are the stock raw ones (3130, 3220) and the k delta (96)
+  // converted with the same factor, so the backlight switches where it did.
   .ambient_light_lux_dark_offset = 200,
   .ambient_light_lux_num = 10,
   .ambient_light_lux_den = 27,
@@ -31,6 +55,7 @@ static const BoardConfig BOARD_CONFIG = {
   .ambient_light_dark_threshold = 1085,
 #endif
   .ambient_k_delta_threshold = 35,
+#endif
   .photo_en = PBL_GPIO(STM32_GPIOA, 3, 0),
   .als_adc_channel = ADC_Channel_2,
 #ifdef CONFIG_BOARD_SPALDING
