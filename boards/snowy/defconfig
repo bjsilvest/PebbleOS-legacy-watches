@@ -62,6 +62,8 @@ CONFIG_NIMBLE_BLE_TRANSPORT_ISO_COUNT=0
 
 CONFIG_BT_HCI_UART=y
 CONFIG_BT_CONTROLLER_CC2564=y
+# No Bluetooth bring-up rows under Information: the port is tested.
+CONFIG_BT_CONTROLLER_DIAGNOSTICS=n
 
 # The CC2564B (Bluetooth 4.1) as the pebble-dev firmware found it works:
 # legacy pairing allowed, no MITM (LE Secure Connections only with MITM
