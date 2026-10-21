@@ -1147,10 +1147,11 @@ void shell_prefs_init(void) {
   }
 #endif
 
-#if defined(CONFIG_AMBIENT_LIGHT_W1160)
-  // One-time: the ALS pipeline switched from raw counts to lux, so stored
-  // threshold overrides are in the wrong unit (~5x too high). Drop them so
-  // the device follows the new lux board defaults.
+#if defined(CONFIG_AMBIENT_LIGHT_W1160) || \
+    (defined(CONFIG_AMBIENT_LIGHT_STM32_ADC) && defined(CONFIG_DYNAMIC_BACKLIGHT))
+  // One-time: the ALS pipeline switched from raw counts to lux (W1160 ~5x,
+  // the snowy ADC sensor ~3x), so stored threshold overrides are in the wrong
+  // unit. Drop them so the device follows the new lux board defaults.
   if (!s_als_threshold_migrated_v2) {
     s_backlight_ambient_threshold = BOARD_CONFIG.ambient_light_dark_threshold;
     SettingsFile v2file = {};
