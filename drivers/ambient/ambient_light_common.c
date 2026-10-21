@@ -70,10 +70,35 @@ void ambient_light_resume(void) {
 }
 
 bool ambient_light_lux_available(void) {
+#ifdef CONFIG_AMBIENT_LIGHT_LUX_TABLE
+  return true;
+#else
   return BOARD_CONFIG.ambient_light_lux_den != 0U;
+#endif
 }
 
+#ifdef CONFIG_AMBIENT_LIGHT_LUX_TABLE
+static uint32_t prv_level_to_lux_table(uint32_t light_level) {
+  const AmbientLightLuxPoint *table = BOARD_CONFIG.ambient_light_lux_table;
+  const size_t len = BOARD_CONFIG.ambient_light_lux_table_len;
+  if (light_level <= table[0].level) {
+    return table[0].lux;
+  }
+  for (size_t i = 1; i < len; i++) {
+    const AmbientLightLuxPoint *lo = &table[i - 1];
+    const AmbientLightLuxPoint *hi = &table[i];
+    if (light_level <= hi->level) {
+      return lo->lux + ((hi->lux - lo->lux) * (light_level - lo->level)) / (hi->level - lo->level);
+    }
+  }
+  return table[len - 1].lux;
+}
+#endif
+
 uint32_t ambient_light_level_to_lux(uint32_t light_level) {
+#ifdef CONFIG_AMBIENT_LIGHT_LUX_TABLE
+  return prv_level_to_lux_table(light_level);
+#endif
   const uint32_t den = BOARD_CONFIG.ambient_light_lux_den;
   const uint32_t offset = BOARD_CONFIG.ambient_light_lux_dark_offset;
   if (den == 0U) {
