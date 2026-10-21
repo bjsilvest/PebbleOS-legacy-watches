@@ -1,3 +1,4 @@
-# The bb2 build is the largest; its heartbeat leaves out task, stack, heap
-# and filesystem statistics to fit.
+# Without this the bb2 build would be the largest by about 0.5 KB, and over
+# the limit: its heartbeat leaves out task, stack, heap and filesystem
+# statistics.
 CONFIG_SERVICE_ANALYTICS_SYSTEM_STATS=n
