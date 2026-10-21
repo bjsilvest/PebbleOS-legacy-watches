@@ -1,0 +1,3 @@
+# The bb2 build is the largest; its heartbeat leaves out task, stack, heap
+# and filesystem statistics to fit.
+CONFIG_SERVICE_ANALYTICS_SYSTEM_STATS=n

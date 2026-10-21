@@ -22,9 +22,9 @@ Everything below follows from three hard limits:
 | Kernel RAM | about 86 KiB | 128 KiB SRAM, less the aplite app region (32 KiB) and the worker region (12 KiB) |
 | System resources | 256 KiB | The stock firmware and the stock recovery firmware install resource packs only into the stock 256 KiB banks |
 
-Current sizes: firmware ev2_4 507,411 B, v1_5 507,571 B, v2_0 507,699 B and
-bb2 507,763 B (141 B left on bb2, the largest); resources 258,525 B (3.6 KiB
-left); static kernel RAM 66,400 B, which leaves about 19 KiB for the kernel
+Current sizes: firmware ev2_4 507,635 B, v1_5 507,763 B, v2_0 507,891 B and
+bb2 507,411 B (13 B left on v2_0, now the largest); resources 258,525 B (3.6 KiB
+left); static kernel RAM 67,232 B (bb2 67,200 B), which leaves about 18 KiB for the kernel
 heap by the linker map. No out-of-memory or other crash on hardware with a
 phone connected since -312 (notifications, watchface installs, reconnects).
 
@@ -41,7 +41,8 @@ phone connected since -312 (notifications, watchface installs, reconnects).
 | Voice: dictation, voice replies, the Reminders app | No microphone (`MIC=n`); the voice service is built only with one | The hardware has no microphone |
 | Heart rate sensor | No `HRM` | The hardware has none |
 | Gothic 36 (regular and bold) and LECO 60 fonts | `RESOURCES_LARGE_FONTS=n`; the tintin resource map aliases them to Gothic 28 and LECO 42 | 75 KB of resources. None is an SDK font. On 144x168 only the Extra Large text size used Gothic 36, so Extra Large now looks like Large. |
-| Native analytics heartbeats | `SERVICE_ANALYTICS_NATIVE=n` | About 3 KB |
+| Fault dump on the serial console (registers, fault status, MPU regions) | `LOG_FROM_FAULT_HANDLER=n` | About 2.4 KB, paid for the analytics heartbeat. The console needs the case opened; the reboot reason and core dumps are kept. |
+| Task, stack, heap and filesystem statistics in the analytics heartbeat (bb2 only) | `SERVICE_ANALYTICS_SYSTEM_STATS=n` in `defconfig.bb2` | About 0.5 KB; those metrics are sent as 0. The other revisions send them. |
 | Debug shell and the PULSE serial console | `SHELL=n`, `PULSE_EVERYWHERE=n` | About 13 KB (shell) and 9.5 KB (PULSE) of flash, and 9 KB of RAM. QEMU app installs through pypkjs need PULSE. |
 | INFO- and WARNING-level logging | `DEFAULT_LOG_LEVEL_ERROR=y` | About 8 KB; only errors are logged. Core dumps are kept (2.8 KB) and make up for the lost warnings. |
 | LE Secure Connections | Legacy pairing only: `NIMBLE_BLE_SM_SC=n`, `SM_LEGACY=y`, `SM_MITM=n` | The CC2564A is a Bluetooth 4.0 controller |
@@ -57,6 +58,7 @@ phone connected since -312 (notifications, watchface installs, reconnects).
 | System fonts | Smaller glyph hash tables, and RLE4-encoded glyphs where that is smaller. Same glyphs. | `RESOURCES_COMPACT_FONTS=y` (`tools/font/pbf_compact.py`) |
 | Resources kept in the filesystem | The timezone database, the emoji fonts, every font except the Gothic text fonts, Gothic 9 and the golf app are stored deflated in the resource pack. The first boot after an install inflates them into the filesystem file `sysres` (about 0.3 s); later boots check and skip it. If the file were lost, those resources would be missing until the next boot rebuilds it; Gothic, images and the Bluetooth init script never depend on it. | `"files"` entry with `"unpack": true` in `resources/normal/tintin/resource_map.json`, `fw/resource/resource_unpack.c` |
 | Right-to-left text (Hebrew, Arabic) | Back on (`TEXT_RTL`): the fonts have no such glyphs, but a language pack brings its own extended fonts. Tested on ev2_4 with the Arabic pack. Paid for by the Smart Alarm and diagnostics cuts, a smaller BiDi classifier and text layout path, shorter app developer log messages, and no per-app launcher color on black and white boards. | `452984284` |
+| Analytics heartbeat | Sent hourly as on the bigger watches (the phone app's battery page), with CPU running, WFI and STOP time. The record is built from tables instead of one copy per metric: same bytes, about 0.7 KB smaller. | `SERVICE_ANALYTICS_NATIVE`, `dfeeea2f9` |
 | Built-in fallback font | Hex digits only, as stock firmware had it (it only draws error codes). Applies to all boards. | `204422d73` |
 | Launcher | The 4.x glance launcher (`SERVICE_APP_GLANCES=y`), which stock aplite never had. The legacy list launcher stays in the tree for builds without glances. `app_glance_reload` allocates its glance only while it runs, so apps keep the full runtime RAM. | `LAUNCHER_LEGACY`, `app_state_set_glance` |
 | Per-app runtime RAM | 6,816 bytes instead of 6,820, so the 32 KiB app region is aligned for the MPU. AppState leaves out touch and health state the board lacks, and holds the app glance as a pointer, allocated only while an app reloads it. | `APP_RAM_APLITE_RUNTIME_SIZE`, `e9f29d8ec` |
