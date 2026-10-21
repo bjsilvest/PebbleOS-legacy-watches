@@ -47,9 +47,19 @@ void kernel_pbl_log_from_fault_handler_fmt(const char *src_filename, uint16_t sr
                                            char *buffer, unsigned int buffer_len, const char *fmt,
                                            ...);
 
+#ifdef CONFIG_LOG_FROM_FAULT_HANDLER
 #define PBL_LOG_FROM_FAULT_HANDLER(message) \
   kernel_pbl_log_from_fault_handler(__FILE_NAME__, __LINE__, message)
 
 #define PBL_LOG_FROM_FAULT_HANDLER_FMT(buffer, buffer_len, fmt, ...)                      \
   kernel_pbl_log_from_fault_handler_fmt(__FILE_NAME__, __LINE__, buffer, buffer_len, fmt, \
                                         __VA_ARGS__)
+#else
+// Arguments stay type-checked and count as used, but are not evaluated.
+#define PBL_LOG_FROM_FAULT_HANDLER(message) ((void)sizeof(message))
+
+#define PBL_LOG_FROM_FAULT_HANDLER_FMT(buffer, buffer_len, fmt, ...)              \
+  ((void)sizeof(kernel_pbl_log_from_fault_handler_fmt(__FILE_NAME__, __LINE__, buffer, \
+                                                      buffer_len, fmt, __VA_ARGS__), \
+                0))
+#endif
