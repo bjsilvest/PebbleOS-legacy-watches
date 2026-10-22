@@ -36,6 +36,9 @@
 
 Profiler g_profiler;
 
+// Without CONFIG_PROFILER the node macros compile to nothing, so the built-in
+// nodes would never be timed: leave them out. The syscalls still work.
+#ifdef CONFIG_PROFILER
 #undef PROFILER_NODE
 #define PROFILER_NODE(name) ProfilerNode g_profiler_node_##name = {.module_name = #name};
 #include "profiler_list.h"
@@ -50,6 +53,7 @@ static ProfilerNode *s_profiler_nodes[] = {
 static void prv_profiler_node_add(ProfilerNode *node) {
   g_profiler.nodes = list_append(g_profiler.nodes, (ListNode *)node);
 }
+#endif
 
 static int prv_node_compare(void *a, void *b) {
   return ((ProfilerNode *)b)->total - ((ProfilerNode *)a)->total;
@@ -67,10 +71,12 @@ void profiler_init(void) {
   g_profiler.end = 0;
   g_profiler.start = 0;
   g_profiler.nodes = nullptr;
+#ifdef CONFIG_PROFILER
   for (uint32_t i = 0; i < ARRAY_LENGTH(s_profiler_nodes); i++) {
     prv_node_reset(s_profiler_nodes[i]);
     prv_profiler_node_add(s_profiler_nodes[i]);
   }
+#endif
 }
 
 void profiler_start(void) {
