@@ -15,13 +15,13 @@ PebblePhoneCaller *phone_call_util_create_caller(const char *number, const char 
   }
 
   if ((!name || !strlen(name)) && (!number || !strlen(number))) {
-    const char *i18n_name = i18n_get("Unknown", __FILE__);
+    const char *i18n_name = i18n_get("Unknown", __FILE_NAME__);
 
     caller->name = kernel_malloc(strlen(i18n_name) + 1);
     if (caller->name) {
       strcpy(caller->name, i18n_name);
     }
-    i18n_free(i18n_name, __FILE__);
+    i18n_free(i18n_name, __FILE_NAME__);
 
     return caller;
   }

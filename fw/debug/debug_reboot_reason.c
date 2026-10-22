@@ -131,7 +131,7 @@ void debug_reboot_reason_print(McuRebootReason mcu_reboot_reason) {
   }
   // Generic reason string
   if (reason_string) {
-    pbl_log(LOG_LEVEL_WARNING, __FILE__, __LINE__, reason_string, restarted_safely_string,
+    pbl_log(LOG_LEVEL_WARNING, __FILE_NAME__, __LINE__, reason_string, restarted_safely_string,
             rebooted_due_to, reason.extra.value);
   }
 
