@@ -72,11 +72,18 @@ static void prv_disable_all_interrupts(I2C_TypeDef *i2c) {
   i2c->CR2 &= ~(I2C_CR2_ITEVTEN | I2C_CR2_ITERREN | I2C_CR2_ITBUFEN);
 }
 
+// The pins are only handed to the peripheral while the bus is enabled, as the
+// stock firmware does: on a switched rail they sit low while it is off, and an
+// I2C seeing that can latch BUSY so that no reset clears it.
+static void prv_pins_input(const struct pbl_i2c_stm32 *i2c) {
+  pbl_gpio_configure(&i2c->scl, PBL_GPIO_INPUT);
+  pbl_gpio_configure(&i2c->sda, PBL_GPIO_INPUT);
+}
+
 static int prv_init(const struct pbl_i2c_bus *bus) {
   const struct pbl_i2c_stm32 *i2c = prv_i2c(bus);
 
-  pbl_gpio_stm32_af(&i2c->scl, i2c->scl_af, PBL_GPIO_OPEN_DRAIN, GPIO_Speed_50MHz);
-  pbl_gpio_stm32_af(&i2c->sda, i2c->sda_af, PBL_GPIO_OPEN_DRAIN, GPIO_Speed_50MHz);
+  prv_pins_input(i2c);
 
   RCC_APB1PeriphClockCmd(i2c->rcc, ENABLE);
   I2C_DeInit(i2c->i2c);
@@ -90,6 +97,9 @@ static int prv_init(const struct pbl_i2c_bus *bus) {
 
 static void prv_enable(const struct pbl_i2c_bus *bus) {
   const struct pbl_i2c_stm32 *i2c = prv_i2c(bus);
+
+  pbl_gpio_stm32_af(&i2c->scl, i2c->scl_af, PBL_GPIO_OPEN_DRAIN, GPIO_Speed_50MHz);
+  pbl_gpio_stm32_af(&i2c->sda, i2c->sda_af, PBL_GPIO_OPEN_DRAIN, GPIO_Speed_50MHz);
 
   RCC_APB1PeriphClockCmd(i2c->rcc, ENABLE);
 
@@ -109,6 +119,7 @@ static void prv_disable(const struct pbl_i2c_bus *bus) {
 
   I2C_DeInit(i2c->i2c);
   RCC_APB1PeriphClockCmd(i2c->rcc, DISABLE);
+  prv_pins_input(i2c);
 }
 
 static bool prv_is_busy(const struct pbl_i2c_bus *bus) {
