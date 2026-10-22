@@ -9,6 +9,19 @@
 
 #include <board/board.h>
 
+// Buttons
+///////////////////////////////////////////////////////////////////////////////
+
+const BoardConfigButton BOARD_CONFIG_BUTTON = {
+  .buttons = {
+    [BUTTON_ID_BACK] = {"Back", PBL_GPIO(STM32_GPIOC, 3, PBL_GPIO_ACTIVE_LOW), PBL_INPUT_KEY_BACK},
+    [BUTTON_ID_UP] = {"Up", PBL_GPIO(STM32_GPIOA, 2, PBL_GPIO_ACTIVE_LOW), PBL_INPUT_KEY_UP},
+    [BUTTON_ID_SELECT] =
+        {"Select", PBL_GPIO(STM32_GPIOC, 6, PBL_GPIO_ACTIVE_LOW), PBL_INPUT_KEY_SELECT},
+    [BUTTON_ID_DOWN] = {"Down", PBL_GPIO(STM32_GPIOA, 1, PBL_GPIO_ACTIVE_LOW), PBL_INPUT_KEY_DOWN},
+  },
+};
+
 // Debug UART
 ///////////////////////////////////////////////////////////////////////////////
 

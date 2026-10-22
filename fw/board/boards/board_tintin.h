@@ -46,15 +46,7 @@ static const BoardConfig BOARD_CONFIG = {
 // drives low; the lines have external pull-ups.
 static const struct pbl_gpio BOARD_BUTTON_COM = PBL_GPIO(STM32_GPIOA, 0, 0);
 
-static const BoardConfigButton BOARD_CONFIG_BUTTON = {
-  .buttons = {
-    [BUTTON_ID_BACK] = {"Back", PBL_GPIO(STM32_GPIOC, 3, PBL_GPIO_ACTIVE_LOW), PBL_INPUT_KEY_BACK},
-    [BUTTON_ID_UP] = {"Up", PBL_GPIO(STM32_GPIOA, 2, PBL_GPIO_ACTIVE_LOW), PBL_INPUT_KEY_UP},
-    [BUTTON_ID_SELECT] =
-        {"Select", PBL_GPIO(STM32_GPIOC, 6, PBL_GPIO_ACTIVE_LOW), PBL_INPUT_KEY_SELECT},
-    [BUTTON_ID_DOWN] = {"Down", PBL_GPIO(STM32_GPIOA, 1, PBL_GPIO_ACTIVE_LOW), PBL_INPUT_KEY_DOWN},
-  },
-};
+extern const BoardConfigButton BOARD_CONFIG_BUTTON;
 
 static const BoardConfigPower BOARD_CONFIG_POWER = {
 #if defined(CONFIG_BOARD_TINTIN_BB2)
