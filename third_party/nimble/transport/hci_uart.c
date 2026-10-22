@@ -28,6 +28,7 @@
 #include <pbl/drivers/rtc.h>
 #include <pbl/soc/stm32/sleep.h>
 
+#include <host/ble_hs.h>
 #include <host/ble_store.h>
 #ifdef CONFIG_SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK_V2
 #include <pbl/services/shared_prf_storage/shared_prf_storage.h>
@@ -948,11 +949,9 @@ static void prv_hcill_rx(uint8_t msg) {
       soc_stm32_stop_release();
       return;
     case HCILL_WAKE_UP_IND:
-      if (s_hcill == HcillWaking) {
-        // Both sides woke at once: this is the acknowledgment.
-        prv_hcill_set_awake();
-        return;
-      }
+      // If both sides woke at once, this is the acknowledgment of ours, but
+      // the controller still waits for one of its own (Linux hci_ll does the
+      // same): without it, it never sends again.
       pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
       pbl_irq_lock();
       if (s_hcill == HcillAsleep) {
@@ -1034,7 +1033,32 @@ static bool prv_hcill_lock_awake(void) {
 
     (void)pbl_sem_take(&s_hcill_awake, PBL_MSEC(HCILL_WAKE_TIMEOUT_MS));
   }
-  PBL_LOG_ERR("CC2564 did not wake up");
+
+  // Left waking, the controller's next wake pulse would be ignored and every
+  // packet dropped, with the host still holding its links. Go back to sleep
+  // and reset the host: it drops the links, so advertising starts again, and
+  // its HCI Reset wakes the controller anew.
+  pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
+  bool back_to_sleep = false;
+  pbl_irq_lock();
+  if (s_hcill == HcillWaking) {
+    cc2564_hold_rts(true);
+    s_hcill = HcillAsleep;
+    back_to_sleep = true;
+  }
+  pbl_irq_unlock();
+  if (back_to_sleep) {
+    cc2564_cts_wake_enable(prv_hcill_cts_wake_isr);
+    soc_stm32_stop_release();
+  }
+  pbl_mutex_unlock(&s_tx_mutex);
+
+  static uint32_t s_wake_failures;
+  s_wake_failures++;
+  if (s_wake_failures <= 3U || (s_wake_failures % 256U) == 0U) {
+    PBL_LOG_ERR("CC2564 did not wake up (%lu)", (unsigned long)s_wake_failures);
+  }
+  ble_hs_sched_reset(BLE_HS_ECONTROLLER);
   return false;
 }
 #endif
