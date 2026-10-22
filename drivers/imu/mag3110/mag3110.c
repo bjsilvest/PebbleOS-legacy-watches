@@ -67,7 +67,9 @@ static void prv_interrupt_handler(void) {
 }
 
 //! Standby: not sampling and no interrupts. Takes up to 1/ODR (200 ms at
-//! 5 Hz) to take effect.
+//! 5 Hz) to take effect. A sample finished meanwhile is read out: its data
+//! ready interrupt would otherwise stay high, and the rising edge EXTI would
+//! miss every sample after it.
 static bool prv_enter_standby_mode(void) {
   if (!prv_write(CTRL_REG1, 0x00)) {
     return false;
@@ -79,7 +81,8 @@ static bool prv_enter_standby_mode(void) {
       return false;
     }
     if (sysmod == 0) {
-      return true;
+      uint8_t raw_data[7];
+      return prv_read(DR_STATUS_REG, sizeof(raw_data), raw_data);
     }
     psleep(2);
   }
@@ -120,10 +123,7 @@ void mag_release(void) {
   pbl_mutex_lock(&s_mag_mutex, PBL_FOREVER);
   --s_use_refcount;
   if (s_use_refcount == 0 && s_present) {
-    // Standby, then read the data to clear the interrupt for next time.
     prv_enter_standby_mode();
-    uint8_t raw_data[7];
-    prv_read(DR_STATUS_REG, sizeof(raw_data), raw_data);
     exti_disable(prv_exti());
   }
   pbl_mutex_unlock(&s_mag_mutex);
