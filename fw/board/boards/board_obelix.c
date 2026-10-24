@@ -1,17 +1,21 @@
 /* SPDX-FileCopyrightText: 2025 Core Devices LLC */
 /* SPDX-License-Identifier: Apache-2.0 */
 
-#include <pbl/drivers/backlight.h>
+#include <pbl/drivers/ambient/w1160.h>
+#include <pbl/drivers/backlight/aw2016.h>
 #include <pbl/drivers/gpio/npm1300.h>
 #include <pbl/drivers/hrm/gh3x2x.h>
+#include <pbl/drivers/imu/lsm6dso/lsm6dso.h>
+#include <pbl/drivers/imu/mmc5603nj/mmc5603nj.h>
 #include <pbl/drivers/pmic/npm1300.h>
 #include <pbl/drivers/regulator/npm1300.h>
 #include <pbl/drivers/sf32lb52/debounced_button_definitions.h>
+#include <pbl/drivers/temperature/sf32lb.h>
+#include <pbl/drivers/vibe/aw86225.h>
 #include <pbl/kernel/irq.h>
 
 #include <board/board.h>
 #include <board/splash.h>
-#include <system/passert.h>
 
 static UARTDeviceState s_dbg_uart_state = {
   .huart =
@@ -253,7 +257,7 @@ PBL_IRQ_CONNECT(I2C1, 5, pbl_i2c_sf32lb_irq_handler, &s_i2c1, 0);
 
 PBL_NPM1300_DEFINE(s_npm1300, &s_i2c1.bus, 0x6B);
 PBL_NPM1300_CHARGER_DEFINE(s_npm1300_charger, &s_npm1300, &NPM1300_CONFIG,
-                           {.peripheral = hwp_gpio1, .gpio_pin = 26});
+                           PBL_IRQ_SPEC(SF32LB_GPIO1_INTC, 26, PBL_IRQ_TYPE_EDGE_RISING));
 PBL_NPM1300_GPIO_DEFINE(s_npm1300_gpio, &s_npm1300);
 
 const struct pbl_npm1300_charger *const NPM1300_CHARGER = &s_npm1300_charger;
@@ -266,13 +270,13 @@ PBL_NPM1300_REGULATOR_DEFINE(s_npm1300_ldsw1, "npm1300_ldsw1", &s_npm1300, PBL_N
 PBL_NPM1300_REGULATOR_DEFINE(s_npm1300_ldsw2, "npm1300_ldsw2", &s_npm1300, PBL_NPM1300_LDSW2, 3300,
                              true, false);
 
-static const struct pbl_i2c_dev s_i2c_aw86225 = PBL_I2C_DEV(&s_i2c1.bus, 0x58);
+PBL_AW86225_DEFINE(s_aw86225, &s_i2c1.bus, 0x58, PBL_GPIO(SF32LB_GPIO1, 1, PBL_GPIO_ACTIVE_LOW));
 
-const struct pbl_i2c_dev *const I2C_AW86225 = &s_i2c_aw86225;
+const struct pbl_vibe *const VIBE = &s_aw86225.vibe;
 
-static const struct pbl_i2c_dev s_i2c_aw2016 = PBL_I2C_DEV(&s_i2c1.bus, 0x64);
+PBL_AW2016_DEFINE(s_aw2016, &s_i2c1.bus, 0x64);
 
-const struct pbl_i2c_dev *const I2C_AW2016 = &s_i2c_aw2016;
+const struct pbl_backlight *const BACKLIGHT = &s_aw2016.backlight;
 
 PBL_I2C_SF32LB_DMA_DEFINE(s_i2c2, "i2c2", I2C2, 400000, PAD_PA32, I2C2_SCL, PAD_PA33, I2C2_SDA,
                           DMA1_Channel6, DMA_REQUEST_23, DMAC1_CH6, 5, nullptr);
@@ -280,49 +284,29 @@ PBL_I2C_SF32LB_DMA_DEFINE(s_i2c2, "i2c2", I2C2, 400000, PAD_PA32, I2C2_SCL, PAD_
 PBL_IRQ_CONNECT(I2C2, 5, pbl_i2c_sf32lb_irq_handler, &s_i2c2, 0);
 PBL_IRQ_CONNECT(DMAC1_CH6, 5, pbl_i2c_sf32lb_dma_irq_handler, &s_i2c2, 0);
 
-static LSM6DSOState s_lsm6dso_state;
-
-static const LSM6DSOConfig s_lsm6dso_config = {
-  .state = &s_lsm6dso_state,
-  .i2c = PBL_I2C_DEV(&s_i2c2.bus, 0x6a),
-  .int1 =
-      {
-        .peripheral = hwp_gpio1,
-        .gpio_pin = 38,
-      },
-  .int1_in = PBL_GPIO(SF32LB_GPIO1, 38, 0),
 #ifdef CONFIG_IS_BIGBOARD
-  .axis_map =
-      {
-        [AXIS_X] = 0,
-        [AXIS_Y] = 1,
-        [AXIS_Z] = 2,
-      },
-  .axis_dir = {
-    [AXIS_X] = -1,
-    [AXIS_Y] = -1,
-    [AXIS_Z] = 1,
-  },
+#define LSM6DSO_AXIS_DIR_Y   (-1)
+#define MMC5603NJ_AXIS_DIR_X (-1)
+#define MMC5603NJ_AXIS_DIR_Y 1
 #else
-  .axis_map =
-      {
-        [AXIS_X] = 0,
-        [AXIS_Y] = 1,
-        [AXIS_Z] = 2,
-      },
-  .axis_dir = {
-    [AXIS_X] = -1,
-    [AXIS_Y] = 1,
-    [AXIS_Z] = 1,
-  },
+#define LSM6DSO_AXIS_DIR_Y   1
+#define MMC5603NJ_AXIS_DIR_X 1
+#define MMC5603NJ_AXIS_DIR_Y (-1)
 #endif
-};
 
-const LSM6DSOConfig *const LSM6DSO = &s_lsm6dso_config;
+PBL_LSM6DSO_DEFINE(s_lsm6dso, &s_i2c2.bus, 0x6a,
+                   .int1 = PBL_IRQ_SPEC(SF32LB_GPIO1_INTC, 38, PBL_IRQ_TYPE_EDGE_RISING),
+                   .int1_in = PBL_GPIO(SF32LB_GPIO1, 38, 0),
+                   .axis_map = {[AXIS_X] = 0, [AXIS_Y] = 1, [AXIS_Z] = 2},
+                   .axis_dir = {[AXIS_X] = -1, [AXIS_Y] = LSM6DSO_AXIS_DIR_Y, [AXIS_Z] = 1});
 
-static const struct pbl_i2c_dev s_i2c_mmc5603nj = PBL_I2C_DEV(&s_i2c2.bus, 0x30);
+const struct pbl_accel *const ACCEL = &s_lsm6dso.accel;
 
-const struct pbl_i2c_dev *const I2C_MMC5603NJ = &s_i2c_mmc5603nj;
+PBL_MMC5603NJ_DEFINE(
+    s_mmc5603nj, &s_i2c2.bus, 0x30, .axis_map = {[AXIS_X] = 1, [AXIS_Y] = 0, [AXIS_Z] = 2},
+    .axis_dir = {[AXIS_X] = MMC5603NJ_AXIS_DIR_X, [AXIS_Y] = MMC5603NJ_AXIS_DIR_Y, [AXIS_Z] = 1});
+
+const struct pbl_mag *const MAG = &s_mmc5603nj.mag;
 
 PBL_I2C_SF32LB_DEFINE(s_i2c3, "i2c3", I2C3, 400000, PAD_PA11, I2C3_SCL, PAD_PA10, I2C3_SDA,
                       nullptr);
@@ -336,12 +320,7 @@ static const struct pbl_i2c_dev s_i2c_cst816_boot = PBL_I2C_DEV(&s_i2c3.bus, 0x6
 static const TouchSensor touch_cst816 = {
   .i2c = &s_i2c_cst816,
   .i2c_boot = &s_i2c_cst816_boot,
-  .int_exti =
-      {
-        .peripheral = hwp_gpio1,
-        .gpio_pin = 27,
-        .pull = GPIO_PuPd_UP,
-      },
+  .int_gpio = PBL_GPIO(SF32LB_GPIO1, 27, PBL_GPIO_PULL_UP),
   .reset = PBL_GPIO(&s_npm1300_gpio.port, 2, PBL_GPIO_ACTIVE_LOW | PBL_GPIO_PULL_UP),
 };
 
@@ -358,20 +337,12 @@ static HRMDeviceState s_hrm_state;
 static HRMDevice s_hrm = {
   .state = &s_hrm_state,
   .i2c = &s_i2c_gh3x2x,
-  .int_exti =
-      {
-        .peripheral = hwp_gpio1,
-        .gpio_pin = 44,
-      },
+  .int_irq = PBL_IRQ_SPEC(SF32LB_GPIO1_INTC, 44, PBL_IRQ_TYPE_EDGE_FALLING),
   .int_input = PBL_GPIO(SF32LB_GPIO1, 44, 0),
   .reset = PBL_GPIO(&s_npm1300_gpio.port, 3, PBL_GPIO_PULL_UP),
 };
 
 HRMDevice *const HRM = &s_hrm;
-
-const BoardConfigActuator BOARD_CONFIG_VIBE = {
-  .ctl = PBL_GPIO(SF32LB_GPIO1, 1, PBL_GPIO_ACTIVE_LOW),
-};
 
 // TODO(OBELIX): Adjust to final battery parameters
 const Npm1300Config NPM1300_CONFIG = {
@@ -383,9 +354,13 @@ const Npm1300Config NPM1300_CONFIG = {
   .vbus_current_lim0 = 500, .vbus_current_startup = 500,
 };
 
-static const struct pbl_i2c_dev s_i2c_w1160 = PBL_I2C_DEV(&s_i2c1.bus, 0x48);
+// Bench-calibrated on 3 production units (unit spread 1.3%); dark floor
+// is <20 counts so no offset is needed.
+static const struct pbl_als_scale s_w1160_scale = {.offset = 0, .num = 100, .den = 483};
 
-const struct pbl_i2c_dev *const I2C_W1160 = &s_i2c_w1160;
+PBL_W1160_DEFINE(s_w1160, &s_i2c1.bus, 0x48, &s_w1160_scale);
+
+const struct pbl_als *const ALS = &s_w1160.als;
 
 const BoardConfigPower BOARD_CONFIG_POWER = {
   .low_power_threshold = 4U,
@@ -396,11 +371,6 @@ const BoardConfig BOARD_CONFIG = {
   .backlight_on_percent = 45,
   .ambient_light_dark_threshold = 800,
   .ambient_k_delta_threshold = 100,
-  // Bench-calibrated on 3 production units (unit spread 1.3%); dark floor
-  // is <20 counts so no offset is needed.
-  .ambient_light_lux_dark_offset = 0,
-  .ambient_light_lux_num = 100,
-  .ambient_light_lux_den = 483,
   .backlight_default_color = BACKLIGHT_COLOR_WARM_WHITE,
 };
 
@@ -504,3 +474,5 @@ void board_init(void) {
   mic_init(MIC);
   audio_init(AUDIO);
 }
+
+const struct pbl_temp *const DIE_TEMP = SF32LB_TEMP;

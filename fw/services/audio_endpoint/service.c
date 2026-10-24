@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: 2024 Google LLC */
 /* SPDX-License-Identifier: Apache-2.0 */
 
+#include <pbl/kernel/assert.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/audio_endpoint.h>
 #include <pbl/services/audio_endpoint_private.h>
@@ -10,7 +11,6 @@
 #include <pbl/util/circular_buffer.h>
 
 #include <comm/bt_lock.h>
-#include <system/passert.h>
 
 PBL_LOG_MODULE_DEFINE(service_audio_endpoint, CONFIG_SERVICE_AUDIO_ENDPOINT_LOG_LEVEL);
 
@@ -114,9 +114,9 @@ void audio_endpoint_add_frame(AudioEndpointSessionId session_id, uint8_t *frame,
   }
 
   CommSession *comm_session = comm_session_get_system_session();
-  SendBuffer *sb = comm_session_send_buffer_begin_write(comm_session, AUDIO_ENDPOINT,
-                                                        sizeof(DataTransferMsg) + frame_size + 1,
-                                                        0 /* timeout_ms, never block */);
+  SendBuffer *sb = comm_session_send_buffer_begin_write_bulk(
+      comm_session, AUDIO_ENDPOINT, sizeof(DataTransferMsg) + frame_size + 1,
+      0 /* timeout_ms, never block */);
   if (!sb) {
     s_dropped_frames++;
     PBL_LOG_DBG("Dropping a frame...");

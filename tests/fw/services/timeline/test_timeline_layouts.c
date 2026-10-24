@@ -5,11 +5,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <pbl/kernel/assert.h>
 #include <pbl/services/alarms/alarm.h>
 #include <pbl/services/timeline/sports_layout.h>
 #include <pbl/services/timeline/weather_layout.h>
 #include <pbl/util/size.h>
 
+#include <applib/ui/window_private.h>
 #include <apps/system/timeline/pin_window.h>
 #include <clar.h>
 
@@ -72,41 +74,6 @@ const char *alarm_get_string_for_kind(AlarmKind kind, bool all_caps) {
 
 // Stubs
 /////////////////////
-
-#include <stubs_action_menu.h>
-#include <stubs_alerts_preferences.h>
-#include <stubs_analytics.h>
-#include <stubs_animation_timing.h>
-#include <stubs_app_install_manager.h>
-#include <stubs_app_timer.h>
-#include <stubs_app_window_stack.h>
-#include <stubs_bootbits.h>
-#include <stubs_click.h>
-#include <stubs_event_service_client.h>
-#include <stubs_layer.h>
-#include <stubs_logging.h>
-#include <stubs_memory_layout.h>
-#include <stubs_modal_manager.h>
-#include <stubs_mutex.h>
-#include <stubs_passert.h>
-#include <stubs_pbl_malloc.h>
-#include <stubs_pebble_process_info.h>
-#include <stubs_pebble_tasks.h>
-#include <stubs_process_manager.h>
-#include <stubs_property_animation.h>
-#include <stubs_serial.h>
-#include <stubs_shell_prefs.h>
-#include <stubs_sleep.h>
-#include <stubs_syscalls.h>
-#include <stubs_task_wdt.h>
-#include <stubs_timeline.h>
-#include <stubs_timeline_actions.h>
-#include <stubs_timeline_item.h>
-#include <stubs_timeline_layer.h>
-#include <stubs_timeline_peek.h>
-#include <stubs_vibes.h>
-#include <stubs_window_manager.h>
-#include <stubs_window_stack.h>
 
 // Helper Functions
 /////////////////////

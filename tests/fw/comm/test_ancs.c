@@ -3,42 +3,18 @@
 
 #include <pbl/services/evented_timer.h>
 #include <pbl/services/notifications/ancs/ancs_notifications.h>
+#include <pbl/services/phone_call_util.h>
 #include <pbl/services/regular_timer.h>
 #include <pbl/util/size.h>
 
 #include <clar.h>
 #include <comm/ble/gap_le_connection.h>
-#include <comm/ble/gap_le_task.h>
 #include <comm/ble/kernel_le_client/ancs/ancs.h>
 #include <comm/ble/kernel_le_client/ancs/ancs_definition.h>
 #include <comm/ble/kernel_le_client/ancs/ancs_util.h>
 
 // Stubs
 ///////////////////////////////////////////////////////////
-
-#include <stubs_analytics.h>
-#include <stubs_ble.h>
-#include <stubs_bt_stack.h>
-#include <stubs_codepoint.h>
-#include <stubs_i18n.h>
-#include <stubs_ios_notif_pref_db.h>
-#include <stubs_layout_layer.h>
-#include <stubs_logging.h>
-#include <stubs_mutex.h>
-#include <stubs_nexmo.h>
-#include <stubs_passert.h>
-#include <stubs_pebble_pairing_service.h>
-#include <stubs_pebble_tasks.h>
-#include <stubs_pin_db.h>
-#include <stubs_rand_ptr.h>
-#include <stubs_reminder_db.h>
-#include <stubs_reminders.h>
-#include <stubs_serial.h>
-#include <stubs_sleep.h>
-#include <stubs_system_reset.h>
-#include <stubs_task_wdt.h>
-#include <stubs_timeline.h>
-#include <stubs_utf8.h>
 
 void launcher_task_add_callback(void (*callback)(void *data), void *data) {
   callback(data);
@@ -153,7 +129,7 @@ void prv_cmp_last_received_notification(TimelineItem *item) {
 // Called from inside prv_write_control_point_request.
 // If this function is called we have requested a ds_notification
 enum pbl_bt_errno gatt_client_op_write(pbl_bt_characteristic_t characteristic,
-                                       const uint8_t *buffer, size_t length, GAPLEClient client) {
+                                       const uint8_t *buffer, size_t length) {
   cl_assert_equal_i(characteristic, s_characteristics[ANCSCharacteristicControl]);
 
   if (s_gatt_client_op_write_should_fail_once) {

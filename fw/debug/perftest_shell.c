@@ -11,6 +11,7 @@
 #include <pbl/drivers/watchdog.h>
 #include <pbl/kernel/thread.h>
 #include <pbl/services/compositor/compositor.h>
+#include <pbl/services/compositor/compositor_private.h>
 #include <pbl/shell/shell.h>
 #include <pbl/task_wdt/task_wdt.h>
 #include <pbl/util/math.h>
@@ -32,6 +33,7 @@ static GContext *prv_perftest_get_context(void) {
   GContext *ctx = &s_perftest_ctx;
   FrameBuffer *fb = compositor_get_framebuffer();
   memset(fb->buffer, 0xff, FRAMEBUFFER_SIZE_BYTES);
+  compositor_app_framebuffer_mirror_invalidate();
   graphics_context_init(ctx, fb, GContextInitializationMode_App);
   return ctx;
 }
@@ -134,7 +136,7 @@ static const PerftestTextString s_perftest_text_strings[TestStringCount] = {
                   "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM",
         .lengths =
             {
-#if defined(CONFIG_BOARD_OBELIX) || defined(CONFIG_BOARD_GETAFIX)
+#if defined(CONFIG_PLATFORM_EMERY) || defined(CONFIG_PLATFORM_GABBRO)
               [TestStringFont_Gothic18] = 204,
               [TestStringFont_Gothic24B] = 144,
               [TestStringFont_Other] = STRING_LENGTH_MAX,
@@ -155,7 +157,7 @@ static const PerftestTextString s_perftest_text_strings[TestStringCount] = {
                   "ハヒフヘホマミムメモヤユヨラリルレロワヲン",
         .lengths =
             {
-#if defined(CONFIG_BOARD_OBELIX) || defined(CONFIG_BOARD_GETAFIX)
+#if defined(CONFIG_PLATFORM_EMERY) || defined(CONFIG_PLATFORM_GABBRO)
               [TestStringFont_Gothic18] = 579,
               [TestStringFont_Gothic24B] = 291,
               [TestStringFont_Other] = STRING_LENGTH_MAX,
@@ -169,7 +171,7 @@ static const PerftestTextString s_perftest_text_strings[TestStringCount] = {
               "FLASH access on Robe"
               "\xe2\x80\xa6",
     .lengths = {
-#if defined(CONFIG_BOARD_OBELIX) || defined(CONFIG_BOARD_GETAFIX)
+#if defined(CONFIG_PLATFORM_EMERY) || defined(CONFIG_PLATFORM_GABBRO)
       [TestStringFont_Gothic18] = 134,
       [TestStringFont_Gothic24B] = 134,
       [TestStringFont_Other] = STRING_LENGTH_MAX,

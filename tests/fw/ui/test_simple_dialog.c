@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 
+#include <pbl/kernel/assert.h>
 #include <pbl/services/timeline/timeline_resources.h>
 #include <pbl/util/hash.h>
 #include <pbl/util/math.h>
@@ -21,7 +22,6 @@
 #include <resource/resource.h>
 #include <resource/resource_ids.auto.h>
 #include <shell/system_theme.h>
-#include <system/passert.h>
 
 static GContext s_ctx;
 
@@ -39,32 +39,7 @@ GContext *graphics_context_get_current_context(void) {
 // Stubs
 /////////////////////
 
-#include <stubs_analytics.h>
-#include <stubs_app_install_manager.h>
-#include <stubs_app_state.h>
-#include <stubs_app_timer.h>
-#include <stubs_bootbits.h>
 #include <stubs_buffer.h>
-#include <stubs_click.h>
-#include <stubs_heap.h>
-#include <stubs_layer.h>
-#include <stubs_logging.h>
-#include <stubs_memory_layout.h>
-#include <stubs_mutex.h>
-#include <stubs_passert.h>
-#include <stubs_pbl_malloc.h>
-#include <stubs_pebble_tasks.h>
-#include <stubs_print.h>
-#include <stubs_serial.h>
-#include <stubs_shell_prefs.h>
-#include <stubs_sleep.h>
-#include <stubs_status_bar_layer.h>
-#include <stubs_syscall_internal.h>
-#include <stubs_syscalls.h>
-#include <stubs_task_wdt.h>
-#include <stubs_vibes.h>
-#include <stubs_window_manager.h>
-#include <stubs_window_stack.h>
 
 AnimationProgress animation_timing_scaled(AnimationProgress time_normalized,
                                           AnimationProgress interval_start,
@@ -267,7 +242,7 @@ void test_simple_dialog__does_text_fit(void) {
   msg = "This error is too long for rect displays";
   text_fits = simple_dialog_does_text_fit(msg, DISP_FRAME.size, icon_size, use_status_bar);
 #if PBL_DISPLAY_WIDTH >= 200
-  // The wider obelix display still fits this string with the larger 28-point
+  // The wider emery display still fits this string with the larger 28-point
   // font, just like the round gabbro display does.
   cl_assert(text_fits);
 #else

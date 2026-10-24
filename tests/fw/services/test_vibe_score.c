@@ -3,13 +3,12 @@
 
 #include <string.h>
 
+#include <pbl/drivers/vibe.h>
 #include <pbl/services/vibes/vibe_score.h>
 
 #include <clar.h>
 
 // stub
-#include <stubs_logging.h>
-#include <stubs_passert.h>
 
 void sys_vibe_pattern_trigger_start(void) {
 }
@@ -22,7 +21,9 @@ const uint8_t *sys_resource_read_only_bytes(ResAppNum app_num, uint32_t resource
   return nullptr;
 }
 
-int8_t vibe_get_braking_strength(void) {
+const struct pbl_vibe *const VIBE = nullptr;
+
+int8_t pbl_vibe_get_braking_strength(const struct pbl_vibe *vibe) {
   return -100;
 }
 

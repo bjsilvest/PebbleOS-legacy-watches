@@ -10,15 +10,6 @@
 #include <fake_rtc.h>
 #include <fake_session.h>
 #include <fake_system_task.h>
-#include <stubs_alerts.h>
-#include <stubs_alerts_preferences.h>
-#include <stubs_bt_lock.h>
-#include <stubs_hexdump.h>
-#include <stubs_logging.h>
-#include <stubs_mutex.h>
-#include <stubs_passert.h>
-#include <stubs_vibe_score.h>
-#include <stubs_vibe_score_info.h>
 #include <syscall/syscall.h>
 
 // Fakes

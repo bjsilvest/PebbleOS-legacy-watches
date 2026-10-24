@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 
+#include <pbl/kernel/assert.h>
 #include <pbl/kernel/compiler.h>
 #include <pbl/services/i18n/i18n.h>
 #include <pbl/services/timeline/timeline_resources.h>
@@ -18,7 +19,6 @@
 #include <kernel/pbl_malloc.h>
 #include <process_management/app_install_manager.h>
 #include <resource/resource_ids.auto.h>
-#include <system/passert.h>
 
 // Max size of the temperature and phrase displayed together
 #define WEATHER_APP_GLANCE_MAX_STRING_BUFFER_SIZE (WEATHER_SERVICE_MAX_SHORT_PHRASE_BUFFER_SIZE + 5)
@@ -124,7 +124,9 @@ static void prv_weather_event_handler([[maybe_unused]] PebbleEvent *event, void 
       const char *temp_and_phrase_formatter = i18n_get("%i° - %s", weather_glance);
       /// Today's current temperature (e.g. "68°")
       const char *temp_only_formatter = i18n_get("%i°", weather_glance);
-      const char *localized_phrase = i18n_get(forecast->current_weather_phrase, weather_glance);
+      const char *phrase = weather_type_get_phrase(forecast->current_weather_type);
+      const char *localized_phrase =
+          phrase ? i18n_get(phrase, weather_glance) : forecast->current_weather_phrase;
       const char *formatter_string =
           strlen(localized_phrase) ? temp_and_phrase_formatter : temp_only_formatter;
       // It's safe to pass more arguments to snprintf() than might be used by formatter_string

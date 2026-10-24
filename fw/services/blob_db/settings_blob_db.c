@@ -74,6 +74,10 @@ static const char *s_syncable_settings[] = {
   "lightPreset",
 #ifdef CONFIG_BACKLIGHT_HAS_COLOR
   "lightColor",
+  "lightColorDayNightEnabled",
+  "lightColorNight",
+  "lightColorSunriseMinute",
+  "lightColorSunsetMinute",
 #endif
 
   // Language preferences
@@ -112,8 +116,6 @@ static const char *s_syncable_settings[] = {
   "heartRatePreferences",
 #ifdef CONFIG_HRM_SPO2
   "spo2Preferences",
-  "bloodOxygenPreferences",
-  "bloodOxygenActivityPreferences",
 #endif
 
   // Menu wrap around preferences
@@ -146,6 +148,7 @@ static const char *s_syncable_notif_prefs[] = {
   "dndWeekdayScheduleEnabled",
   "dndWeekendSchedule",
   "dndWeekendScheduleEnabled",
+  DND_SCHEDULE_SLOT_KEYS,
   "notifWindowTimeout",
   "notifTextSize",
   "notifDesignStyle",

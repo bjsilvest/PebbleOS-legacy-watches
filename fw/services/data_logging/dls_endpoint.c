@@ -4,6 +4,7 @@
 #include <inttypes.h>
 
 #include <pbl/crc/crc.h>
+#include <pbl/kernel/assert.h>
 #include <pbl/kernel/compiler.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/comm_session/protocol.h>
@@ -18,7 +19,6 @@
 #include <pbl/util/math.h>
 
 #include <kernel/pbl_malloc.h>
-#include <system/passert.h>
 
 PBL_LOG_MODULE_DECLARE(service_data_logging, CONFIG_SERVICE_DATA_LOGGING_LOG_LEVEL);
 
@@ -280,8 +280,8 @@ bool dls_endpoint_send_data(DataLoggingSession *logging_session, const uint8_t *
 
   const uint32_t total_length = sizeof(DataLoggingSendDataMessage) + num_bytes;
   const uint32_t timeout_ms = 500;
-  SendBuffer *sb = comm_session_send_buffer_begin_write(session, ENDPOINT_ID_DATA_LOGGING,
-                                                        total_length, timeout_ms);
+  SendBuffer *sb = comm_session_send_buffer_begin_write_bulk(session, ENDPOINT_ID_DATA_LOGGING,
+                                                             total_length, timeout_ms);
   if (!sb) {
     pbl_mutex_unlock(&s_endpoint_data.mutex);
     return false;
@@ -412,8 +412,7 @@ static void prv_reopen_next_session_system_task_cb(void *data) {
                dls_private_send_session(entry->session, false));
   } else {
     // Session has disappeared between the time that the reopen list was
-    // created and now. This ideally shouldn't happen, but there's a lot
-    // that's broken about datalogging. See PBL-37078.
+    // created and now. This ideally shouldn't happen.
     success = true;
   }
   kernel_free(entry);

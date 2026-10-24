@@ -4,6 +4,8 @@
 #include <pbl/drivers/clocksource.h>
 #include <pbl/drivers/mic.h>
 #include <pbl/drivers/mic/nrf5/pdm_definitions.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/delay.h>
 #include <pbl/kernel/mutex.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/system_task.h>
@@ -14,9 +16,7 @@
 #include <kernel/events.h>
 #include <kernel/kernel_heap.h>
 #include <kernel/pbl_malloc.h>
-#include <kernel/util/sleep.h>
 #include <nrfx_pdm.h>
-#include <system/passert.h>
 
 PBL_LOG_MODULE_DEFINE(driver_mic_nrf5, CONFIG_DRIVER_MIC_LOG_LEVEL);
 
@@ -442,7 +442,7 @@ void mic_stop(const MicDevice *this) {
 
   // Give the PDM hardware a moment to finish any pending operations
   // This helps ensure no DMA operations are still accessing our buffers
-  psleep(1); // 1ms delay to let hardware settle
+  pbl_sleep_ms(1); // 1ms delay to let hardware settle
 
   // Release high frequency oscillator
   clocksource_hfxo_release();

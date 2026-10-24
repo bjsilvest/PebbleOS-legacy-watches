@@ -22,17 +22,6 @@
 #include <fake_session.h>
 #include <fake_spi_flash.h>
 #include <fake_system_task.h>
-#include <stubs_app_fetch_endpoint.h>
-#include <stubs_bt_lock.h>
-#include <stubs_hexdump.h>
-#include <stubs_irq.h>
-#include <stubs_logging.h>
-#include <stubs_mutex.h>
-#include <stubs_passert.h>
-#include <stubs_pfs.h>
-#include <stubs_serial.h>
-#include <stubs_task_wdt.h>
-#include <stubs_tick.h>
 #include <system/bootbits.h>
 #include <system/firmware_storage.h>
 
@@ -64,7 +53,7 @@ bool firmware_update_is_in_progress(void) {
   return s_firmware_update_is_in_progress;
 }
 
-void psleep(int millis) {
+void pbl_sleep_ms(uint32_t ms) {
 }
 
 void app_storage_get_file_name(char *name, size_t buf_length, AppInstallId app_id,

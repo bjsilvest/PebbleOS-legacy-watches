@@ -119,10 +119,7 @@ static const VoltagePoint charge_curve[] = {
   {70, 4250}
 };
 
-#elif defined(CONFIG_BOARD_ASTERIX) || defined(CONFIG_BOARD_OBELIX) ||       \
-    defined(CONFIG_BOARD_SILK) || defined(CONFIG_BOARD_QEMU_EMERY) ||        \
-    defined(CONFIG_BOARD_QEMU_FLINT) || defined(CONFIG_BOARD_QEMU_GABBRO) || \
-    defined(CONFIG_BOARD_NATIVE_EMERY)
+#else
 // When the voltage drops below these (mV), the watch will start heading for standby (after delay)
 #define BATTERY_CRITICAL_VOLTAGE_CHARGING    3550
 #define BATTERY_CRITICAL_VOLTAGE_DISCHARGING 3300
@@ -158,9 +155,6 @@ static const VoltagePoint charge_curve[] = {
   {90, 4175},
   {100, 4260}
 };
-
-#else
-#error "No battery curve for platform!"
 #endif
 
 static const uint8_t NUM_DISCHARGE_POINTS = ARRAY_LENGTH(discharge_curve);

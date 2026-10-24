@@ -13,25 +13,7 @@
 #include <clar.h>
 
 // Stubs
-#include <stubs_app_install_manager.h>
 #include <stubs_app_state.h>
-#include <stubs_app_window_stack.h>
-#include <stubs_click.h>
-#include <stubs_gbitmap.h>
-#include <stubs_graphics.h>
-#include <stubs_graphics_context.h>
-#include <stubs_heap.h>
-#include <stubs_logging.h>
-#include <stubs_modal_manager.h>
-#include <stubs_passert.h>
-#include <stubs_pbl_malloc.h>
-#include <stubs_pebble_tasks.h>
-#include <stubs_process_manager.h>
-#include <stubs_resources.h>
-#include <stubs_status_bar_layer.h>
-#include <stubs_syscalls.h>
-#include <stubs_unobstructed_area.h>
-#include <stubs_window_stack.h>
 
 bool modal_manager_is_window_visible(Window *window) {
   return false;

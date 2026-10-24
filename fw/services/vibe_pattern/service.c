@@ -7,7 +7,9 @@
 #include <pbl/drivers/accel.h>
 #include <pbl/drivers/rtc.h>
 #include <pbl/drivers/vibe.h>
+#include <pbl/kernel/assert.h>
 #include <pbl/kernel/mutex.h>
+#include <pbl/kernel/syscall.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/accel_manager.h>
 #include <pbl/services/analytics/analytics.h>
@@ -20,8 +22,6 @@
 #include <kernel/pbl_malloc.h>
 #include <kernel/pebble_tasks.h>
 #include <syscall/syscall.h>
-#include <syscall/syscall_internal.h>
-#include <system/passert.h>
 
 PBL_LOG_MODULE_DEFINE(service_vibe_pattern, CONFIG_SERVICE_VIBE_PATTERN_LOG_LEVEL);
 
@@ -33,8 +33,8 @@ typedef struct {
 
 // The maximum history we need to keep is based on the maximum time between accel samples (the
 // lowest sampling rate) in milliseconds and the maximum number of accel samples per update.
-#define MAX_HISTORY_MS    (accel_get_max_num_samples() * 1000 / ACCEL_MINIMUM_SAMPLING_RATE)
-#define END_NOT_SET       0
+#define MAX_HISTORY_MS (pbl_accel_get_max_num_samples(ACCEL) * 1000 / ACCEL_MINIMUM_SAMPLING_RATE)
+#define END_NOT_SET    0
 #define HISTORY_CLEAR_ALL 0
 
 static PBL_MUTEX_DEFINE(s_vibe_history_mutex);
@@ -42,7 +42,7 @@ static VibeHistory *s_vibe_history = nullptr;
 static bool s_vibe_history_enabled = false;
 static bool s_vibe_service_enabled = true;
 
-DEFINE_SYSCALL(bool, sys_vibe_history_was_vibrating, uint64_t time_search) {
+PBL_SYSCALL(bool, sys_vibe_history_was_vibrating, (VAL, uint64_t, time_search)) {
   bool rc = false;
 
   pbl_mutex_lock(&s_vibe_history_mutex, PBL_FOREVER);
@@ -76,13 +76,13 @@ static void prv_vibe_history_clear(uint64_t cutoff) {
   }
 }
 
-DEFINE_SYSCALL(void, sys_vibe_history_start_collecting, void) {
+PBL_SYSCALL(void, sys_vibe_history_start_collecting) {
   pbl_mutex_lock(&s_vibe_history_mutex, PBL_FOREVER);
   s_vibe_history_enabled = true;
   pbl_mutex_unlock(&s_vibe_history_mutex);
 }
 
-DEFINE_SYSCALL(void, sys_vibe_history_stop_collecting, void) {
+PBL_SYSCALL(void, sys_vibe_history_stop_collecting) {
   pbl_mutex_lock(&s_vibe_history_mutex, PBL_FOREVER);
   s_vibe_history_enabled = false;
   prv_vibe_history_clear(HISTORY_CLEAR_ALL);
@@ -213,7 +213,7 @@ static void prv_update_strength_analytics(uint8_t new_strength_pct) {
 
 //! Turn the vibe motor on or off.
 //!
-//! This function should be used instead of vibe_ctl so that the vibe
+//! This function should be used instead of pbl_vibe_start() so that the vibe
 //! history is kept in sync with the vibe state.
 //! The caller must be holding s_vibe_pattern_mutex
 static void prv_vibes_set_vibe_strength(int32_t new_strength) {
@@ -229,8 +229,7 @@ static void prv_vibes_set_vibe_strength(int32_t new_strength) {
   prv_update_strength_analytics(new_strength_pct);
 
   if (new_strength != VIBE_STRENGTH_OFF) {
-    vibe_set_strength(new_strength);
-    vibe_ctl(true /* on */);
+    (void)pbl_vibe_start(VIBE, new_strength);
     s_last_vibe_active_tick = rtc_get_ticks();
     if (s_vibe_strength == VIBE_STRENGTH_OFF) {
       // Transitioning from off to on
@@ -238,7 +237,7 @@ static void prv_vibes_set_vibe_strength(int32_t new_strength) {
       prv_vibe_history_start_event();
     }
   } else {
-    vibe_ctl(false /* on */);
+    (void)pbl_vibe_stop(VIBE);
     if (s_vibe_strength != VIBE_STRENGTH_OFF) {
       // Transitioning from on to off; stamp the end so the shake holdoff runs
       // from when the motor actually stopped.
@@ -321,7 +320,7 @@ void vibes_set_default_vibe_strength(int32_t vibe_strength_default) {
   s_vibe_strength_default = vibe_strength_default;
 }
 
-DEFINE_SYSCALL(int32_t, sys_vibe_get_vibe_strength, void) {
+PBL_SYSCALL(int32_t, sys_vibe_get_vibe_strength) {
   return vibes_get_vibe_strength();
 }
 
@@ -338,7 +337,8 @@ uint32_t vibes_get_time_since_last_vibe_ms(void) {
 bool prv_vibe_pattern_enqueue_step_raw(uint32_t duration_ms, int32_t strength) {
   pbl_mutex_lock(&s_vibe_pattern_mutex, PBL_FOREVER);
 
-  if (s_pattern_in_progress) {
+  if (s_pattern_in_progress ||
+      list_count((ListNode *)s_vibe_queue_head) >= CONFIG_SERVICE_VIBE_PATTERN_MAX_STEPS) {
     pbl_mutex_unlock(&s_vibe_pattern_mutex);
     return false;
   }
@@ -352,15 +352,24 @@ bool prv_vibe_pattern_enqueue_step_raw(uint32_t duration_ms, int32_t strength) {
 
   list_init((ListNode *)step);
   step->duration_ms = MIN(duration_ms, MAX_VIBE_DURATION_MS);
-  step->strength = strength;
+  step->strength = CLIP(strength, VIBE_STRENGTH_MIN, VIBE_STRENGTH_MAX);
 
   if (s_vibe_queue_head == nullptr) {
     // Fresh queue: take the explicitly-set owner, else default by task.
     if (s_pending_owner != VibePatternOwner_Other) {
       s_pattern_owner = s_pending_owner;
     } else {
-      s_pattern_owner = (pebble_task_get_current() == PebbleTask_App) ? VibePatternOwner_App
-                                                                      : VibePatternOwner_Other;
+      switch (pebble_task_get_current()) {
+        case PebbleTask_App:
+          s_pattern_owner = VibePatternOwner_App;
+          break;
+        case PebbleTask_Worker:
+          s_pattern_owner = VibePatternOwner_Worker;
+          break;
+        default:
+          s_pattern_owner = VibePatternOwner_Other;
+          break;
+      }
     }
     s_pending_owner = VibePatternOwner_Other;
     s_vibe_queue_head = step;
@@ -373,16 +382,17 @@ bool prv_vibe_pattern_enqueue_step_raw(uint32_t duration_ms, int32_t strength) {
   return true;
 }
 
-DEFINE_SYSCALL(bool, sys_vibe_pattern_enqueue_step_raw, uint32_t duration_ms, int32_t strength) {
+PBL_SYSCALL(bool, sys_vibe_pattern_enqueue_step_raw, (VAL, uint32_t, duration_ms),
+            (VAL, int32_t, strength)) {
   return prv_vibe_pattern_enqueue_step_raw(duration_ms, strength);
 }
 
-DEFINE_SYSCALL(bool, sys_vibe_pattern_enqueue_step, uint32_t duration_ms, bool on) {
+PBL_SYSCALL(bool, sys_vibe_pattern_enqueue_step, (VAL, uint32_t, duration_ms), (VAL, bool, on)) {
   return prv_vibe_pattern_enqueue_step_raw(duration_ms,
                                            on ? s_vibe_strength_default : VIBE_STRENGTH_OFF);
 }
 
-DEFINE_SYSCALL(void, sys_vibe_pattern_trigger_start, void) {
+PBL_SYSCALL(void, sys_vibe_pattern_trigger_start) {
   pbl_mutex_lock(&s_vibe_pattern_mutex, PBL_FOREVER);
   if (s_vibe_queue_head == nullptr || s_pattern_in_progress) {
     // either no vibes queued or I've already started
@@ -439,7 +449,14 @@ static void prv_clear_pattern_locked(void) {
   s_pattern_owner = VibePatternOwner_Other;
 }
 
-DEFINE_SYSCALL(void, sys_vibe_pattern_clear, void) {
+PBL_SYSCALL(void, sys_vibe_pattern_clear) {
+  if (from_user) {
+    vibe_pattern_clear_for_owner((pebble_task_get_current() == PebbleTask_Worker)
+                                     ? VibePatternOwner_Worker
+                                     : VibePatternOwner_App);
+    return;
+  }
+
   pbl_mutex_lock(&s_vibe_pattern_mutex, PBL_FOREVER);
   prv_clear_pattern_locked();
   pbl_mutex_unlock(&s_vibe_pattern_mutex);

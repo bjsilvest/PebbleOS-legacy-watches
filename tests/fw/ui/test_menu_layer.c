@@ -17,23 +17,12 @@
 #include <fake_app_timer.h>
 #include <fake_rtc.h>
 #include <pebble_asserts.h>
+#include <stubs_app_state.h>
+#include <stubs_compiled_with_legacy2_sdk.h>
 
 // Stubs
 /////////////////////
 #include <pbl/util/testing.h>
-
-#include <stubs_app_state.h>
-#include <stubs_click.h>
-#include <stubs_graphics.h>
-#include <stubs_heap.h>
-#include <stubs_logging.h>
-#include <stubs_passert.h>
-#include <stubs_pbl_malloc.h>
-#include <stubs_pebble_tasks.h>
-#include <stubs_process_manager.h>
-#include <stubs_ui_window.h>
-#include <stubs_unobstructed_area.h>
-#include <stubs_vibes.h>
 
 // ---------------------------------------------------------------------------------------------
 // Touch-navigation harness (CONFIG_TOUCH). menu_layer.c resolves the per-task touch-nav state
@@ -45,6 +34,10 @@ bool sys_touch_nav_enabled(void) {
 }
 bool sys_touch_app_nav_active(void) {
   return false;
+}
+
+bool menu_text_scroll_is_allowed(void) {
+  return true;
 }
 
 static TouchNavState s_touch_nav_state;
@@ -466,8 +459,8 @@ void test_menu_layer__center_focused_handles_skipped_rows(void) {
 }
 
 // Not declared in menu_layer.h; normally reached via the window click config
-extern void menu_up_click_handler(ClickRecognizerRef recognizer, MenuLayer *menu_layer);
-extern void menu_down_click_handler(ClickRecognizerRef recognizer, MenuLayer *menu_layer);
+extern void menu_up_click_handler(ClickRecognizerRef recognizer, void *context);
+extern void menu_down_click_handler(ClickRecognizerRef recognizer, void *context);
 
 static void prv_redirect_off_last_row(struct MenuLayer *menu_layer, MenuIndex *new_index,
                                       MenuIndex old_index, void *callback_context) {

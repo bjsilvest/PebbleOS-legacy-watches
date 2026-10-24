@@ -11,9 +11,13 @@ config IMU_SHELL
       The imu shell command, to read the accelerometer and magnetometer
       drivers directly.
 
-choice ACCEL
-    prompt "Accelerometer"
-    optional
+menuconfig ACCEL
+    bool "Accelerometer"
+    help
+      Accelerometer drivers (pbl/drivers/accel.h). The board instantiates
+      the accelerometer it has and exports it as ACCEL.
+
+if ACCEL
 
 config ACCEL_BMA255
     bool "Bosch BMA255"
@@ -27,6 +31,7 @@ config ACCEL_BMI160
 
 config ACCEL_LIS2DW12
     bool "ST LIS2DW12"
+    depends on I2C
     help
       Support for the ST LIS2DW12 accelerometer.
 
@@ -38,6 +43,7 @@ config ACCEL_LIS3DH
 
 config ACCEL_LSM6DSO
     bool "ST LSM6DSO"
+    depends on I2C
     help
       Support for the ST LSM6DSO accelerometer/gyroscope.
 
@@ -51,7 +57,7 @@ config ACCEL_POSIX
     help
       Accelerometer of a native build: a watch lying still, face up.
 
-endchoice
+endif # ACCEL
 
 if ACCEL_LIS2DW12
 
@@ -137,15 +143,14 @@ endif # ACCEL_LSM6DSO
 menuconfig MAG
     bool "Magnetometer"
     help
-      Magnetometer Drivers
+      Magnetometer drivers (pbl/drivers/mag.h). The board instantiates
+      the magnetometer it has and exports it as MAG.
 
 if MAG
 
-choice MAG_DRIVER
-    prompt "Magnetometer Driver"
-
 config MAG_MMC5603NJ
     bool "MEMSIC MMC5603NJ"
+    depends on I2C
     help
       Support for the MEMSIC MMC5603NJ magnetometer.
 
@@ -154,8 +159,6 @@ config MAG_MAG3110
     depends on I2C && SOC_STM32F4
     help
       Support for the NXP MAG3110 magnetometer (snowy).
-
-endchoice
 
 endif # MAG
 

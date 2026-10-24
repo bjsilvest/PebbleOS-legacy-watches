@@ -16,19 +16,6 @@
 // Stubs
 ////////////////////////////////////
 
-#include <stubs_app_state.h>
-#include <stubs_compiled_with_legacy2_sdk.h>
-#include <stubs_gpath.h>
-#include <stubs_graphics.h>
-#include <stubs_graphics_context.h>
-#include <stubs_heap.h>
-#include <stubs_logging.h>
-#include <stubs_passert.h>
-#include <stubs_pbl_malloc.h>
-#include <stubs_pebble_tasks.h>
-#include <stubs_ui_window.h>
-#include <stubs_unobstructed_area.h>
-
 extern void prv_content_indicator_update_proc(Layer *layer, GContext *ctx);
 
 // Helpers
@@ -97,7 +84,7 @@ void test_content_indicator__init_should_add_to_buffer(void) {
   }
 
   // Initializing more content indicators than the buffer can hold should assert
-  cl_assert_passert(content_indicator_init(&content_indicator));
+  cl_assert_panic(content_indicator_init(&content_indicator));
 }
 
 void test_content_indicator__deinit_should_remove_from_buffer(void) {

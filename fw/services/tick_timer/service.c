@@ -2,15 +2,15 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 #include <pbl/drivers/rtc.h>
+#include <pbl/kernel/assert.h>
 #include <pbl/kernel/mutex.h>
+#include <pbl/kernel/syscall.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/regular_timer.h>
 #include <pbl/services/tick_timer.h>
 
 #include <kernel/events.h>
 #include <syscall/syscall.h>
-#include <syscall/syscall_internal.h>
-#include <system/passert.h>
 
 PBL_LOG_MODULE_DEFINE(service_tick_timer, CONFIG_SERVICE_TICK_TIMER_LOG_LEVEL);
 
@@ -118,17 +118,17 @@ static void prv_request(uintptr_t flags) {
       },
     };
     if (!event_try_put_from_process(task, &e)) {
-      syscall_failed();
+      pbl_syscall_fail();
     }
   } else {
     prv_apply_request((void *)request);
   }
 }
 
-DEFINE_SYSCALL(void, sys_tick_timer_subscribe, TimeUnits units) {
+PBL_SYSCALL(void, sys_tick_timer_subscribe, (VAL, TimeUnits, units)) {
   prv_request(REQUEST_FIRST_TICK | (((units & SECOND_UNIT) != 0) ? REQUEST_SECONDS : 0U));
 }
 
-DEFINE_SYSCALL(void, sys_tick_timer_unsubscribe, void) {
+PBL_SYSCALL(void, sys_tick_timer_unsubscribe) {
   prv_request(0U);
 }

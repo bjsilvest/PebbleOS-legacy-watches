@@ -14,6 +14,13 @@ config STATUS_LED
       Backlight drivers that also drive a charging status LED select this
       Kconfig symbol.
 
+config BACKLIGHT_SHELL
+    bool "Shell commands"
+    default y
+    depends on SHELL
+    help
+      The backlight shell command, to set the brightness and color.
+
 config BACKLIGHT_HAS_COLOR
     bool
     help

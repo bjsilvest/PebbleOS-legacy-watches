@@ -6,6 +6,8 @@
 
 #include <pbl/drivers/flash.h>
 #include <pbl/drivers/rtc.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/delay.h>
 #include <pbl/kernel/mutex.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/comm_session/session.h>
@@ -22,11 +24,10 @@
 #include <applib/data_logging.h>
 #include <comm/bt_lock.h>
 #include <kernel/pbl_malloc.h>
-#include <kernel/util/sleep.h>
+#include <kernel/pebble_tasks.h>
 #include <process_management/pebble_process_md.h>
 #include <process_management/process_manager.h>
 #include <syscall/syscall.h>
-#include <system/passert.h>
 
 PBL_LOG_MODULE_DEFINE(service_data_logging, CONFIG_SERVICE_DATA_LOGGING_LOG_LEVEL);
 
@@ -459,7 +460,7 @@ void dls_finish(DataLoggingSession *logging_session) {
     // unlock and wait a little bit, since the system task should be busy writing these to flash.
     dls_unlock_session(logging_session, false /*inactivate*/);
     timeout -= 10;
-    psleep(10);
+    pbl_sleep_ms(10);
     if (!dls_lock_session(logging_session)) {
       // Someone snuck in and marked it inactive on us
       goto exit;
@@ -487,8 +488,6 @@ static void prv_write_all_sessions_to_flash(void *data) {
 // ----------------------------------------------------------------------------------------
 DataLoggingResult dls_log(DataLoggingSession *session, const void *data, uint32_t num_items) {
 #ifndef CONFIG_RELEASE
-  // TODO: We should be able to remove this requirement once PBL-23925 is fixed
-  //
   // Some datalogging code holds the dls_list.c:s_list_mutex while taking the
   // bt_lock. Since we are locking the list and then trying to get the bt_lock,
   // any other thread which holds the bt_lock and then trys to call a log could
@@ -505,13 +504,15 @@ DataLoggingResult dls_log(DataLoggingSession *session, const void *data, uint32_
   }
 
   uint32_t num_bytes = num_items * session->item_size;
-  if (session->data->buffer_storage && num_bytes > DLS_SESSION_MAX_BUFFERED_ITEM_SIZE) {
-    return (DATA_LOGGING_INVALID_PARAMS);
-  }
 
   bool active = dls_lock_session(session);
   if (!active) {
     return (DATA_LOGGING_CLOSED);
+  }
+
+  if (session->data->buffer_storage && num_bytes > DLS_SESSION_MAX_BUFFERED_ITEM_SIZE) {
+    result = DATA_LOGGING_INVALID_PARAMS;
+    goto unlock_and_exit;
   }
 
   PBL_LOG_DBG("logging %d items of size %d to session %d", (int)num_items, (int)session->item_size,

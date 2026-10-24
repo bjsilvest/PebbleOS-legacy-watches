@@ -4,9 +4,9 @@
 #include <string.h>
 
 #include <pbl/drivers/display/display.h>
+#include <pbl/kernel/assert.h>
 
 #include <board/board.h>
-#include <system/passert.h>
 
 #define REG32(addr) (*(volatile uint32_t *)(addr))
 
@@ -118,7 +118,7 @@ void display_update(NextRowCallback nrcb, UpdateCompleteCallback uccb) {
   s_updating = false;
 
   // In QEMU the update is immediate, so call the completion callback directly
-  uccb();
+  uccb(true);
 }
 
 void display_update_boot_frame(uint8_t *framebuffer) {
