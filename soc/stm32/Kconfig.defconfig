@@ -31,4 +31,7 @@ config NUM_IRQS
     default 91 if HAL_STM32_STM32F439
     default 97
 
+config NUM_IRQ_PRIO_BITS
+    default 4
+
 endif # SOC_STM32F4
