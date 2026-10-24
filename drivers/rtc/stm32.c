@@ -109,8 +109,8 @@ RtcTicks rtc_get_ticks(void) {
 }
 
 void rtc_set_time(time_t time) {
-  struct tm t;
-  gmtime_r(&time, &t);
+  struct pbl_tm t;
+  pbl_gmtime_r(&time, &t);
 
   PBL_ASSERTN(!rtc_sanitize_struct_tm(&t));
 
@@ -131,8 +131,8 @@ void rtc_set_time(time_t time) {
   RTC_SetDate(RTC_Format_BIN, &rtc_date);
 }
 
-void rtc_set_time_tm(struct tm *time_tm) {
-  rtc_set_time(mktime(time_tm));
+void rtc_set_time_tm(struct pbl_tm *time_tm) {
+  rtc_set_time(pbl_mktime(time_tm));
 }
 
 void rtc_get_time_ms(time_t *out_seconds, uint16_t *out_ms) {
@@ -157,7 +157,7 @@ void rtc_get_time_ms(time_t *out_seconds, uint16_t *out_ms) {
   }
   PBL_ASSERTN(max_loops > 0);
 
-  struct tm current_time = {
+  struct pbl_tm current_time = {
     .tm_sec = rtc_time.RTC_Seconds,
     .tm_min = rtc_time.RTC_Minutes,
     .tm_hour = rtc_time.RTC_Hours,
@@ -170,7 +170,7 @@ void rtc_get_time_ms(time_t *out_seconds, uint16_t *out_ms) {
   // otherwise cause a reboot loop.
   const bool sanitized = rtc_sanitize_struct_tm(&current_time);
 
-  *out_seconds = mktime(&current_time);
+  *out_seconds = pbl_mktime(&current_time);
   *out_ms = (uint16_t)(((RTC_CLOCK_SYNC_PRESCALER - sub_seconds) * 1000) /
                        (RTC_CLOCK_SYNC_PRESCALER + 1));
 

@@ -138,7 +138,7 @@ void display_set_rotated(bool rotated) {
 
 static void prv_terminate_transfer(void *data) {
   s_updating = false;
-  s_uccb();
+  s_uccb(true);
 }
 
 void display_update(NextRowCallback nrcb, UpdateCompleteCallback uccb) {

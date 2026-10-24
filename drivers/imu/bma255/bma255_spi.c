@@ -8,8 +8,8 @@
 
 #include <pbl/drivers/gpio/stm32.h>
 #include <pbl/drivers/rtc.h>
-
 #include <pbl/kernel/delay.h>
+
 #include <stm32f4xx.h>
 
 #define BMA255_SPI SPI3

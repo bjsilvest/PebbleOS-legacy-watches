@@ -200,8 +200,8 @@ void rtc_set_time(time_t time) {
   pbl_irq_unlock();
 }
 
-void rtc_set_time_tm(struct tm *time_tm) {
-  rtc_set_time(mktime(time_tm));
+void rtc_set_time_tm(struct pbl_tm *time_tm) {
+  rtc_set_time(pbl_mktime(time_tm));
 }
 
 void rtc_get_time_ms(time_t *out_seconds, uint16_t *out_ms) {

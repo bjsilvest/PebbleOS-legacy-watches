@@ -13,7 +13,7 @@
 #include <stm32f4xx.h>
 #include <system/rtc_registers.h>
 
-bool rtc_sanitize_struct_tm(struct tm *t) {
+bool rtc_sanitize_struct_tm(struct pbl_tm *t) {
   // The hardware only stores a two-digit year, so only 2000-2037 work (the
   // upper bound is time_t's 2038 limit). tm_year is years since 1900.
   if (t->tm_year < 100) {
@@ -27,11 +27,11 @@ bool rtc_sanitize_struct_tm(struct tm *t) {
 }
 
 bool rtc_sanitize_time_t(time_t *t) {
-  struct tm time_struct;
-  gmtime_r(t, &time_struct);
+  struct pbl_tm time_struct;
+  pbl_gmtime_r(t, &time_struct);
 
   const bool result = rtc_sanitize_struct_tm(&time_struct);
-  *t = mktime(&time_struct);
+  *t = pbl_mktime(&time_struct);
 
   return result;
 }
@@ -44,9 +44,9 @@ time_t rtc_get_time(void) {
   return seconds;
 }
 
-void rtc_get_time_tm(struct tm *time_tm) {
+void rtc_get_time_tm(struct pbl_tm *time_tm) {
   time_t t = rtc_get_time();
-  localtime_r(&t, time_tm);
+  pbl_localtime_r(&t, time_tm);
 }
 
 const char *rtc_get_time_string(char *buffer) {
@@ -54,9 +54,9 @@ const char *rtc_get_time_string(char *buffer) {
 }
 
 const char *time_t_to_string(char *buffer, time_t t) {
-  struct tm time;
-  localtime_r(&t, &time);
-  strftime(buffer, TIME_STRING_BUFFER_SIZE, "%c", &time);
+  struct pbl_tm time;
+  pbl_localtime_r(&t, &time);
+  pbl_strftime_r(buffer, TIME_STRING_BUFFER_SIZE, "%c", &time);
   return buffer;
 }
 
