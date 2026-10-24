@@ -16,8 +16,9 @@
 #include <pbl/util/size.h>
 
 #include <board/board.h>
-#include <kernel/util/sleep.h>
-#include <system/passert.h>
+#include <pbl/kernel/delay.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 #define BMA255_DEBUG 0
 
@@ -726,5 +727,5 @@ void accel_enable_double_tap_detection(bool on) {
 
 [[maybe_unused]] static void prv_soft_reset(void) {
   bma255_write_register(BMA255Register_BGW_SOFTRESET, BMA255_SOFT_RESET_VALUE);
-  psleep(4);
+  pbl_sleep_ms(4);
 }

@@ -3,7 +3,8 @@
 
 #include <pbl/drivers/dma/stm32.h>
 
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 static void prv_start_circular(const struct pbl_dma_stm32_stream *dma, volatile void *periph_addr,
                                void *buffer, uint32_t size_bytes, uint32_t unit_bytes,

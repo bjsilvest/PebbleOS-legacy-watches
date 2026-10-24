@@ -9,7 +9,7 @@
 #include <pbl/drivers/gpio/stm32.h>
 #include <pbl/drivers/rtc.h>
 
-#include <kernel/util/sleep.h>
+#include <pbl/kernel/delay.h>
 #include <stm32f4xx.h>
 
 #define BMA255_SPI SPI3
@@ -93,7 +93,7 @@ void bma255_send_byte(uint8_t byte) {
 //! Assert SCS, start the SPI clock and send the address.
 void bma255_prepare_txn(uint8_t address) {
   while (rtc_get_ticks() < (s_last_write_ticks + MIN_TICKS_AFTER_WRITE)) {
-    psleep(1);
+    pbl_sleep_ms(1);
   }
   pbl_gpio_set(&s_scs, true);
   bma255_enable_spi_clock();

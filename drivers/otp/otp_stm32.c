@@ -6,7 +6,8 @@
 
 #include <pbl/drivers/otp.h>
 
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 // RM0402, section 3.5 (OTP area)
 #define OTP_SLOTS_BASE_ADDR (0x1FFF7800)

@@ -15,7 +15,8 @@
 #include <pbl/util/math.h>
 
 #include <board/board.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 #include <system/status_codes.h>
 
 //! Duty cycles are integers in [0, 100].

@@ -5,7 +5,8 @@
 #include <pbl/kernel/mutex.h>
 
 #include <stm32f4xx.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 // Give up on a peripheral that never becomes ready (e.g. not emulated).
 #define MAX_POLLS 100000U

@@ -5,9 +5,10 @@
 #include <pbl/drivers/gpio/stm32.h>
 #include <pbl/kernel/mutex.h>
 
-#include <kernel/util/delay.h>
+#include <pbl/kernel/delay.h>
 #include <stm32f4xx.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 static PBL_MUTEX_DEFINE(s_adc_mutex);
 
@@ -57,7 +58,7 @@ void pbl_adc_stm32_read(uint8_t channel, const struct pbl_gpio *pin, uint32_t *v
   ADC_RegularChannelConfig(ADC1, channel, 2, ADC_SampleTime_144Cycles);
   ADC_EOCOnEachRegularChannelCmd(ADC1, ENABLE);
   ADC_Cmd(ADC1, ENABLE);
-  delay_us(3); // tSTAB
+  pbl_busy_wait_us(3); // tSTAB
 
   uint32_t vref_sum = 0;
   uint32_t vmon_sum = 0;

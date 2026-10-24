@@ -9,7 +9,8 @@
 #include <pbl/soc/stm32/sleep.h>
 
 #include <stm32f4xx.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 //! Timers whose output is enabled: APB1 by index (TIM2 = 0 ... TIM14 = 8),
 //! APB2 from 9 (TIM1 = 9, TIM8 = 10, TIM9 = 25 ... TIM11 = 27).

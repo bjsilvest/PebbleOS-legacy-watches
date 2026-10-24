@@ -8,7 +8,8 @@
 #include <pbl/kernel/irq.h>
 
 #include <stm32f4xx.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 #define NUM_GPIO_LINES 16
 

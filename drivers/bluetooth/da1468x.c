@@ -30,7 +30,7 @@
 #include <pbl/util/math.h>
 
 #include <board/board.h>
-#include <kernel/util/delay.h>
+#include <pbl/kernel/delay.h>
 
 PBL_LOG_MODULE_DEFINE(driver_bt_da1468x, CONFIG_BT_LOG_LEVEL);
 
@@ -321,7 +321,7 @@ static void prv_hold_in_reset(void) {
 
 static bool prv_boot_once(void) {
   prv_hold_in_reset();
-  delay_us(100);
+  pbl_busy_wait_us(100);
 #ifdef BOARD_BT_HAS_FLOW_CONTROL
   // Released while the bootrom probes these pins for SPI.
   pbl_gpio_configure(&BOARD_BT_CTS, PBL_GPIO_INPUT);
