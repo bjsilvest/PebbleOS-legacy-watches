@@ -10,7 +10,8 @@
 #include <pbl/drivers/ambient_light.h>
 
 #include <board/board.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 static uint32_t s_dark_threshold;
 static bool s_initialized;

@@ -8,7 +8,7 @@
 
 #include <pbl/drivers/gpio/stm32.h>
 
-#include <kernel/util/sleep.h>
+#include <pbl/kernel/delay.h>
 #include <stm32f4xx.h>
 
 #define BMI160_SPI          SPI1
@@ -116,5 +116,5 @@ void bmi160_enable_spi_mode(void) {
   // The BMI160 needs a rising edge on SCS to switch into SPI mode; the
   // datasheet recommends reading the reserved register 0x7F.
   bmi160_read_reg(0x7f);
-  psleep(2); // Necessary on cold boots
+  pbl_sleep_ms(2); // Necessary on cold boots
 }

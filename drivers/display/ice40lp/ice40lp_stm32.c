@@ -31,7 +31,7 @@
 #include <board/board.h>
 #include <kernel/events.h>
 #include <kernel/pbl_malloc.h>
-#include <kernel/util/delay.h>
+#include <pbl/kernel/delay.h>
 #include <stm32f4xx.h>
 #include <uzlib.h>
 
@@ -137,7 +137,7 @@ static bool prv_wait_not_busy(void) {
     if (!prv_busy()) {
       return true;
     }
-    delay_us(10);
+    pbl_busy_wait_us(10);
   }
   return false;
 }
@@ -186,10 +186,10 @@ static bool prv_program(void) {
   pbl_gpio_set(scs, true);
   pbl_gpio_set(creset, false);
   // CRESET must stay low for 200 ns.
-  delay_us(10);
+  pbl_busy_wait_us(10);
   pbl_gpio_set(creset, true);
   // The iCE40 needs 800 us of housekeeping after reset.
-  delay_us(1000);
+  pbl_busy_wait_us(1000);
 
   const bool written = prv_write_bitstream();
 
@@ -205,7 +205,7 @@ static bool prv_program(void) {
       done = true;
       break;
     }
-    delay_us(100);
+    pbl_busy_wait_us(100);
   }
   if (!done) {
     PBL_LOG_ERR("FPGA CDONE not high after programming");
@@ -217,9 +217,9 @@ static bool prv_program(void) {
 
 static void prv_power_enable(void) {
   // 1 ms between rails; the PMIC brings up VLCD (3.2 V) first.
-  delay_us(2000);
+  pbl_busy_wait_us(2000);
   pbl_gpio_set(&BOARD_CONFIG_DISPLAY.rail_6v6, true);
-  delay_us(2000);
+  pbl_busy_wait_us(2000);
   pbl_gpio_set(&BOARD_CONFIG_DISPLAY.rail_4v5, true);
 }
 
@@ -257,7 +257,7 @@ static void prv_send_black_frame(void) {
   memset(s_line, 0, sizeof(s_line));
   const struct pbl_gpio *scs = &BOARD_CONFIG_DISPLAY.scs;
   pbl_gpio_set(scs, true);
-  delay_us(5);
+  pbl_busy_wait_us(5);
   const uint8_t cmd = CMD_FRAME_BEGIN;
   prv_spi_write(&cmd, 1);
   for (int i = 0; i < DISP_LINES; i++) {
@@ -320,7 +320,7 @@ static void prv_send_frame(const uint8_t *fb) {
   }
 
   pbl_gpio_set(scs, true);
-  delay_us(5);
+  pbl_busy_wait_us(5);
   const uint8_t cmd = CMD_FRAME_BEGIN;
   prv_spi_write(&cmd, 1);
 
@@ -425,7 +425,7 @@ static void prv_start_dma_frame(const uint8_t *fb) {
 
   soc_stm32_stop_block();
   pbl_gpio_set(&cfg->scs, true);
-  delay_us(5);
+  pbl_busy_wait_us(5);
   const uint8_t cmd = CMD_FRAME_BEGIN;
   prv_spi_write(&cmd, 1);
   SPI_I2S_DMACmd(cfg->spi, SPI_I2S_DMAReq_Tx, ENABLE);
@@ -444,7 +444,7 @@ void display_clear(void) {
 
   // Let a frame in flight finish; its line buffers are in use.
   for (int ms = 0; display_update_in_progress() && ms < (int)FRAME_TIMEOUT_MS; ms++) {
-    delay_us(1000);
+    pbl_busy_wait_us(1000);
   }
 
   // One black frame, as on the stock firmware; the PMIC cuts the rails later.

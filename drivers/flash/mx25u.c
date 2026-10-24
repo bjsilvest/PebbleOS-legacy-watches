@@ -17,7 +17,8 @@
 
 #include <board/board.h>
 #include <flash_region/flash_region.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 #include <system/status_codes.h>
 
 static QSPIFlashPart QSPI_FLASH_PART = {

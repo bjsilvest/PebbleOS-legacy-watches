@@ -6,7 +6,8 @@
 
 #include <board/board.h>
 #include <kernel/events.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 static bool s_rotated_180 = false;
 

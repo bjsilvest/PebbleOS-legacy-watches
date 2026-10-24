@@ -16,7 +16,8 @@
 
 #include <board/board.h>
 #include <kernel/events.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 PBL_LOG_MODULE_DEFINE(driver_pmic, CONFIG_DRIVER_PMIC_LOG_LEVEL);
 

@@ -17,7 +17,7 @@
 
 #include <applib/app_logging.h>
 #include <board/board.h>
-#include <kernel/util/sleep.h>
+#include <pbl/kernel/delay.h>
 #include <mfg/mfg_info.h>
 
 PBL_LOG_MODULE_DEFINE(driver_hrm_as7000, CONFIG_DRIVER_HRM_LOG_LEVEL);
@@ -317,7 +317,7 @@ static void prv_power_off(HRMDevice *dev) {
   const uint32_t elapsed_ms =
       (uint32_t)((rtc_get_ticks() - state->power_on_ticks) * 1000 / RTC_TICKS_HZ);
   if (elapsed_ms < BOOT_DELAY_MS) {
-    psleep(BOOT_DELAY_MS - elapsed_ms);
+    pbl_sleep_ms(BOOT_DELAY_MS - elapsed_ms);
   }
 
   pbl_gpio_set(&dev->enable, false);
@@ -335,7 +335,7 @@ static void prv_watchdog_system_cb(void *context) {
   if (dev->state->state == AS7000State_On && dev->state->missed_seconds >= WATCHDOG_TIMEOUT_S) {
     PBL_LOG_ERR("AS7000 stopped handshaking, power cycling");
     prv_power_off(dev);
-    psleep(SHUT_DOWN_DELAY_MS);
+    pbl_sleep_ms(SHUT_DOWN_DELAY_MS);
     prv_power_on(dev);
   }
   pbl_mutex_unlock(&dev->state->lock);
@@ -356,7 +356,7 @@ static bool prv_wait_int(HRMDevice *dev, bool level, int timeout_ms) {
       return true;
     }
     system_task_watchdog_feed();
-    psleep(1);
+    pbl_sleep_ms(1);
   }
   return false;
 }
@@ -503,7 +503,7 @@ void hrm_init(HRMDevice *dev) {
 
   pbl_gpio_stm32_analog(&dev->int_gpio);
   pbl_gpio_configure(&dev->enable, PBL_GPIO_OUTPUT_ACTIVE);
-  psleep(BOOT_DELAY_MS);
+  pbl_sleep_ms(BOOT_DELAY_MS);
   const bool found = prv_read(dev, ADDR_INFO_START, &info, sizeof(info));
   pbl_gpio_set(&dev->enable, false);
 
