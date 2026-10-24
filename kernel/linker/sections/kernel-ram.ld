@@ -26,6 +26,8 @@
 #else
         *nimble.dir*(.bss .bss.* COMMON)
 #endif
+        /* The sys shell's audit_delay result buffer. */
+        *sys_shell.c.obj(.bss .bss.*)
 #ifdef CONFIG_PULSE_EVERYWHERE
         /* Only without PULSE's buffers is there room for it in SRAM. */
         *task_timer.c.obj(.bss .bss.*)
