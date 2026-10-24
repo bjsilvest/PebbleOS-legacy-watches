@@ -16,7 +16,6 @@
 // Fakes
 #include <fake_pebble_tasks.h>
 #include <stubs_app_cache.h>
-#include <stubs_app_fetch_endpoint.h>
 #include <stubs_app_manager.h>
 
 // Stubs
