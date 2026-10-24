@@ -20,6 +20,7 @@
 #include <pbl/drivers/bluetooth/da1468x.h>
 #endif
 #include <pbl/kernel/assert.h>
+#include <pbl/kernel/delay.h>
 #include <pbl/kernel/fatal.h>
 #include <pbl/services/app_fetch_endpoint.h>
 #include <pbl/services/blob_db/api.h>
@@ -374,17 +375,18 @@ static void prv_read_light(SystemInformationData *info) {
 
   light_allow(false);
   for (size_t i = 0; i < ARRAY_LENGTH(s_light_read_ms); i++) {
-    psleep(s_light_read_ms[i] - elapsed_ms);
+    pbl_sleep_ms(s_light_read_ms[i] - elapsed_ms);
     elapsed_ms = s_light_read_ms[i];
-    raw[i] = ambient_light_get_light_level();
+    raw[i] = 0;
+    (void)pbl_als_read(ALS, &raw[i]);
   }
   light_allow(true);
   light_enable_interaction();
 
   const uint32_t settled = raw[ARRAY_LENGTH(raw) - 1];
-  if (ambient_light_lux_available()) {
+  if (pbl_als_has_lux(ALS)) {
     sniprintf(info->light_string, sizeof(info->light_string), "%" PRIu32 " (%" PRIu32 " lux)",
-              settled, ambient_light_level_to_lux(settled));
+              settled, pbl_als_to_lux(ALS, settled));
   } else {
     sniprintf(info->light_string, sizeof(info->light_string), "%" PRIu32 " %" PRIu32 " %" PRIu32,
               raw[0], raw[1], raw[2]);

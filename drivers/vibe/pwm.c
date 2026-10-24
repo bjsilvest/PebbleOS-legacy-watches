@@ -8,15 +8,11 @@
 #include <pbl/drivers/pmic.h>
 #include <pbl/drivers/pwm.h>
 #include <pbl/drivers/vibe.h>
-#include <pbl/logging/logging.h>
+#include <pbl/drivers/vibe/pwm.h>
 #include <pbl/services/battery/battery_monitor.h>
 #include <pbl/services/battery/battery_state.h>
 #include <pbl/util/math.h>
-
-#include <board/board.h>
-#include <pbl/kernel/assert.h>
-#include <pbl/kernel/fatal.h>
-#include <system/status_codes.h>
+#include <pbl/util/misc.h>
 
 //! Duty cycles are integers in [0, 100].
 #define PWM_TIMER_UPDATE_PERIOD (100)
@@ -27,16 +23,16 @@
 #define PWM_DUTY_CYCLE_OFF  (0)
 #define PWM_DUTY_CYCLE_FULL (PWM_TIMER_UPDATE_PERIOD)
 
-static uint8_t s_vibe_duty_cycle = PWM_DUTY_CYCLE_FULL;
-static bool s_initialized;
+static const struct pbl_vibe_pwm *prv_get(const struct pbl_vibe *vibe) {
+  return container_of(vibe, const struct pbl_vibe_pwm, vibe);
+}
 
-void vibe_init(void) {
-  if (s_initialized) {
-    return;
-  }
+static int prv_init(const struct pbl_vibe *vibe) {
+  const struct pbl_vibe_pwm *dev = prv_get(vibe);
 
-  pwm_init(&BOARD_CONFIG_VIBE.pwm, PWM_TIMER_UPDATE_PERIOD, PWM_TIMER_FREQUENCY_HZ);
-  s_initialized = true;
+  pwm_init(&dev->pwm, PWM_TIMER_UPDATE_PERIOD, PWM_TIMER_FREQUENCY_HZ);
+
+  return 0;
 }
 
 static uint16_t prv_get_vsys_mv(void) {
@@ -47,57 +43,38 @@ static uint16_t prv_get_vsys_mv(void) {
   return battery_state_get_voltage();
 }
 
-void vibe_set_strength(int8_t strength) {
+static int prv_start(const struct pbl_vibe *vibe, int8_t strength) {
+  const struct pbl_vibe_pwm *dev = prv_get(vibe);
   // Treat "reverse" strength as forward strength.
   uint32_t duty_cycle = ABS(strength);
 
-  if (BOARD_CONFIG_VIBE.vsys_scale > 0) {
+  if (battery_monitor_critical_lockout()) {
+    duty_cycle = PWM_DUTY_CYCLE_OFF;
+  } else if (dev->vsys_scale > 0U) {
     const uint16_t vsys_mv = prv_get_vsys_mv();
-    if (vsys_mv > 0) {
-      duty_cycle = (BOARD_CONFIG_VIBE.vsys_scale * duty_cycle) / vsys_mv;
+    if (vsys_mv > 0U) {
+      duty_cycle = (dev->vsys_scale * duty_cycle) / vsys_mv;
     }
   }
 
-  s_vibe_duty_cycle = MIN(duty_cycle, PWM_DUTY_CYCLE_FULL);
-}
+  duty_cycle = MIN(duty_cycle, PWM_DUTY_CYCLE_FULL);
+  pwm_enable(&dev->pwm, duty_cycle != PWM_DUTY_CYCLE_OFF);
+  pwm_set_duty_cycle(&dev->pwm, duty_cycle);
 
-static void prv_vibe_raw_ctl(bool on) {
-  pwm_enable(&BOARD_CONFIG_VIBE.pwm, on);
-  pwm_set_duty_cycle(&BOARD_CONFIG_VIBE.pwm, on ? s_vibe_duty_cycle : PWM_DUTY_CYCLE_OFF);
-}
-
-void vibe_ctl(bool on) {
-  if (!s_initialized) {
-    return;
-  }
-
-  if (on && battery_monitor_critical_lockout()) {
-    on = false;
-  }
-
-  PBL_LOG_DBG("Vibe status <%s>", on ? "on" : "off");
-  prv_vibe_raw_ctl(on);
-}
-
-void vibe_force_off(void) {
-  if (!s_initialized) {
-    return;
-  }
-  prv_vibe_raw_ctl(false);
-}
-
-int8_t vibe_get_braking_strength(void) {
-  // Single direction: braking is just turning it off.
-  return VIBE_STRENGTH_OFF;
-}
-
-status_t vibe_calibrate(void) {
-  return E_INVALID_OPERATION;
-}
-
-uint8_t vibe_get_calibration(void) {
   return 0;
 }
 
-void vibe_apply_calibration(uint8_t cali) {
+static int prv_stop(const struct pbl_vibe *vibe) {
+  const struct pbl_vibe_pwm *dev = prv_get(vibe);
+
+  pwm_enable(&dev->pwm, false);
+  pwm_set_duty_cycle(&dev->pwm, PWM_DUTY_CYCLE_OFF);
+
+  return 0;
 }
+
+const struct pbl_vibe_ops pbl_vibe_pwm_ops = {
+  .init = prv_init,
+  .start = prv_start,
+  .stop = prv_stop,
+};

@@ -19,6 +19,11 @@ menuconfig ACCEL
 
 if ACCEL
 
+config ACCEL_BMA255
+    bool "Bosch BMA255"
+    help
+      Support for the Bosch BMA255 accelerometer.
+
 config ACCEL_LIS2DW12
     bool "ST LIS2DW12"
     depends on I2C

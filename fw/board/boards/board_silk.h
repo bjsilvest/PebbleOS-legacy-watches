@@ -3,7 +3,6 @@
 
 #pragma once
 
-#include <pbl/drivers/backlight/pwm.h>
 #include <pbl/drivers/regulator/gpio.h>
 #ifdef CONFIG_HRM
 #include <pbl/drivers/hrm/as7000.h>
@@ -16,10 +15,6 @@
 static const BoardConfig BOARD_CONFIG = {
   .ambient_light_dark_threshold = 150,
   .ambient_k_delta_threshold = 50,
-  .photo_en = PBL_GPIO(STM32_GPIOC, 0, 0),
-  .als_always_on = true,
-  .als_adc_channel = ADC_Channel_13,
-  .als_adc_pin = PBL_GPIO(STM32_GPIOC, 3, 0),
   .backlight_on_percent = 25,
 };
 
@@ -60,36 +55,6 @@ static const BoardConfigAccel BOARD_CONFIG_ACCEL = {
         PBL_GPIO(STM32_GPIOA, 3, 0),
       },
   .default_motion_sensitivity = 55U, // Medium
-};
-
-// Vibe: DRV2603 driven by TIM14 CH1
-static const BoardConfigActuator BOARD_CONFIG_VIBE = {
-  .pwm =
-      {
-        .output = PBL_GPIO(STM32_GPIOA, 7, 0),
-        .timer = TIM14,
-        .rcc = RCC_APB1Periph_TIM14,
-        .af = GPIO_AF_TIM14,
-        .channel = 1,
-      },
-  .vsys_scale = 3300,
-};
-
-// 4.5 V LED boost (PB13), for the backlight and the HRM LEDs
-extern const struct pbl_gpio_regulator BOARD_LED_BOOST;
-
-// Backlight: TIM3 CH1, powered by the LED boost
-static const BacklightPwmConfig BACKLIGHT_PWM = {
-  .supply = &BOARD_LED_BOOST.reg,
-  .pwm =
-      {
-        .output = PBL_GPIO(STM32_GPIOC, 6, 0),
-        .timer = TIM3,
-        .rcc = RCC_APB1Periph_TIM3,
-        .af = GPIO_AF_TIM3,
-        .channel = 1,
-      },
-  .max_duty_cycle_percent = 67,
 };
 
 static const BoardConfigSharpDisplay BOARD_CONFIG_DISPLAY = {

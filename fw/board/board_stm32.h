@@ -37,16 +37,6 @@ typedef struct {
   /////////////////////////////////////////////////////////////////////////////
   const uint32_t ambient_light_dark_threshold;
   const uint32_t ambient_k_delta_threshold;
-  // Raw-count -> lux conversion: lux = (level - offset) * num / den.
-  // den == 0 means no conversion available for this board.
-  const uint32_t ambient_light_lux_dark_offset;
-  const uint32_t ambient_light_lux_num;
-  const uint32_t ambient_light_lux_den;
-  const struct pbl_gpio photo_en;
-  const bool als_always_on;
-  //! ADC channel and input pin of an analog light sensor.
-  const uint8_t als_adc_channel;
-  const struct pbl_gpio als_adc_pin;
 
   const uint8_t backlight_on_percent; // percent of max possible brightness
 } BoardConfig;
