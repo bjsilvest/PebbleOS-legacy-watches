@@ -198,6 +198,19 @@ void arch_cycle_enable(void) {
   DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 }
 
+#ifdef CONFIG_ARCH_CYCLE_SOFT_FALLBACK
+// Roughly the cycles a busy-wait iteration takes, so waits end at about the right time
+#define SOFT_CYCLES_PER_READ 16U
+
+uint32_t arch_cycle_soft_get_32(void) {
+  static volatile uint32_t s_cycles;
+
+  s_cycles += SOFT_CYCLES_PER_READ;
+
+  return s_cycles;
+}
+#endif
+
 uint32_t arch_cycles_per_sec(void) {
   return SystemCoreClock;
 }

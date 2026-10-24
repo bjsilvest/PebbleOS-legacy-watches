@@ -55,3 +55,11 @@ config CPU_HAS_FPU
 	bool
 	help
 	  Single-precision FPU: FPv4-SP on ARMv7-M, FPv5-SP on ARMv8-M.
+
+config ARCH_CYCLE_SOFT_FALLBACK
+	bool "Software cycle counter without a DWT"
+	default y if SOC_STM32F4
+	help
+	  Count cycles in software when the DWT cycle counter cannot be
+	  enabled, as on the QEMU Pebble machines, so busy-waits still end.
+	  Hardware with a DWT is unaffected.
