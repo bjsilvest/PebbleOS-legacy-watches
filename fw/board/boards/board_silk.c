@@ -1,13 +1,18 @@
 /* SPDX-FileCopyrightText: 2024 Google LLC */
 /* SPDX-License-Identifier: Apache-2.0 */
 
+#include <pbl/drivers/ambient/stm32_adc.h>
+#include <pbl/drivers/backlight/pwm.h>
 #include <pbl/drivers/dma/stm32.h>
 #include <pbl/drivers/flash/qspi_flash_definitions.h>
 #include <pbl/drivers/i2c/stm32.h>
+#include <pbl/drivers/imu/bma255/bma255.h>
 #include <pbl/drivers/mic/stm32/dfsdm_definitions.h>
 #include <pbl/drivers/pmic/as3701b.h>
 #include <pbl/drivers/regulator/gpio.h>
+#include <pbl/drivers/temperature/stm32.h>
 #include <pbl/drivers/uart/stm32.h>
+#include <pbl/drivers/vibe/pwm.h>
 #include <pbl/kernel/irq.h>
 
 #include <board/board.h>
@@ -121,6 +126,52 @@ static const struct pbl_i2c_dev I2C_SLAVE_AS3701B = PBL_I2C_DEV(&s_i2c3.bus, 0x4
 ///////////////////////////////////////////////////////////////////////////////
 
 PBL_GPIO_REGULATOR_DEFINE(BOARD_LED_BOOST, "led_boost", STM32_GPIOB, 13, 0, false);
+
+// Backlight: TIM3 CH1, powered by the LED boost
+///////////////////////////////////////////////////////////////////////////////
+
+PBL_BACKLIGHT_PWM_DEFINE(s_backlight, .supply = &BOARD_LED_BOOST.reg,
+                         .pwm =
+                             {
+                               .output = PBL_GPIO(STM32_GPIOC, 6, 0),
+                               .timer = TIM3,
+                               .rcc = RCC_APB1Periph_TIM3,
+                               .af = GPIO_AF_TIM3,
+                               .channel = 1,
+                             },
+                         .max_duty_cycle_percent = 67);
+const struct pbl_backlight *const BACKLIGHT = &s_backlight.backlight;
+
+// Vibe: DRV2603 driven by TIM14 CH1
+///////////////////////////////////////////////////////////////////////////////
+
+PBL_VIBE_PWM_DEFINE(s_vibe, false,
+                    .pwm =
+                        {
+                          .output = PBL_GPIO(STM32_GPIOA, 7, 0),
+                          .timer = TIM14,
+                          .rcc = RCC_APB1Periph_TIM14,
+                          .af = GPIO_AF_TIM14,
+                          .channel = 1,
+                        },
+                    .vsys_scale = 3300);
+const struct pbl_vibe *const VIBE = &s_vibe.vibe;
+
+// Ambient light: photodiode on ADC1 channel 13, no lux calibration
+///////////////////////////////////////////////////////////////////////////////
+
+PBL_ALS_STM32_ADC_DEFINE(s_als, nullptr, .enable = PBL_GPIO(STM32_GPIOC, 0, 0),
+                         .channel = ADC_Channel_13, .pin = PBL_GPIO(STM32_GPIOC, 3, 0),
+                         .always_on = true);
+const struct pbl_als *const ALS = &s_als.als;
+
+// Accelerometer: BMA255 on SPI, see BOARD_CONFIG_ACCEL
+///////////////////////////////////////////////////////////////////////////////
+
+PBL_BMA255_DEFINE(s_bma255);
+const struct pbl_accel *const ACCEL = &s_bma255.accel;
+
+const struct pbl_temp *const DIE_TEMP = STM32_TEMP;
 
 #ifdef CONFIG_HRM
 // HRM: AS7000 (Pebble 2 HR only, probed at boot)

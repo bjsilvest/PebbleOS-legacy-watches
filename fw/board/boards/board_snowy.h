@@ -8,61 +8,25 @@
 // (spalding), electrically the same but for the round display and the few
 // values below. Pins from the stock board_snowy.c/.h and board_spalding_evt.c/.h.
 
-#include <pbl/drivers/backlight/pwm.h>
-#include <pbl/drivers/i2c.h>
 #include <pbl/services/imu/units.h>
-#include <pbl/util/size.h>
 
 #define BT_VENDOR_ID   0x0154
 #define BT_VENDOR_NAME "Pebble Technology"
 
-#ifdef CONFIG_BOARD_SPALDING
-// Light sensor readings (3 s after the backlight went off) on a Pebble Time
-// Round in seven lighting conditions, against the middle of each condition's
-// usual lux range: the phototransistor jumps from the dark floor in the
-// faintest light, then rises slowly up to sunlight.
-static const AmbientLightLuxPoint s_ambient_light_lux_table[] = {
-  {236, 0},      // closet, near pitch dark
-  {2861, 2},     // dark room, light from a doorway
-  {2995, 10},    // dim room, one small lamp
-  {3589, 175},   // normal indoor light
-  {3636, 550},   // bright room, desk lamp
-  {3822, 3000},  // outdoors in shade
-  {4006, 10000}, // direct sunlight
-};
-#endif
-
 static const BoardConfig BOARD_CONFIG = {
 #ifdef CONFIG_BOARD_SPALDING
-  .ambient_light_lux_table = s_ambient_light_lux_table,
-  .ambient_light_lux_table_len = ARRAY_LENGTH(s_ambient_light_lux_table),
   // As the lux-calibrated Core watches: the backlight stops coming on in
   // light brighter than a desk lamp.
   .ambient_light_dark_threshold = 800,
   .ambient_k_delta_threshold = 100,
+  .backlight_on_percent = 25,
 #else
-  // PROVISIONAL lux conversion, until the sensor is calibrated against a lux
-  // meter: the snowy dark floor read ~200 and a phone flashlight ~2900, taken
-  // here as about 1000 lux. The dynamic backlight ramp works in lux. The dark
-  // thresholds are the stock raw ones (3130, 3220) and the k delta (96)
-  // converted with the same factor, so the backlight switches where it did.
-  .ambient_light_lux_dark_offset = 200,
-  .ambient_light_lux_num = 10,
-  .ambient_light_lux_den = 27,
 #ifdef CONFIG_BOARD_SNOWY_S3
   .ambient_light_dark_threshold = 1118,
 #else
   .ambient_light_dark_threshold = 1085,
 #endif
   .ambient_k_delta_threshold = 35,
-#endif
-  .photo_en = PBL_GPIO(STM32_GPIOA, 3, 0),
-  .als_adc_channel = ADC_Channel_2,
-#ifdef CONFIG_BOARD_SPALDING
-  .als_adc_pin = PBL_GPIO(STM32_GPIOA, 2, 0),
-  .backlight_on_percent = 25,
-#else
-  .als_adc_pin = PBL_GPIO(STM32_GPIOC, 2, 0),
   .backlight_on_percent = 45,
 #endif
 };
@@ -122,58 +86,6 @@ static const BoardConfigAccel BOARD_CONFIG_ACCEL = {
     PBL_GPIO(STM32_GPIOG, 6, 0),
   },
 };
-
-static const BoardConfigMag BOARD_CONFIG_MAG = {
-  .mag_config = {
-#ifdef CONFIG_BOARD_SPALDING
-    .axes_offsets[AXIS_X] = 0,
-    .axes_offsets[AXIS_Y] = 1,
-    .axes_offsets[AXIS_Z] = 2,
-    .axes_inverts[AXIS_X] = false,
-    .axes_inverts[AXIS_Y] = true,
-    .axes_inverts[AXIS_Z] = false,
-#else
-    .axes_offsets[AXIS_X] = 1,
-    .axes_offsets[AXIS_Y] = 0,
-    .axes_offsets[AXIS_Z] = 2,
-    .axes_inverts[AXIS_X] = true,
-    .axes_inverts[AXIS_Y] = true,
-    .axes_inverts[AXIS_Z] = false,
-#endif
-  },
-};
-
-// Vibe: H-bridge driven by TIM10 CH1, enabled by PF4
-static const BoardConfigActuator BOARD_CONFIG_VIBE = {
-  .pwm =
-      {
-        .output = PBL_GPIO(STM32_GPIOB, 8, 0),
-        .timer = TIM10,
-        .rcc = RCC_APB2Periph_TIM10,
-        .apb2 = true,
-        .af = GPIO_AF_TIM10,
-        .channel = 1,
-      },
-  .ctl = PBL_GPIO(STM32_GPIOF, 4, 0),
-  .hbridge = true,
-};
-
-// Backlight: TIM12 CH1
-static const BacklightPwmConfig BACKLIGHT_PWM = {
-  .pwm =
-      {
-        .output = PBL_GPIO(STM32_GPIOB, 14, 0),
-        .timer = TIM12,
-        .rcc = RCC_APB1Periph_TIM12,
-        .af = GPIO_AF_TIM12,
-        .channel = 1,
-      },
-  .max_duty_cycle_percent = 100,
-};
-
-// MAG3110 data ready, active high
-static const struct pbl_gpio BOARD_MAG_INT = PBL_GPIO(STM32_GPIOF, 14, 0);
-extern const struct pbl_i2c_dev *const I2C_MAG3110;
 
 extern const struct pbl_dma_stm32_stream ICE40LP_TX_DMA;
 

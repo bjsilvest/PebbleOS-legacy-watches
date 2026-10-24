@@ -9,15 +9,11 @@
 #include <pbl/drivers/pmic.h>
 #include <pbl/drivers/pwm.h>
 #include <pbl/drivers/vibe.h>
-#include <pbl/logging/logging.h>
+#include <pbl/drivers/vibe/pwm.h>
 #include <pbl/services/battery/battery_monitor.h>
 #include <pbl/services/battery/battery_state.h>
 #include <pbl/util/math.h>
-
-#include <board/board.h>
-#include <pbl/kernel/assert.h>
-#include <pbl/kernel/fatal.h>
-#include <system/status_codes.h>
+#include <pbl/util/misc.h>
 
 //! Duty cycles are integers in [0, 100].
 #define PWM_TIMER_UPDATE_PERIOD (100)
@@ -25,22 +21,30 @@
 #define PWM_OUTPUT_FREQUENCY_HZ (22 * 1000)
 #define PWM_TIMER_FREQUENCY_HZ  (PWM_TIMER_UPDATE_PERIOD * PWM_OUTPUT_FREQUENCY_HZ)
 
-#define PWM_DUTY_CYCLE_OFF  (BOARD_CONFIG_VIBE.hbridge ? PWM_TIMER_UPDATE_PERIOD / 2 : 0)
 #define PWM_DUTY_CYCLE_FULL (PWM_TIMER_UPDATE_PERIOD)
 
-static uint8_t s_vibe_duty_cycle = PWM_DUTY_CYCLE_FULL;
-static bool s_initialized;
+static const struct pbl_vibe_pwm *prv_get(const struct pbl_vibe *vibe) {
+  return container_of(vibe, const struct pbl_vibe_pwm, vibe);
+}
 
-void vibe_init(void) {
-  if (s_initialized) {
-    return;
+static uint32_t prv_duty_cycle_off(const struct pbl_vibe_pwm *dev) {
+  return dev->hbridge ? PWM_TIMER_UPDATE_PERIOD / 2 : 0;
+}
+
+static int prv_init(const struct pbl_vibe *vibe) {
+  const struct pbl_vibe_pwm *dev = prv_get(vibe);
+  int ret;
+
+  if (pbl_gpio_is_connected(&dev->ctl)) {
+    ret = pbl_gpio_configure(&dev->ctl, PBL_GPIO_OUTPUT_INACTIVE);
+    if (ret != 0) {
+      return ret;
+    }
   }
 
-  if (BOARD_CONFIG_VIBE.ctl.port) {
-    pbl_gpio_configure(&BOARD_CONFIG_VIBE.ctl, PBL_GPIO_OUTPUT_INACTIVE);
-  }
-  pwm_init(&BOARD_CONFIG_VIBE.pwm, PWM_TIMER_UPDATE_PERIOD, PWM_TIMER_FREQUENCY_HZ);
-  s_initialized = true;
+  pwm_init(&dev->pwm, PWM_TIMER_UPDATE_PERIOD, PWM_TIMER_FREQUENCY_HZ);
+
+  return 0;
 }
 
 static uint16_t prv_get_vsys_mv(void) {
@@ -51,68 +55,58 @@ static uint16_t prv_get_vsys_mv(void) {
   return battery_state_get_voltage();
 }
 
-void vibe_set_strength(int8_t strength) {
-  if (BOARD_CONFIG_VIBE.hbridge) {
+static uint32_t prv_duty_cycle(const struct pbl_vibe_pwm *dev, int8_t strength) {
+  const uint32_t off = prv_duty_cycle_off(dev);
+
+  if (dev->hbridge) {
     // Scale -100..100 to 0..100.
-    s_vibe_duty_cycle =
-        ((PWM_DUTY_CYCLE_FULL - PWM_DUTY_CYCLE_OFF) * strength / VIBE_STRENGTH_MAX) +
-        PWM_DUTY_CYCLE_OFF;
-    return;
+    return ((PWM_DUTY_CYCLE_FULL - off) * strength / VIBE_STRENGTH_MAX) + off;
   }
 
   // Treat "reverse" strength as forward strength.
   uint32_t duty_cycle = ABS(strength);
 
-  if (BOARD_CONFIG_VIBE.vsys_scale > 0) {
+  if (dev->vsys_scale > 0U) {
     const uint16_t vsys_mv = prv_get_vsys_mv();
-    if (vsys_mv > 0) {
-      duty_cycle = (BOARD_CONFIG_VIBE.vsys_scale * duty_cycle) / vsys_mv;
+    if (vsys_mv > 0U) {
+      duty_cycle = (dev->vsys_scale * duty_cycle) / vsys_mv;
     }
   }
 
-  s_vibe_duty_cycle = MIN(duty_cycle, PWM_DUTY_CYCLE_FULL);
+  return MIN(duty_cycle, PWM_DUTY_CYCLE_FULL);
 }
 
-static void prv_vibe_raw_ctl(bool on) {
-  pwm_enable(&BOARD_CONFIG_VIBE.pwm, on);
-  pwm_set_duty_cycle(&BOARD_CONFIG_VIBE.pwm, on ? s_vibe_duty_cycle : PWM_DUTY_CYCLE_OFF);
-  if (BOARD_CONFIG_VIBE.ctl.port) {
-    pbl_gpio_set(&BOARD_CONFIG_VIBE.ctl, on);
+static void prv_raw_ctl(const struct pbl_vibe_pwm *dev, bool on, uint32_t duty_cycle) {
+  pwm_enable(&dev->pwm, on);
+  pwm_set_duty_cycle(&dev->pwm, on ? duty_cycle : prv_duty_cycle_off(dev));
+  if (pbl_gpio_is_connected(&dev->ctl)) {
+    (void)pbl_gpio_set(&dev->ctl, on);
   }
 }
 
-void vibe_ctl(bool on) {
-  if (!s_initialized) {
-    return;
+static int prv_start(const struct pbl_vibe *vibe, int8_t strength) {
+  const struct pbl_vibe_pwm *dev = prv_get(vibe);
+
+  if (battery_monitor_critical_lockout()) {
+    prv_raw_ctl(dev, false, 0);
+    return 0;
   }
 
-  if (on && battery_monitor_critical_lockout()) {
-    on = false;
-  }
+  prv_raw_ctl(dev, true, prv_duty_cycle(dev, strength));
 
-  PBL_LOG_DBG("Vibe status <%s>", on ? "on" : "off");
-  prv_vibe_raw_ctl(on);
-}
-
-void vibe_force_off(void) {
-  if (!s_initialized) {
-    return;
-  }
-  prv_vibe_raw_ctl(false);
-}
-
-int8_t vibe_get_braking_strength(void) {
-  // An H-bridge can run it backwards; single direction just turns it off.
-  return BOARD_CONFIG_VIBE.hbridge ? VIBE_STRENGTH_MIN : VIBE_STRENGTH_OFF;
-}
-
-status_t vibe_calibrate(void) {
-  return E_INVALID_OPERATION;
-}
-
-uint8_t vibe_get_calibration(void) {
   return 0;
 }
 
-void vibe_apply_calibration(uint8_t cali) {
+static int prv_stop(const struct pbl_vibe *vibe) {
+  const struct pbl_vibe_pwm *dev = prv_get(vibe);
+
+  prv_raw_ctl(dev, false, 0);
+
+  return 0;
 }
+
+const struct pbl_vibe_ops pbl_vibe_pwm_ops = {
+  .init = prv_init,
+  .start = prv_start,
+  .stop = prv_stop,
+};

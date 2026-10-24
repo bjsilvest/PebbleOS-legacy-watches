@@ -6,19 +6,23 @@
 #include "bma255_private.h"
 #include "bma255_regs.h"
 
+#include <errno.h>
 #include <inttypes.h>
 
 #include <pbl/drivers/accel.h>
 #include <pbl/drivers/exti.h>
+#include <pbl/drivers/imu/bma255/bma255.h>
 #include <pbl/drivers/rtc.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/delay.h>
+#include <pbl/kernel/fatal.h>
 #include <pbl/logging/logging.h>
+#include <pbl/services/new_timer/new_timer.h>
 #include <pbl/util/math.h>
+#include <pbl/util/misc.h>
 #include <pbl/util/size.h>
 
 #include <board/board.h>
-#include <pbl/kernel/delay.h>
-#include <pbl/kernel/assert.h>
-#include <pbl/kernel/fatal.h>
 
 #define BMA255_DEBUG 0
 
@@ -41,6 +45,7 @@
 #define BMA255_FIFO_SIZE_BYTES       (BMA255_FIFO_MAX_FRAMES * BMA255_FIFO_FRAME_SIZE_BYTES)
 
 // Driver state
+static const struct pbl_bma255 *s_dev;
 static BMA255PowerMode s_accel_power_mode = BMA255PowerMode_Normal;
 static bool s_fifo_is_enabled = false;
 static bool s_shake_detection_enabled = false;
@@ -102,11 +107,29 @@ static struct {
   },
 };
 
-void accel_init(void) {
+static uint32_t prv_get_sampling_interval(void);
+static void prv_set_shake_sensitivity_high(bool sensitivity_high);
+
+static void prv_work_cb(void *data) {
+  void (*work)(void) = data;
+
+  pbl_accel_lock(&s_dev->accel);
+  work();
+  pbl_accel_unlock(&s_dev->accel);
+}
+
+//! Run driver work on the timer task, with the device lock held
+static void prv_queue_work_from_isr(void (*work)(void)) {
+  new_timer_add_work_callback_from_isr(prv_work_cb, (void *)work);
+}
+
+static int prv_init(const struct pbl_accel *accel) {
+  s_dev = container_of(accel, const struct pbl_bma255, accel);
+
   bma255_gpio_init();
   if (!bma255_query_whoami()) {
     PBL_LOG_ERR("Failed to query BMA255");
-    return;
+    return -ENODEV;
   }
   // Workaround to fix FIFO Frame Leakage: Disable temperature sensor (we're not using it anyways)
   // See Section 2.2.1 of
@@ -120,12 +143,8 @@ void accel_init(void) {
                      ExtiTrigger_Rising, prv_bma255_IRQ1_handler);
   exti_configure_pin(pbl_exti_stm32_config(&BOARD_CONFIG_ACCEL.accel_int_gpios[1]),
                      ExtiTrigger_Rising, prv_bma255_IRQ2_handler);
-}
 
-void accel_power_up(void) {
-}
-
-void accel_power_down(void) {
+  return 0;
 }
 
 bool bma255_query_whoami(void) {
@@ -217,7 +236,7 @@ static void prv_drain_fifo(void) {
   // static buffer for now. This should be safe because only one thread should be draining the data.
   static AccelDriverSample data[BMA255_FIFO_MAX_FRAMES];
   const uint64_t timestamp_us = prv_get_curr_system_time_ms() * 1000;
-  const uint32_t sampling_interval_us = accel_get_sampling_interval();
+  const uint32_t sampling_interval_us = prv_get_sampling_interval();
 
   uint8_t fifo_status = bma255_read_register(BMA255Register_FIFO_STATUS);
   BMA255_DBG("Drain %" PRIu8 " samples", num_samples_available);
@@ -244,7 +263,7 @@ static void prv_drain_fifo(void) {
     data[i].timestamp_us = timestamp_us - ((num_samples_available - i) * sampling_interval_us);
     BMA255_DBG("%2d: %" PRId16 " %" PRId16 " %" PRId16 " %" PRIu32, i, data[i].x, data[i].y,
                data[i].z, (uint32_t)data[i].timestamp_us);
-    accel_cb_new_sample(&data[i]);
+    pbl_accel_report_sample(&s_dev->accel, &data[i]);
   }
 
   // clear of fifo overrun flag must happen after draining samples, also the samples available will
@@ -266,7 +285,7 @@ static void prv_handle_data(void) {
 
   AccelDriverSample data;
   prv_read_curr_accel_data(&data);
-  accel_cb_new_sample(&data);
+  pbl_accel_report_sample(&s_dev->accel, &data);
 }
 
 static void prv_handle_motion_interrupts(void) {
@@ -296,7 +315,11 @@ static void prv_handle_motion_interrupts(void) {
     int32_t direction = ((int2_status & BMA255_INT_STATUS_2_SLOPE_SIGN) == 0) ? 1 : -1;
     direction *= (invert ? -1 : 1);
 
-    accel_cb_shake_detected(axis, direction);
+    pbl_accel_report_event(&s_dev->accel, &(const struct pbl_accel_event){
+                                            .type = PBL_ACCEL_EVENT_SHAKE,
+                                            .axis = axis,
+                                            .direction = direction,
+                                          });
   }
 }
 
@@ -305,7 +328,7 @@ static void prv_bma255_IRQ1_handler(void) {
   BMA255_DBG("Slope Int");
   if (!s_accel_outstanding_motion_work) {
     s_accel_outstanding_motion_work = true;
-    accel_offload_work_from_isr(prv_handle_motion_interrupts);
+    prv_queue_work_from_isr(prv_handle_motion_interrupts);
   }
 }
 
@@ -317,7 +340,7 @@ static void prv_bma255_IRQ2_handler(void) {
   BMA255_DBG("Data Int");
   if (!s_accel_outstanding_data_work) {
     s_accel_outstanding_data_work = true;
-    accel_offload_work_from_isr(prv_handle_data);
+    prv_queue_work_from_isr(prv_handle_data);
   }
 }
 
@@ -341,7 +364,7 @@ static void prv_update_accel_interrupts(bool enable, AccelOperatingMode mode) {
   }
 }
 
-uint32_t accel_get_sampling_interval(void) {
+static uint32_t prv_get_sampling_interval(void) {
   BMA255ODR odr_max = 0;
   for (uint32_t i = 0; i < ARRAY_LENGTH(s_operating_states); i++) {
     if (s_operating_states[i].enabled) {
@@ -482,7 +505,8 @@ static void prv_disable_operating_mode(AccelOperatingMode mode) {
   prv_configure_operating_mode();
 }
 
-uint32_t accel_set_sampling_interval(uint32_t interval_us) {
+static int prv_set_sampling_interval(const struct pbl_accel *accel, uint32_t interval_us,
+                                     uint32_t *actual_us) {
   BMA255SampleInterval actual_interval = prv_get_supported_sampling_interval(interval_us);
 
   // FIXME: For now, tie us to 125Hz. 125Hz is a rate that is easy enough to
@@ -496,11 +520,16 @@ uint32_t accel_set_sampling_interval(uint32_t interval_us) {
 
   prv_enable_operating_mode(AccelOperatingMode_Data, actual_interval);
 
-  return accel_get_sampling_interval();
+  *actual_us = prv_get_sampling_interval();
+  return 0;
+}
+
+static uint32_t prv_get_sampling_interval_op(const struct pbl_accel *accel) {
+  return prv_get_sampling_interval();
 }
 
 static void prv_configure_operating_mode(void) {
-  BMA255SampleInterval interval_us = accel_get_sampling_interval();
+  BMA255SampleInterval interval_us = prv_get_sampling_interval();
   const uint8_t odr = (uint8_t)prv_get_odr(interval_us);
   const uint8_t bw = s_odr_settings[odr].bw;
   const uint8_t tsleep = s_odr_settings[odr].tsleep;
@@ -520,7 +549,7 @@ static void prv_configure_operating_mode(void) {
   }
 }
 
-int accel_peek(AccelDriverSample *data) {
+static int prv_peek(const struct pbl_accel *accel, AccelDriverSample *data) {
   prv_read_curr_accel_data(data);
   return 0;
 }
@@ -585,7 +614,7 @@ static void prv_configure_fifo_interrupts(bool enable_int, bool use_fifo) {
   prv_update_accel_interrupts(enable_int, AccelOperatingMode_Data);
 }
 
-void accel_set_num_samples(uint32_t num_samples) {
+static int prv_set_num_samples(const struct pbl_accel *accel, uint32_t num_samples) {
   // Disable interrupts so they won't fire while we change sampling rate
   prv_configure_fifo_interrupts(false, false);
 
@@ -628,6 +657,8 @@ void accel_set_num_samples(uint32_t num_samples) {
   prv_configure_fifo_interrupts(enable_int, use_fifo);
 
   s_fifo_is_enabled = use_fifo;
+
+  return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -643,7 +674,7 @@ static void prv_enable_shake_detection(void) {
 
   // configure the anymotion interrupt to fire after 4 successive
   // samples are over the threhold specified
-  accel_set_shake_sensitivity_high(false /* sensitivity_high */);
+  prv_set_shake_sensitivity_high(false /* sensitivity_high */);
   bma255_write_register(BMA255Register_INT_5,
                         BMA255_INT_5_SLOPE_DUR_MASK << BMA255_INT_5_SLOPE_DUR_SHIFT);
 
@@ -657,10 +688,10 @@ static void prv_disable_shake_detection(void) {
   prv_disable_operating_mode(AccelOperatingMode_ShakeDetection);
 }
 
-void accel_enable_shake_detection(bool enable) {
+static int prv_set_shake_detection(const struct pbl_accel *accel, bool enable) {
   if (s_shake_detection_enabled == enable) {
     // the requested change matches what we already have!
-    return;
+    return 0;
   }
   PBL_LOG_DBG("%s shake detection", enable ? "Enabling" : "Disabling");
 
@@ -672,9 +703,11 @@ void accel_enable_shake_detection(bool enable) {
   }
 
   s_shake_detection_enabled = enable;
+
+  return 0;
 }
 
-void accel_set_shake_sensitivity_high(bool sensitivity_high) {
+static void prv_set_shake_sensitivity_high(bool sensitivity_high) {
   // Configure the threshold level at which the BMA255 will think shake has occurred
   const AccelConfig *cfg = &BOARD_CONFIG_ACCEL.accel_config;
   uint8_t threshold = s_shake_threshold ?: cfg->shake_thresholds[AccelThresholdHigh];
@@ -684,7 +717,12 @@ void accel_set_shake_sensitivity_high(bool sensitivity_high) {
   bma255_write_register(BMA255Register_INT_6, threshold);
 }
 
-void accel_set_shake_sensitivity_percent(uint8_t percent) {
+static int prv_set_shake_sensitivity_high_op(const struct pbl_accel *accel, bool high) {
+  prv_set_shake_sensitivity_high(high);
+  return 0;
+}
+
+static int prv_set_shake_sensitivity_percent(const struct pbl_accel *accel, uint8_t percent) {
   // Higher is more sensitive. The settings default (55, "Medium") keeps the
   // stock threshold, 100 is the stock high sensitivity one, 0 twice the stock.
   const int medium = 55;
@@ -700,25 +738,17 @@ void accel_set_shake_sensitivity_percent(uint8_t percent) {
   }
   s_shake_threshold = MIN(threshold, UINT8_MAX);
   bma255_write_register(BMA255Register_INT_6, s_shake_threshold);
+
+  return 0;
 }
 
-void accel_set_rotated(bool rotated) {
+static int prv_set_rotated(const struct pbl_accel *accel, bool rotated) {
   s_rotated_180 = rotated;
+  return 0;
 }
 
-uint32_t accel_get_max_num_samples(void) {
+static uint32_t prv_get_max_num_samples(const struct pbl_accel *accel) {
   return BMA255_FIFO_MAX_FRAMES;
-}
-
-bool accel_get_double_tap_detection_enabled(void) {
-  return false;
-}
-
-bool accel_get_shake_detection_enabled(void) {
-  return s_shake_detection_enabled;
-}
-
-void accel_enable_double_tap_detection(bool on) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -729,3 +759,16 @@ void accel_enable_double_tap_detection(bool on) {
   bma255_write_register(BMA255Register_BGW_SOFTRESET, BMA255_SOFT_RESET_VALUE);
   pbl_sleep_ms(4);
 }
+
+const struct pbl_accel_ops pbl_bma255_ops = {
+  .init = prv_init,
+  .set_rotated = prv_set_rotated,
+  .set_sampling_interval = prv_set_sampling_interval,
+  .get_sampling_interval = prv_get_sampling_interval_op,
+  .set_num_samples = prv_set_num_samples,
+  .get_max_num_samples = prv_get_max_num_samples,
+  .peek = prv_peek,
+  .set_shake_detection = prv_set_shake_detection,
+  .set_shake_sensitivity_high = prv_set_shake_sensitivity_high_op,
+  .set_shake_sensitivity_percent = prv_set_shake_sensitivity_percent,
+};

@@ -2,12 +2,19 @@
 /* SPDX-FileCopyrightText: 2026 Brian Silvestri */
 /* SPDX-License-Identifier: Apache-2.0 */
 
+#include <pbl/drivers/ambient/stm32_adc.h>
+#include <pbl/drivers/backlight/pwm.h>
 #include <pbl/drivers/dma/stm32.h>
 #include <pbl/drivers/i2c/stm32.h>
+#include <pbl/drivers/imu/bmi160/bmi160.h>
+#include <pbl/drivers/imu/mag3110/mag3110.h>
 #include <pbl/drivers/mic/stm32/i2s_pdm_definitions.h>
 #include <pbl/drivers/pmic/max14690.h>
+#include <pbl/drivers/temperature/stm32.h>
 #include <pbl/drivers/uart/stm32.h>
+#include <pbl/drivers/vibe/pwm.h>
 #include <pbl/kernel/irq.h>
+#include <pbl/util/size.h>
 
 #include <board/board.h>
 
@@ -76,8 +83,15 @@ PBL_IRQ_CONNECT(I2C1_EV, 12, pbl_i2c_stm32_ev_irq_handler, &s_i2c1, 0);
 PBL_IRQ_CONNECT(I2C1_ER, 12, pbl_i2c_stm32_er_irq_handler, &s_i2c1, 0);
 
 static const struct pbl_i2c_dev I2C_SLAVE_MAX14690 = PBL_I2C_DEV(&s_i2c1.bus, 0x28);
-static const struct pbl_i2c_dev I2C_SLAVE_MAG3110 = PBL_I2C_DEV(&s_i2c1.bus, 0x0e);
-const struct pbl_i2c_dev *const I2C_MAG3110 = &I2C_SLAVE_MAG3110;
+
+// Compass: MAG3110, data ready active high on PF14
+PBL_MAG3110_DEFINE(s_mag3110, &s_i2c1.bus, 0x0e, .int_gpio = PBL_GPIO(STM32_GPIOF, 14, 0),
+#ifdef CONFIG_BOARD_SPALDING
+                   .axis_map = {0, 1, 2}, .axis_dir = {1, -1, 1});
+#else
+                   .axis_map = {1, 0, 2}, .axis_dir = {-1, -1, 1});
+#endif
+const struct pbl_mag *const MAG = &s_mag3110.mag;
 
 // PMIC
 ///////////////////////////////////////////////////////////////////////////////
@@ -87,6 +101,83 @@ PBL_MAX14690_DEFINE(s_max14690, &s_i2c1.bus, &I2C_SLAVE_MAX14690,
                     .int_gpio = PBL_GPIO(STM32_GPIOG, 7, 0), .mon_adc_channel = ADC_Channel_1,
                     .mon_adc_pin = PBL_GPIO(STM32_GPIOA, 1, 0));
 const struct pbl_max14690 *const MAX14690 = &s_max14690;
+
+// Backlight: TIM12 CH1
+///////////////////////////////////////////////////////////////////////////////
+
+PBL_BACKLIGHT_PWM_DEFINE(s_backlight,
+                         .pwm =
+                             {
+                               .output = PBL_GPIO(STM32_GPIOB, 14, 0),
+                               .timer = TIM12,
+                               .rcc = RCC_APB1Periph_TIM12,
+                               .af = GPIO_AF_TIM12,
+                               .channel = 1,
+                             },
+                         .max_duty_cycle_percent = 100);
+const struct pbl_backlight *const BACKLIGHT = &s_backlight.backlight;
+
+// Vibe: H-bridge driven by TIM10 CH1, enabled by PF4
+///////////////////////////////////////////////////////////////////////////////
+
+PBL_VIBE_PWM_DEFINE(s_vibe, true,
+                    .pwm =
+                        {
+                          .output = PBL_GPIO(STM32_GPIOB, 8, 0),
+                          .timer = TIM10,
+                          .rcc = RCC_APB2Periph_TIM10,
+                          .apb2 = true,
+                          .af = GPIO_AF_TIM10,
+                          .channel = 1,
+                        },
+                    .ctl = PBL_GPIO(STM32_GPIOF, 4, 0));
+const struct pbl_vibe *const VIBE = &s_vibe.vibe;
+
+// Ambient light: phototransistor on ADC1 channel 2, powered by PA3
+///////////////////////////////////////////////////////////////////////////////
+
+#ifdef CONFIG_BOARD_SPALDING
+// Light sensor readings (3 s after the backlight went off) on a Pebble Time
+// Round in seven lighting conditions, against the middle of each condition's
+// usual lux range: the phototransistor jumps from the dark floor in the
+// faintest light, then rises slowly up to sunlight.
+static const struct pbl_als_lux_point s_als_lux_table[] = {
+  {236, 0},      // closet, near pitch dark
+  {2861, 2},     // dark room, light from a doorway
+  {2995, 10},    // dim room, one small lamp
+  {3589, 175},   // normal indoor light
+  {3636, 550},   // bright room, desk lamp
+  {3822, 3000},  // outdoors in shade
+  {4006, 10000}, // direct sunlight
+};
+
+static const struct pbl_als_scale s_als_scale = {
+  .table = s_als_lux_table,
+  .table_len = ARRAY_LENGTH(s_als_lux_table),
+};
+
+PBL_ALS_STM32_ADC_DEFINE(s_als, &s_als_scale, .enable = PBL_GPIO(STM32_GPIOA, 3, 0),
+                         .channel = ADC_Channel_2, .pin = PBL_GPIO(STM32_GPIOA, 2, 0));
+#else
+// PROVISIONAL lux conversion, until the sensor is calibrated against a lux
+// meter: the snowy dark floor read ~200 and a phone flashlight ~2900, taken
+// here as about 1000 lux. The dynamic backlight ramp works in lux. The dark
+// thresholds are the stock raw ones (3130, 3220) and the k delta (96)
+// converted with the same factor, so the backlight switches where it did.
+static const struct pbl_als_scale s_als_scale = {.offset = 200, .num = 10, .den = 27};
+
+PBL_ALS_STM32_ADC_DEFINE(s_als, &s_als_scale, .enable = PBL_GPIO(STM32_GPIOA, 3, 0),
+                         .channel = ADC_Channel_2, .pin = PBL_GPIO(STM32_GPIOC, 2, 0));
+#endif
+const struct pbl_als *const ALS = &s_als.als;
+
+// Accelerometer: BMI160 on SPI, see BOARD_CONFIG_ACCEL
+///////////////////////////////////////////////////////////////////////////////
+
+PBL_BMI160_DEFINE(s_bmi160);
+const struct pbl_accel *const ACCEL = &s_bmi160.accel;
+
+const struct pbl_temp *const DIE_TEMP = STM32_TEMP;
 
 // Microphone: I2S on SPI2
 ///////////////////////////////////////////////////////////////////////////////
