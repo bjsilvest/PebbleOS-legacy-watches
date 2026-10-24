@@ -9,10 +9,11 @@
 #include "option_menu.h"
 #include "window.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 
-#include <pbl/drivers/ambient_light.h>
+#include <pbl/drivers/als.h>
 #ifdef CONFIG_BT_CONTROLLER_DIAGNOSTICS
 #include <pbl/bluetooth/advert.h>
 #include <pbl/bluetooth/hci_uart.h>
@@ -26,6 +27,9 @@
 #define bt_controller_status  cc2564_status
 #define bt_controller_chip_id cc2564_chip_id
 #endif
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/delay.h>
+#include <pbl/kernel/fatal.h>
 #include <pbl/services/app_fetch_endpoint.h>
 #include <pbl/services/blob_db/api.h>
 #include <pbl/services/bluetooth/local_id.h>
@@ -44,13 +48,13 @@
 #include <applib/ui/dialogs/confirmation_dialog.h>
 #include <applib/ui/dialogs/dialog.h>
 #include <applib/ui/dialogs/expandable_dialog.h>
+#include <applib/ui/dialogs/simple_dialog.h>
 #include <applib/ui/option_menu_window.h>
 #include <applib/ui/ui.h>
 #include <kernel/core_dump.h>
 #include <kernel/event_loop.h>
 #include <kernel/pbl_malloc.h>
 #include <kernel/ui/modals/modal_manager.h>
-#include <kernel/util/sleep.h>
 #include <mfg/mfg_info.h>
 #include <mfg/mfg_serials.h>
 #include <process_management/app_manager.h>
@@ -58,8 +62,8 @@
 #include <shell/normal/battery_ui.h>
 #include <shell/prefs.h>
 #include <shell/system_app_ids.auto.h>
+#include <syscall/syscall.h>
 #include <system/bootbits.h>
-#include <system/passert.h>
 #include <system/reboot_reason.h>
 #include <system/version.h>
 
@@ -525,7 +529,7 @@ static void prv_maybe_trigger_core_dump() {
 /////////////////////////////
 
 static void prv_update_als_threshold_label(NumberWindow *number_window, SettingsSystemData *data) {
-  uint32_t current_reading = light_get_ambient_lux();
+  uint32_t current_reading = light_get_ambient_gate_lux();
   uint32_t current_threshold = (uint32_t)number_window_get_value(number_window);
   bool would_backlight_be_on = current_reading <= current_threshold;
 
@@ -562,10 +566,10 @@ static void prv_als_threshold_menu_push(SettingsSystemData *data) {
   // Give time for backlight to turn off
   // If we don't do this, the text may say the false result
   // until the user changes the value
-  psleep(200);
+  sys_psleep(200);
 
   // Get current ambient light reading to show backlight status
-  uint32_t current_reading = light_get_ambient_lux();
+  uint32_t current_reading = light_get_ambient_gate_lux();
   uint32_t current_threshold = backlight_get_ambient_threshold();
   bool would_backlight_be_on = current_reading <= current_threshold;
 
@@ -590,7 +594,7 @@ static void prv_als_threshold_menu_push(SettingsSystemData *data) {
 
   // Set reasonable min/max values for ALS threshold (lux domain)
   number_window_set_min(number_window, 0);
-  number_window_set_max(number_window, ambient_light_level_to_lux(AMBIENT_LIGHT_LEVEL_MAX));
+  number_window_set_max(number_window, pbl_als_to_lux(ALS, AMBIENT_LIGHT_LEVEL_MAX));
   number_window_set_step_size(number_window, 1);
   number_window_set_value(number_window, (int32_t)current_threshold);
 
@@ -758,7 +762,7 @@ static void prv_debugging_select_callback(MenuLayer *menu_layer, MenuIndex *cell
       break;
 #endif
     default:
-      WTF;
+      pbl_panic();
   }
   menu_layer_reload_data(menu_layer);
 }
@@ -1413,9 +1417,24 @@ static void prv_push_kcc_window(SystemCertificationData *data) {
 // Callbacks for the main settings filter list menu.
 ////////////////////////////////////////////////////
 
+static void prv_push_unplug_to_shut_down_dialog(void) {
+  SimpleDialog *simple_dialog = simple_dialog_create("Shutdown Unplug");
+  Dialog *dialog = simple_dialog_get_dialog(simple_dialog);
+
+  dialog_set_text(dialog, i18n_get("Disconnect the charger to shut down.", simple_dialog));
+  dialog_set_icon(dialog, RESOURCE_ID_GENERIC_WARNING_LARGE);
+  dialog_set_timeout(dialog, DIALOG_TIMEOUT_INFINITE);
+
+  i18n_free_all(simple_dialog);
+
+  simple_dialog_push(simple_dialog, modal_manager_get_window_stack(ModalPriorityGeneric));
+}
+
 static void prv_shutdown_confirm_cb(ClickRecognizerRef recognizer, void *context) {
   actionable_dialog_pop((ActionableDialog *)context);
-  battery_ui_handle_shut_down();
+  if (battery_ui_handle_shut_down() == -EBUSY) {
+    prv_push_unplug_to_shut_down_dialog();
+  }
 }
 
 static void prv_shutdown_back_cb(ClickRecognizerRef recognizer, void *context) {
@@ -1466,7 +1485,7 @@ static void prv_draw_row_cb(SettingsCallbacks *context, GContext *ctx, const Lay
     case SystemMenuItem_Count:
       break;
     default:
-      WTF;
+      pbl_panic();
   }
   menu_cell_basic_draw(ctx, cell_layer, i18n_get(s_item_titles[row], data), subtitle, nullptr);
 }
@@ -1498,7 +1517,7 @@ static void prv_select_click_cb(SettingsCallbacks *context, uint16_t row) {
       settings_factory_reset_window_push();
       break;
     default:
-      WTF;
+      pbl_panic();
   }
   settings_menu_reload_data(SettingsMenuItemSystem);
 }

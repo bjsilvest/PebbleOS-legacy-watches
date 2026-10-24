@@ -16,17 +16,6 @@
 #include <fake_gatt_client_subscriptions.h>
 #include <fake_pebble_tasks.h>
 #include <fake_rtc.h>
-#include <stubs_app_install_manager.h>
-#include <stubs_app_manager.h>
-#include <stubs_bt_lock.h>
-#include <stubs_hexdump.h>
-#include <stubs_imaging.h>
-#include <stubs_logging.h>
-#include <stubs_mutex.h>
-#include <stubs_passert.h>
-#include <stubs_pbl_malloc.h>
-#include <stubs_serial.h>
-#include <stubs_tick.h>
 
 struct {
   enum pbl_bt_response_time_state state;
@@ -131,8 +120,7 @@ void test_ams__discover_of_ams_should_subscribe_to_entity_update_characteristic(
 
   // The first instance is expected to be used.
   pbl_bt_characteristic_t entity_update = s_characteristics[0][AMSCharacteristicEntityUpdate];
-  fake_gatt_client_subscriptions_assert_subscribe(entity_update, BLESubscriptionNotifications,
-                                                  GAPLEClientKernel);
+  fake_gatt_client_subscriptions_assert_subscribe(entity_update, BLESubscriptionNotifications);
 }
 
 void test_ams__connect_to_music_service_upon_subscribing_entity_update_characteristic(void) {
@@ -200,7 +188,7 @@ void test_ams__register_for_entity_updates(void) {
 
   // Expect to have written the command to register for the Player entity:
   fake_gatt_client_op_assert_write(entity_update, s_register_player_entity,
-                                   sizeof(s_register_player_entity), GAPLEClientKernel,
+                                   sizeof(s_register_player_entity),
                                    true /* is_response_required */);
   ams_handle_write_response(entity_update, PBL_BT_GATT_ERROR_SUCCESS);
 
@@ -208,7 +196,7 @@ void test_ams__register_for_entity_updates(void) {
 
   // Expect to have written the command to register for the Queue entity:
   fake_gatt_client_op_assert_write(entity_update, s_register_queue_entity,
-                                   sizeof(s_register_queue_entity), GAPLEClientKernel,
+                                   sizeof(s_register_queue_entity),
                                    true /* is_response_required */);
   ams_handle_write_response(entity_update, PBL_BT_GATT_ERROR_SUCCESS);
 
@@ -216,7 +204,7 @@ void test_ams__register_for_entity_updates(void) {
 
   // Expect to have written the command to register for the Track entity:
   fake_gatt_client_op_assert_write(entity_update, s_register_track_entity,
-                                   sizeof(s_register_track_entity), GAPLEClientKernel,
+                                   sizeof(s_register_track_entity),
                                    true /* is_response_required */);
   ams_handle_write_response(entity_update, PBL_BT_GATT_ERROR_SUCCESS);
 
@@ -250,7 +238,7 @@ void test_ams__register_for_entity_updates_retry_if_out_of_resources(void) {
 
   // Expect to have written the command to register for the Player entity:
   fake_gatt_client_op_assert_write(entity_update, s_register_player_entity,
-                                   sizeof(s_register_player_entity), GAPLEClientKernel,
+                                   sizeof(s_register_player_entity),
                                    true /* is_response_required */);
   ams_handle_write_response(entity_update, PBL_BT_GATT_ERROR_SUCCESS);
 }
@@ -343,7 +331,7 @@ void test_ams__send_remote_command(void) {
 
     pbl_bt_characteristic_t remote_command = s_characteristics[0][AMSCharacteristicRemoteCommand];
     const uint8_t ams_cmd = prv_ams_command_for_music_command(music_cmd);
-    fake_gatt_client_op_assert_write(remote_command, &ams_cmd, sizeof(ams_cmd), GAPLEClientKernel,
+    fake_gatt_client_op_assert_write(remote_command, &ams_cmd, sizeof(ams_cmd),
                                      true /* is_response_required */);
 
     // Simulate receiving the response:
@@ -369,7 +357,7 @@ void test_ams__send_remote_command_non_kernel_main_task(void) {
 
   pbl_bt_characteristic_t remote_command = s_characteristics[0][AMSCharacteristicRemoteCommand];
   const uint8_t ams_cmd = prv_ams_command_for_music_command(MusicCommandPlay);
-  fake_gatt_client_op_assert_write(remote_command, &ams_cmd, sizeof(ams_cmd), GAPLEClientKernel,
+  fake_gatt_client_op_assert_write(remote_command, &ams_cmd, sizeof(ams_cmd),
                                    true /* is_response_required */);
 }
 
@@ -684,7 +672,7 @@ void test_ams__supported_capabilities(void) {
 ///////////////////////////////////////////////////////////
 
 void test_ams__create_again_trips_assert(void) {
-  cl_assert_passert(ams_create());
+  cl_assert_panic(ams_create());
 }
 
 void test_ams__create_works_again_after_destroy(void) {

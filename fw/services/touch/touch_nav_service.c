@@ -5,6 +5,7 @@
 
 #ifdef CONFIG_TOUCH
 
+#include <pbl/kernel/syscall.h>
 #include <pbl/services/touch/touch.h>
 
 #include <applib/graphics/gtypes.h>
@@ -15,7 +16,6 @@
 #include <process_management/process_manager.h>
 #include <process_state/app_state/app_state.h>
 #include <syscall/syscall.h>
-#include <syscall/syscall_internal.h>
 
 // --- Action-bar snapshot publish (applib -> current task's nav state) --------------------------
 
@@ -32,10 +32,8 @@ static TouchNavState *prv_current_touch_nav_state(void) {
   }
 }
 
-DEFINE_SYSCALL(void, sys_touch_set_action_bar, const GRect *frame, uint8_t icon_mask) {
-  if (PRIVILEGE_WAS_ELEVATED && frame) {
-    syscall_assert_userspace_buffer(frame, sizeof(*frame));
-  }
+PBL_SYSCALL(void, sys_touch_set_action_bar, (IN_OPT, const GRect *, frame),
+            (VAL, uint8_t, icon_mask)) {
   TouchNavState *state = prv_current_touch_nav_state();
   if (!state) {
     return;
@@ -46,16 +44,6 @@ DEFINE_SYSCALL(void, sys_touch_set_action_bar, const GRect *frame, uint8_t icon_
     local_frame = *frame;
   }
   touch_nav_set_action_bar(state, frame ? &local_frame : nullptr, icon_mask);
-}
-
-// --- App opt-in (applib app_touch_navigation_enable -> app-task participation) -----------------
-
-DEFINE_SYSCALL(void, sys_app_touch_navigation_enable, bool enable) {
-  // App-facing opt-in: only the app task has a per-app participation flag / nav twin to reconcile.
-  if (pebble_task_get_current() != PebbleTask_App) {
-    return;
-  }
-  app_touch_nav_set_participating(enable);
 }
 
 // --- KernelMain-bound effects -----------------------------------------------------------------

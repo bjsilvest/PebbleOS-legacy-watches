@@ -9,10 +9,10 @@
 #include <math.h>
 
 #include <pbl/drivers/battery.h>
-#include <pbl/drivers/exti.h>
 #include <pbl/drivers/i2c.h>
 #include <pbl/drivers/pmic.h>
 #include <pbl/drivers/pmic/npm1300.h>
+#include <pbl/kernel/delay.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/system_task.h>
 #include <pbl/util/bits.h>
@@ -21,8 +21,6 @@
 
 #include <board/board.h>
 #include <kernel/events.h>
-#include <kernel/util/delay.h>
-#include <kernel/util/sleep.h>
 
 PBL_LOG_MODULE_DEFINE(driver_pmic_npm1300, CONFIG_DRIVER_PMIC_LOG_LEVEL);
 
@@ -298,7 +296,7 @@ static void prv_pmic_state_change_cb(void *null) {
                   prv_handle_charge_state_change, nullptr, 0 /*flags*/);
 }
 
-static void prv_npm1300_interrupt_handler(void) {
+static void prv_npm1300_interrupt_handler(void *arg) {
   system_task_add_callback_from_isr(prv_pmic_state_change_cb, nullptr);
 }
 
@@ -414,34 +412,45 @@ int pbl_npm1300_charger_init(const struct pbl_device *dev) {
     return ret;
   }
 
-  exti_configure_pin(charger->irq, ExtiTrigger_Rising, prv_npm1300_interrupt_handler);
-  exti_enable(charger->irq);
+  ret = pbl_device_init(&charger->irq.intc->dev);
+  if (ret != 0) {
+    PBL_LOG_ERR("Interrupt controller unavailable");
+    return ret;
+  }
+
+  ret = pbl_intc_request(&charger->irq, prv_npm1300_interrupt_handler, nullptr);
+  if (ret != 0) {
+    PBL_LOG_ERR("Could not request the interrupt (%d)", ret);
+    return ret;
+  }
+
+  ret = pbl_intc_enable(&charger->irq);
+  if (ret != 0) {
+    PBL_LOG_ERR("Could not enable the interrupt (%d)", ret);
+    return ret;
+  }
 
   return 0;
 }
 
-bool pmic_power_off(void) {
-  // TODO: review implementation, see GH-238
+int pmic_power_off(void) {
+  int ret;
+
+  // Ship mode exits as soon as VBUS is present
   if (pmic_is_usb_connected()) {
-    PBL_LOG_ERR("USB is connected, cannot power off");
-    return false;
+    return -EBUSY;
   }
 
-  if (prv_write_register(NPM1300_TASKENTERSHIPMODE, 1) != 0) {
-    PBL_LOG_ERR("Failed to enter ship mode");
-    return false;
+  ret = prv_write_register(NPM1300_TASKENTERSHIPMODE, 1);
+  if (ret != 0) {
+    PBL_LOG_ERR("Failed to enter ship mode (%d)", ret);
+    return ret;
   }
 
-  // Give enough time for the PMIC to fully power down (tPWRDN = 100ms).
-  // We will die here, if we do not, return false and let upper layers handle
-  // the shutdown failure.
-  delay_us(100000);
+  // tPWRDN is 100 ms
+  pbl_busy_wait_us(100000);
 
-  return false;
-}
-
-bool pmic_full_power_off(void) {
-  return pmic_power_off();
+  return -ETIMEDOUT;
 }
 
 uint16_t pmic_get_vsys(void) {
@@ -461,7 +470,7 @@ uint16_t pmic_get_vsys(void) {
       return 0;
     }
     if ((reg & NPM1300_EVENTSADC_VSYSRDY) == 0) {
-      psleep(ADC_POLL_DELAY_MS);
+      pbl_sleep_ms(ADC_POLL_DELAY_MS);
       elapsed += ADC_POLL_DELAY_MS;
     }
   }
@@ -497,7 +506,7 @@ int battery_get_millivolts(void) {
       return 0;
     }
     if ((reg & NPM1300_EVENTSADC_VBATRDY) == 0) {
-      psleep(ADC_POLL_DELAY_MS);
+      pbl_sleep_ms(ADC_POLL_DELAY_MS);
       elapsed += ADC_POLL_DELAY_MS;
     }
   }
@@ -574,7 +583,7 @@ int battery_get_constants(BatteryConstants *constants) {
       return ret;
     }
     if ((reg & NPM1300_EVENTSADC_VBATRDY) == 0U) {
-      psleep(ADC_POLL_DELAY_MS);
+      pbl_sleep_ms(ADC_POLL_DELAY_MS);
       elapsed += ADC_POLL_DELAY_MS;
     }
   }
@@ -604,7 +613,7 @@ int battery_get_constants(BatteryConstants *constants) {
       return ret;
     }
     if ((reg & NPM1300_EVENTSADC_IBATRDY) == 0U) {
-      psleep(ADC_POLL_DELAY_MS);
+      pbl_sleep_ms(ADC_POLL_DELAY_MS);
       elapsed += ADC_POLL_DELAY_MS;
     }
   }
@@ -634,7 +643,7 @@ int battery_get_constants(BatteryConstants *constants) {
       return ret;
     }
     if ((reg & NPM1300_EVENTSADC_NTCRDY) == 0U) {
-      psleep(ADC_POLL_DELAY_MS);
+      pbl_sleep_ms(ADC_POLL_DELAY_MS);
       elapsed += ADC_POLL_DELAY_MS;
     }
   }

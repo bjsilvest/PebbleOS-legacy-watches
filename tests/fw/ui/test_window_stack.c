@@ -15,28 +15,7 @@
 // Stubs
 ////////////////////////////////////
 
-#include <stubs_accel_service.h>
 #include <stubs_app_state.h>
-#include <stubs_app_timer.h>
-#include <stubs_ble_app_support.h>
-#include <stubs_event_service_client.h>
-#include <stubs_fonts.h>
-#include <stubs_gbitmap.h>
-#include <stubs_graphics.h>
-#include <stubs_graphics_context.h>
-#include <stubs_heap.h>
-#include <stubs_irq.h>
-#include <stubs_logging.h>
-#include <stubs_new_timer.h>
-#include <stubs_passert.h>
-#include <stubs_persist.h>
-#include <stubs_plugin_service.h>
-#include <stubs_print.h>
-#include <stubs_process_manager.h>
-#include <stubs_resources.h>
-#include <stubs_sem.h>
-#include <stubs_syscalls.h>
-#include <stubs_unobstructed_area.h>
 
 // Fakes
 ////////////////////////////////////
@@ -1390,7 +1369,7 @@ void test_window_stack__pop_during_window_unload(void) {
   cl_assert_equal_i(window_stack_count(stack), 0);
   cl_assert_equal_i(prv_get_load_unload_count(), 0);
   cl_assert_equal_i(prv_get_appear_disappear_count(), 0);
-  // FIXME: PBL-25460
+  // TODO: the transition stays scheduled after the window is unloaded
   //  cl_assert_equal_b(animation_is_scheduled(fake_animation_get_first_animation()), false);
 }
 

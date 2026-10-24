@@ -4,7 +4,9 @@
 #include <pbl/drivers/display/display.h>
 #include <pbl/drivers/touch/touch_sensor.h>
 #include <pbl/input/input.h>
+#include <pbl/kernel/assert.h>
 #include <pbl/kernel/mutex.h>
+#include <pbl/kernel/syscall.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/analytics/analytics.h>
 #include <pbl/services/event_service.h>
@@ -16,8 +18,6 @@
 #include <kernel/events.h>
 #include <kernel/pebble_tasks.h>
 #include <syscall/syscall.h>
-#include <syscall/syscall_internal.h>
-#include <system/passert.h>
 
 PBL_LOG_MODULE_DEFINE(service_touch, CONFIG_SERVICE_TOUCH_LOG_LEVEL);
 
@@ -76,6 +76,15 @@ static void prv_remove_subscriber_cb(PebbleTask task) {
     s_app_nav_active = false;
   }
   PBL_LOG_DBG("Touch: subscriber removed, count=%" PRIu8, s_subscriber_count);
+  pbl_mutex_unlock(&s_touch_mutex);
+}
+
+void touch_process_cleanup(PebbleTask task) {
+  pbl_mutex_lock(&s_touch_mutex, PBL_FOREVER);
+  s_raw_subscriber_tasks &= (uint8_t)~(1u << task);
+  if (task == PebbleTask_App) {
+    s_app_nav_active = false;
+  }
   pbl_mutex_unlock(&s_touch_mutex);
 }
 
@@ -149,19 +158,26 @@ bool touch_service_is_globally_enabled(void) {
   return enabled;
 }
 
-DEFINE_SYSCALL(bool, sys_touch_service_is_enabled, void) {
+PBL_SYSCALL(bool, sys_touch_service_is_enabled) {
   return touch_service_is_globally_enabled();
 }
 
-DEFINE_SYSCALL(bool, sys_touch_nav_enabled, void) {
+PBL_SYSCALL(bool, sys_touch_nav_enabled) {
   return touch_nav_enabled();
 }
 
-DEFINE_SYSCALL(bool, sys_touch_app_nav_active, void) {
+PBL_SYSCALL(bool, sys_touch_app_nav_active) {
   return touch_app_nav_active();
 }
 
-DEFINE_SYSCALL(void, sys_touch_set_raw_subscribed, bool subscribed) {
+PBL_SYSCALL(void, sys_touch_set_app_nav_active, (VAL, bool, active)) {
+  if (pebble_task_get_current() != PebbleTask_App) {
+    return;
+  }
+  touch_set_app_nav_active(active);
+}
+
+PBL_SYSCALL(void, sys_touch_set_raw_subscribed, (VAL, bool, subscribed)) {
   const PebbleTask task = pebble_task_get_current();
   pbl_mutex_lock(&s_touch_mutex, PBL_FOREVER);
   if (subscribed) {
@@ -172,7 +188,7 @@ DEFINE_SYSCALL(void, sys_touch_set_raw_subscribed, bool subscribed) {
   pbl_mutex_unlock(&s_touch_mutex);
 }
 
-DEFINE_SYSCALL(void, sys_touch_reset, void) {
+PBL_SYSCALL(void, sys_touch_reset) {
   touch_reset();
 }
 

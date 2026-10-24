@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/delay.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/new_timer/new_timer.h>
 #include <pbl/util/byteorder.h>
@@ -13,8 +15,6 @@
 #include <console/control_protocol_impl.h>
 #include <console/pulse2_transport_impl.h>
 #include <kernel/events.h>
-#include <kernel/util/sleep.h>
-#include <system/passert.h>
 
 #define MAX_CONFIGURE      (10)
 #define MAX_TERMINATE      (2)
@@ -421,7 +421,7 @@ void ppp_control_protocol_close(PPPControlProtocol *this, PPPCPCloseWait wait) {
       if (state == LinkState_Initial || state == LinkState_Closed) {
         return;
       }
-      psleep(2);
+      pbl_sleep_ms(2);
     }
   }
 }

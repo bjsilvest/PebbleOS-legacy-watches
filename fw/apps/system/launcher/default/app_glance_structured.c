@@ -6,6 +6,7 @@
 #include "app_glance_private.h"
 #include "menu_layer.h"
 
+#include <pbl/kernel/assert.h>
 #include <pbl/kernel/compiler.h>
 #include <pbl/services/timeline/attribute.h>
 #include <pbl/util/string.h>
@@ -17,7 +18,6 @@
 #include <process_management/app_install_manager.h>
 #include <resource/resource_ids.auto.h>
 #include <shell/prefs.h>
-#include <system/passert.h>
 
 // Use display height to determine icon margins: larger displays use more margin
 #if PBL_DISPLAY_HEIGHT >= 200
@@ -274,7 +274,7 @@ static bool prv_get_text_scroll_vars(GContext *ctx, uint32_t cumulative_elapsed_
       pause_at_start_ms + normal_scroll_duration_ms + pause_at_end_ms + rewind_scroll_duration_ms;
   vars_out->duration_ms = scroll_duration_ms;
 
-  // Technically mod isn't necessary right now, but it's needed for looping eventually (PBL-40544)
+  // Technically mod isn't necessary right now, but it's needed for looping eventually
   int64_t elapsed_ms = cumulative_elapsed_ms % scroll_duration_ms;
   const uint32_t end_of_normal_scroll_duration_ms = pause_at_start_ms + normal_scroll_duration_ms;
   bool rewind = false;
@@ -455,6 +455,7 @@ static void prv_draw_processed(KinoReel *reel, GContext *ctx, GPoint offset,
   }
 
   GRect glance_frame = (GRect){.origin = offset, .size = structured_glance->glance.size};
+  const LauncherMenuLayerStyle *style = launcher_menu_layer_get_style();
 #if PBL_ROUND && PBL_DISPLAY_HEIGHT >= 200
   // For a circle: x = R - sqrt(R^2 - (y - R)^2), where R = display_size / 2
   const int16_t radius = PBL_DISPLAY_HEIGHT / 2;
@@ -469,14 +470,10 @@ static void prv_draw_processed(KinoReel *reel, GContext *ctx, GPoint offset,
   // Clamp to avoid negative sqrt when row is outside the circle (during scroll animations)
   const int32_t sqrt_arg = MAX(0, radius_sq - y_offset_sq);
   const int16_t circle_inset = radius - integer_sqrt(sqrt_arg);
-  // Add base inset for padding from the actual circle edge
-  // Extra 2px shift for non-center rows to push content slightly more inward
-  const int16_t base_inset = 10;
-  const int16_t horizontal_inset = base_inset + circle_inset;
-#elif PBL_DISPLAY_HEIGHT >= 200 && PBL_RECT
-  const int16_t horizontal_inset = 10;
+  // The style's inset pads the glance from the actual circle edge
+  const int16_t horizontal_inset = style->glance_inset + circle_inset;
 #else
-  const int16_t horizontal_inset = PBL_IF_RECT_ELSE(6, 23);
+  const int16_t horizontal_inset = style->glance_inset;
 #endif
   glance_frame = grect_inset_internal(glance_frame, horizontal_inset, 0);
   // A row dragged to the display edge can be entirely outside the circle; grect_inset then
@@ -515,7 +512,7 @@ static bool prv_set_elapsed(KinoReel *reel, uint32_t elapsed_ms) {
 }
 
 static uint32_t prv_get_duration(KinoReel *reel) {
-  // TODO PBL-40544: Loop the selection animation
+  // TODO: loop the selection animation
   LauncherAppGlanceStructured *structured_glance = kino_reel_custom_get_data(reel);
   return NULL_SAFE_FIELD_ACCESS(structured_glance, selection_animation_duration_ms, 0);
 }

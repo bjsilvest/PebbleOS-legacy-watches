@@ -40,5 +40,5 @@ void kernel_prep_c(void) {
 
   main();
 
-  KERNEL_ASSERT(false);
+  PBL_ASSERTN(false);
 }

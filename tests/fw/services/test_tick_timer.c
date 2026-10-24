@@ -10,9 +10,6 @@
 #include <fake_pebble_tasks.h>
 #include <fake_regular_timer.h>
 #include <kernel/events.h>
-#include <stubs_logging.h>
-#include <stubs_mutex.h>
-#include <stubs_passert.h>
 #include <syscall/syscall.h>
 
 // The App task's queue to KernelMain.
@@ -39,7 +36,7 @@ time_t rtc_get_time(void) {
   return 0;
 }
 
-void syscall_failed(void) {
+void pbl_syscall_fail(void) {
   abort();
 }
 

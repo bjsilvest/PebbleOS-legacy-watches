@@ -16,18 +16,6 @@
 #define GPIO_Port_NULL nullptr
 #define GPIO_Pin_NULL  0U
 
-typedef enum {
-  GPIO_PuPd_NOPULL,
-  GPIO_PuPd_UP,
-  GPIO_PuPd_DOWN,
-} GPIOPuPd_TypeDef;
-
-typedef struct {
-  GPIO_TypeDef *const peripheral; ///< One of GPIOX. For example, GPIOA.
-  const uint32_t gpio_pin;        ///< One of GPIO_Pin_X.
-  GPIOPuPd_TypeDef pull;          ///< Pull-up / pull-down configuration for the pin
-} ExtiConfig;
-
 typedef struct {
   int pad;
   pin_function func;
@@ -50,19 +38,10 @@ typedef struct {
 } PwmConfig;
 
 typedef struct {
-  const struct pbl_gpio ctl;
-} BoardConfigActuator;
-
-typedef struct {
   uint8_t backlight_on_percent;
   // ambient light config
   uint32_t ambient_light_dark_threshold;
   uint32_t ambient_k_delta_threshold;
-  // Raw-count -> lux conversion: lux = (level - offset) * num / den.
-  // den == 0 means no conversion available for this board.
-  uint32_t ambient_light_lux_dark_offset;
-  uint32_t ambient_light_lux_num;
-  uint32_t ambient_light_lux_den;
 #ifdef CONFIG_BACKLIGHT_HAS_COLOR
   // Default RGB backlight color (packed 0x00RRGGBB), applied when no app
   // override is set. User-preference overrides this via backlight_set_color().
@@ -92,15 +71,6 @@ typedef struct {
 typedef struct {
   uint8_t default_motion_sensitivity;
 } BoardConfigAccel;
-
-typedef struct {
-  int axes_offsets[3];
-  bool axes_inverts[3];
-} MagConfig;
-
-typedef struct {
-  const MagConfig mag_config;
-} BoardConfigMag;
 
 #include <pbl/drivers/display/sf32lb/display_jdi.h>
 #include <pbl/drivers/flash/qspi_flash_definitions.h>

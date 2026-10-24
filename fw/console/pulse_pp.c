@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include <pbl/bluetooth/comm.h>
+#include <pbl/kernel/assert.h>
 #include <pbl/kernel/compiler.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/comm_session/session_transport.h>
@@ -14,7 +15,6 @@
 #include <kernel/event_loop.h>
 #include <kernel/events.h>
 #include <kernel/pbl_malloc.h>
-#include <system/passert.h>
 
 #define PULSE_PP_OPCODE_DATA  (1)
 #define PULSE_PP_OPCODE_OPEN  (2)
@@ -186,8 +186,10 @@ unlock:
 static void prv_pulse_pp_send_cb(void *data) {
   PulsePPCallbackPacket *cb_data = data;
   uint8_t *resp = pulse_reliable_send_begin(PULSE2_PEBBLE_PROTOCOL);
-  memcpy(resp, &cb_data->packet, cb_data->packet_length);
-  pulse_reliable_send(resp, cb_data->packet_length);
+  if (resp) {
+    memcpy(resp, &cb_data->packet, cb_data->packet_length);
+    pulse_reliable_send(resp, cb_data->packet_length);
+  }
   kernel_free(data);
 }
 

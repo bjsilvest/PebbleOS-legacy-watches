@@ -1,13 +1,14 @@
 /* SPDX-FileCopyrightText: 2024 Google LLC */
 /* SPDX-License-Identifier: Apache-2.0 */
 
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/filesystem/pfs.h>
 #include <pbl/services/settings/settings_raw_iter.h>
 #include <pbl/util/math.h>
 
 #include <kernel/pbl_malloc.h>
-#include <system/passert.h>
 
 PBL_LOG_MODULE_DECLARE(service_settings, CONFIG_SERVICE_SETTINGS_LOG_LEVEL);
 
@@ -64,7 +65,7 @@ static uint8_t *read_file_into_ram(SettingsRawIter *iter) {
   // that way we should be able to avoid getting into a reboot loop.
   pfs_close_and_remove(iter->fd);
   PBL_LOG_ERR("Data at address %p. Rebooting...", contents);
-  PBL_CROAK("Internal logic error.");
+  pbl_panic("Internal logic error.");
 }
 
 static int sfs_seek(SettingsRawIter *iter, int amount, int whence) {
@@ -84,6 +85,9 @@ static int sfs_pos(SettingsRawIter *iter) {
 }
 
 static int sfs_read(SettingsRawIter *iter, uint8_t *data, int data_len) {
+  if (data_len == 0) {
+    return 0;
+  }
   status_t status = pfs_read(iter->fd, data, data_len);
   if (status >= 0) {
     return status;
@@ -96,6 +100,9 @@ static int sfs_read(SettingsRawIter *iter, uint8_t *data, int data_len) {
 }
 
 static int sfs_write(SettingsRawIter *iter, const uint8_t *data, int data_len) {
+  if (data_len == 0) {
+    return 0;
+  }
   status_t status = pfs_write(iter->fd, data, data_len);
   if (status >= 0) {
     return status;

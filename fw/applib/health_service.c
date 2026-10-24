@@ -6,6 +6,8 @@
 #include "event_service_client.h"
 #include "health_service_private.h"
 
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/activity/activity.h>
 #include <pbl/services/hrm/hrm_manager.h>
@@ -25,7 +27,6 @@
 #include <process_state/worker_state/worker_state.h>
 #include <shell/prefs_syscalls.h>
 #include <syscall/syscall.h>
-#include <system/passert.h>
 
 // Fetching minute history can take a while, so we limit the amount of data we will ever access
 // in one call to this
@@ -62,7 +63,7 @@ static HealthAggregation prv_default_aggregation(HealthMetric metric) {
     case HealthMetricHeartRateRawBPM:
       return HealthAggregationAvg;
   }
-  WTF;
+  pbl_panic();
   return 0;
 }
 
@@ -76,7 +77,7 @@ static HealthServiceState *prv_get_state(bool ensure_cache_initialized) {
   } else if (task == PebbleTask_Worker) {
     result = worker_state_get_health_service_state();
   } else {
-    WTF;
+    pbl_panic();
   }
 
   // clients can free the cache by calling health_service_events_unsubscribe()
@@ -98,7 +99,7 @@ static void prv_health_service_deinit_cache(HealthServiceState *state) {
 // ----------------------------------------------------------------------------------------------
 // returns a time_t of a given time that represents midnight of the given local time.
 static time_t prv_get_midnight_of_local_time(time_t now) {
-  struct tm *local_tm = pbl_override_gmtime(&now);
+  struct pbl_tm *local_tm = pbl_override_gmtime(&now);
   local_tm->tm_hour = 0;
   local_tm->tm_min = 0;
   local_tm->tm_sec = 0;
@@ -136,7 +137,7 @@ static ActivityMetric prv_get_activity_metric(HealthMetric metric) {
     case HealthMetricHeartRateRawBPM:
       return ActivityMetricHeartRateRawBPM;
   }
-  WTF;
+  pbl_panic();
   return 0;
 }
 
@@ -187,7 +188,7 @@ static bool prv_metric_aggregation_implemented(HealthMetric metric, time_t time_
       }
       break;
   }
-  WTF;
+  pbl_panic();
 }
 
 // ----------------------------------------------------------------------------------------------
@@ -235,7 +236,7 @@ static bool prv_get_metric_stats(HealthServiceState *state, HealthMetric metric,
 
   // What day of the week is it now?
   const time_t now_utc = sys_get_time();
-  struct tm *local_tm = pbl_override_localtime(&now_utc);
+  struct pbl_tm *local_tm = pbl_override_localtime(&now_utc);
 
   // Compute weekly, weekday, and daily stats
   *stats = (HealthServiceMetricStats){};
@@ -361,7 +362,7 @@ static bool prv_get_intraday_averages(HealthServiceState *state, HealthMetric me
 static HealthValue prv_sum_intraday_averages(ActivityMetricAverages *averages, time_t time_start,
                                              time_t time_end) {
   PBL_ASSERTN((time_end - time_start) <= PBL_SEC_PER_DAY);
-  struct tm *local_tm = pbl_override_localtime(&time_start);
+  struct pbl_tm *local_tm = pbl_override_localtime(&time_start);
 
   // Add up the metric averages for the passed in time range
   time_t chunk_start_time = time_start;
@@ -466,7 +467,7 @@ static HealthServiceAccessibilityMask prv_get_range_and_daily_history(
     HealthServiceTimeRange *time_range, HealthServiceDailyHistory *daily_history) {
   PBL_ASSERTN((time_range != nullptr) && (daily_history != nullptr));
 
-  // TODO: PBL-31628 permission system to reply with HealthServiceAccessibilityMaskNoPermission
+  // TODO: reply with HealthServiceAccessibilityMaskNoPermission once permissions exist
 
   if (!prv_get_metric_daily_history(state, metric, daily_history)) {
     return HealthServiceAccessibilityMaskNotAvailable;
@@ -569,7 +570,7 @@ static HealthValue prv_compute_aggregate_averaged_using_daily_totals(
   // What day of the week is the scope for? For now, we will use the day of the week that
   // time_start falls on. In the future, we could be better about blending weekday with weekend
   // if the time range spans both
-  struct tm *local_tm = pbl_override_localtime(&time_start);
+  struct pbl_tm *local_tm = pbl_override_localtime(&time_start);
   bool is_weekend = prv_is_weekend(local_tm->tm_wday);
 
   // Compute all stats
@@ -640,7 +641,7 @@ static HealthValue prv_compute_aggregate_using_minute_history(HealthServiceState
   uint32_t num_samples = 0;
   switch (aggregation) {
     case HealthAggregationSum:
-      WTF; // Not supported
+      pbl_panic(); // Not supported
       break;
     case HealthAggregationAvg:
       value = 0;
@@ -701,7 +702,7 @@ static HealthValue prv_compute_aggregate_using_minute_history(HealthServiceState
           value = MIN(value, minute_data[i].heart_rate_bpm);
           break;
         case HealthAggregationSum:
-          WTF;
+          pbl_panic();
           break;
       }
     }
@@ -837,7 +838,7 @@ PBL_T_STATIC int64_t prv_session_compare(const ActivitySession *a, const Activit
       // sessions that start earlier come first
       return a->start_utc - b->start_utc;
     default:
-      WTF;
+      pbl_panic();
   }
 }
 
@@ -1067,7 +1068,7 @@ HealthValue health_service_aggregate_averaged(HealthMetric metric, time_t time_s
       ((time_end - time_start) < PBL_SEC_PER_DAY)) {
     // For now, we will use the day of the week that time_start falls on. In the future, we could
     // be better about blending weekday with weekend if the time range spans both
-    struct tm *local_tm = pbl_override_localtime(&time_start);
+    struct pbl_tm *local_tm = pbl_override_localtime(&time_start);
     bool is_weekend = prv_is_weekend(local_tm->tm_wday);
 
     ActivityMetricAverages averages;
@@ -1426,7 +1427,7 @@ void health_service_activities_iterate(HealthActivityMask activity_mask, time_t 
           break;
         case ActivitySessionType_None:
         case ActivitySessionTypeCount:
-          WTF;
+          pbl_panic();
           break;
       }
       if (!callback(session_activity, session->start_utc,
@@ -1449,14 +1450,14 @@ bool health_service_private_get_yesterdays_sleep_activity(HealthValue *enter_sec
 // ----------------------------------------------------------------------------------------------
 HealthServiceAccessibilityMask health_service_any_activity_accessible(
     HealthActivityMask activity_mask, time_t start_time, time_t end_time) {
-  // TODO: PBL-31628 permission system to reply with HealthServiceAccessibilityMaskNoPermission
+  // TODO: reply with HealthServiceAccessibilityMaskNoPermission once permissions exist
 
   if (activity_mask == HealthActivityNone) {
     return HealthServiceAccessibilityMaskNotAvailable;
   }
 
-  // TODO: PBL-31630 provide more accurate value for available time frame
-  // for now, we say that there's only 1 day worth of data for sleep sessions
+  // TODO: provide a more accurate available time frame; for now only 1 day worth of sleep
+  // sessions is reported
   HealthServiceTimeRange range;
   if (!prv_calculate_time_range(start_time, end_time, &range)) {
     return HealthServiceAccessibilityMaskNotAvailable;

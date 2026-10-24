@@ -29,7 +29,7 @@ typedef struct {
 
 static LowPowerFaceData *s_low_power_data;
 
-static void prv_minute_tick(struct tm *tick_time, TimeUnits units_changed) {
+static void prv_minute_tick(struct pbl_tm *tick_time, TimeUnits units_changed) {
   char *time_format;
 
   if (clock_is_24h_style()) {
@@ -38,8 +38,8 @@ static void prv_minute_tick(struct tm *tick_time, TimeUnits units_changed) {
     time_format = "%I:%M";
   }
 
-  strftime(s_low_power_data->time_text, sizeof(s_low_power_data->time_text), time_format,
-           tick_time);
+  pbl_strftime_r(s_low_power_data->time_text, sizeof(s_low_power_data->time_text), time_format,
+                 tick_time);
 
   // Remove leading zero from hour in case of 12h mode
   if (!clock_is_24h_style() && (s_low_power_data->time_text[0] == '0')) {
@@ -94,7 +94,7 @@ static void init(void) {
   kino_layer_set_reel_with_resource(&s_low_power_data->low_power_kino_layer,
                                     RESOURCE_ID_BATTERY_NEEDS_CHARGING);
   kino_layer_set_alignment(&s_low_power_data->low_power_kino_layer, GAlignBottom);
-  // TODO PBL-30180: Design needs to revise icon so it doesn't have a rounded cap at the bottom
+  // Hide the icon's rounded bottom cap
   s_low_power_data->low_power_kino_layer.layer.frame.origin.y += 2;
   layer_add_child(&s_low_power_data->low_power_window.layer,
                   &s_low_power_data->low_power_kino_layer.layer);
@@ -128,7 +128,7 @@ static void init(void) {
 
   // Because of the delay before the tick timer service first calls prv_minute_tick,
   // we call it ourselves to update the time right away
-  struct tm current_time;
+  struct pbl_tm current_time;
   clock_get_time_tm(&current_time);
   prv_minute_tick(&current_time, MINUTE_UNIT | HOUR_UNIT | DAY_UNIT);
 

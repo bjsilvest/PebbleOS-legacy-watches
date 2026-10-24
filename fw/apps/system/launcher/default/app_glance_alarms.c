@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 
+#include <pbl/kernel/assert.h>
 #include <pbl/kernel/compiler.h>
 #include <pbl/services/alarms/alarm.h>
 #include <pbl/services/clock.h>
@@ -18,7 +19,6 @@
 #include <kernel/pbl_malloc.h>
 #include <process_management/app_install_manager.h>
 #include <resource/resource_ids.auto.h>
-#include <system/passert.h>
 
 typedef struct LauncherAppGlanceAlarms {
   char title[APP_NAME_SIZE_BYTES];
@@ -99,7 +99,6 @@ static void prv_update_glance_for_next_alarm(LauncherAppGlanceAlarms *alarms_gla
   } else {
     // If the next alarm is smart, use the smart alarm icon
     if (alarm_is_next_enabled_alarm_smart()) {
-      // TODO PBL-39113: Replace this placeholder with a better smart alarm icon for the glance
       new_icon_resource_id = RESOURCE_ID_SMART_ALARM_TINY;
     }
 
@@ -118,9 +117,9 @@ static void prv_update_glance_for_next_alarm(LauncherAppGlanceAlarms *alarms_gla
     if (!is_alarm_for_today) {
       // Get a string for the abbreviated day of the week in the user's locale
       char day_buffer[TIME_STRING_REQUIRED_LENGTH] = {};
-      struct tm alarm_time;
-      localtime_r(&alarm_time_epoch, &alarm_time);
-      strftime(day_buffer, sizeof(day_buffer), "%a", &alarm_time);
+      struct pbl_tm alarm_time;
+      pbl_localtime_r(&alarm_time_epoch, &alarm_time);
+      pbl_strftime_r(day_buffer, sizeof(day_buffer), "%a", &alarm_time);
 
       snprintf(alarms_glance->subtitle, alarm_subtitle_size, "%s, %s", day_buffer, time_buffer);
     } else {

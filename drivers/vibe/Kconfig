@@ -15,8 +15,16 @@ config VIBE_PWM
       Single-direction vibe motor driven by a PWM output, its strength
       scaled by the supply voltage (e.g. the TI DRV2603 on silk).
 
+config VIBE_SHELL
+    bool "Shell commands"
+    default y
+    depends on SHELL
+    help
+      The vibe shell command, to drive and calibrate the motor.
+
 config VIBE_AW86225
     bool "Awinic AW86225"
+    depends on I2C
     help
       Support for the Awinic AW86225 haptic driver.
 
@@ -52,11 +60,13 @@ config VIBE_AW86225_OUTPUT_GAIN_PERCENT
 
 config VIBE_AW8623X
     bool "Awinic AW8623X"
+    depends on I2C
     help
       Support for the Awinic AW8623X haptic driver.
 
 config VIBE_DRV2604
     bool "TI DRV2604"
+    depends on I2C
     help
       Support for the TI DRV2604 haptic driver.
 

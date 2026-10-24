@@ -20,14 +20,6 @@ extern void comm_session_send_next_immediately(CommSession *session);
 // Stubs
 ///////////////////////////////////////////////////////////
 
-#include <stubs_analytics.h>
-#include <stubs_bt_lock.h>
-#include <stubs_bt_stack.h>
-#include <stubs_logging.h>
-#include <stubs_passert.h>
-#include <stubs_rand_ptr.h>
-#include <stubs_syscall_internal.h>
-
 void comm_session_analytics_open_session(CommSession *session) {
 }
 
@@ -282,7 +274,7 @@ void test_session__assert_if_deinit_and_transport_did_not_clean_up_properly(void
   CommSession *session = comm_session_open(transport, &s_transport_imp, TransportDestinationSystem);
   cl_assert_equal_b(comm_session_is_valid(session), true);
   // Expect assert when Transport didn't clean up after itself:
-  cl_assert_passert(comm_session_deinit());
+  cl_assert_panic(comm_session_deinit());
   comm_session_close(session, CommSessionCloseReason_UnderlyingDisconnection);
 }
 

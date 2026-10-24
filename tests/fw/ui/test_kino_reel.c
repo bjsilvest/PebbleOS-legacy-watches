@@ -16,20 +16,6 @@
 
 // Stubs
 ////////////////////////////////////
-#include <stubs_app_state.h>
-#include <stubs_compiled_with_legacy2_sdk.h>
-#include <stubs_gpath.h>
-#include <stubs_graphics.h>
-#include <stubs_graphics_context.h>
-#include <stubs_heap.h>
-#include <stubs_logging.h>
-#include <stubs_memory_layout.h>
-#include <stubs_passert.h>
-#include <stubs_pbl_malloc.h>
-#include <stubs_pebble_tasks.h>
-#include <stubs_resources.h>
-#include <stubs_ui_window.h>
-#include <stubs_unobstructed_area.h>
 
 void framebuffer_clear(FrameBuffer *f) {
 }
