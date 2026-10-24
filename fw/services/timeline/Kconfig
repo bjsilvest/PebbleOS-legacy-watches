@@ -15,6 +15,12 @@ config TIMELINE_PEEK
       Show the next timeline event over the watchface. Without it the
       peek calls are no-ops and the watchface is never obstructed.
 
+config TIMELINE_LITE
+    bool "Timeline as a plain list"
+    help
+      Show the timeline as a menu list of pins instead of the animated
+      timeline. Select opens the same pin card. Saves about 9 KB of flash.
+
 module = SERVICE_TIMELINE
 module-str = Timeline
 source "subsys/logging/Kconfig.template.log_level"
