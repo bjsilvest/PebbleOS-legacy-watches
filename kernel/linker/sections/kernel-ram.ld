@@ -28,6 +28,11 @@
 #endif
         /* The sys shell's audit_delay result buffer. */
         *sys_shell.c.obj(.bss .bss.*)
+#ifdef CONFIG_BOARD_SPALDING
+        /* Kernel-only state that pushed spalding's SRAM over in v4.42. */
+        *do_not_disturb.c.obj(.bss .bss.*)
+        *kernel_ui.c.obj(.bss .bss.*)
+#endif
 #ifdef CONFIG_PULSE_EVERYWHERE
         /* Only without PULSE's buffers is there room for it in SRAM. */
         *task_timer.c.obj(.bss .bss.*)
