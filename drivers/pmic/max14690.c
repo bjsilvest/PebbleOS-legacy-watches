@@ -228,13 +228,13 @@ uint32_t pmic_get_last_reset_reason(void) {
   return 0;
 }
 
-bool pmic_power_off(void) {
+int pmic_power_off(void) {
   if (prv_write_register(PmicRegisters_PWR_CFG, 0xB2)) {
     // The PMIC removes our power any time now.
     while (1) {
     }
   }
-  return false;
+  return -EIO;
 }
 
 static void prv_set_mon_config_register(uint8_t value) {
