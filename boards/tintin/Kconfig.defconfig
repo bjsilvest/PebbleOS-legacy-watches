@@ -16,6 +16,10 @@ config FIRMWARE_LEGACY_CRC
 config FIRMWARE_NEW_WORLD_MARKER
     default y
 
+# The tintin firmware leaves out parts of the full one, e.g. the animated timeline.
+config FW_VERSION_SUFFIX
+    default "-lite"
+
 # Show the same 1% charge percent as the phone app.
 config BATTERY_EXACT_PERCENT
     default y
