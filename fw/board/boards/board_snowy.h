@@ -7,39 +7,16 @@
 // Pebble Time (snowy_dvt) and Pebble Time Steel (snowy_s3), electrically the
 // same. Pins from the stock board_snowy.c/.h.
 
-#include <pbl/drivers/backlight/pwm.h>
-#include <pbl/drivers/i2c.h>
 #include <pbl/services/imu/units.h>
-#include <pbl/util/size.h>
 
 #define BT_VENDOR_ID   0x0154
 #define BT_VENDOR_NAME "Pebble Technology"
 
-// Light sensor readings (3 s after the backlight went off) on a Pebble Time
-// in eight lighting conditions, against the middle of each condition's usual
-// lux range: the phototransistor rises steeply up to room light, then
-// flattens out. Not measured on a Steel.
-static const AmbientLightLuxPoint s_ambient_light_lux_table[] = {
-  {201, 0},      // closet, near pitch dark
-  {216, 2},      // dark room, light from a doorway
-  {403, 10},     // dim room, one small lamp
-  {1600, 45},    // evening living room
-  {2603, 175},   // normal indoor light
-  {2854, 550},   // bright room, desk lamp
-  {2957, 3000},  // outdoors in shade
-  {3030, 10000}, // direct sunlight
-};
-
 static const BoardConfig BOARD_CONFIG = {
-  .ambient_light_lux_table = s_ambient_light_lux_table,
-  .ambient_light_lux_table_len = ARRAY_LENGTH(s_ambient_light_lux_table),
   // As the lux-calibrated Core watches: the backlight stops coming on in
   // light brighter than a desk lamp.
   .ambient_light_dark_threshold = 800,
   .ambient_k_delta_threshold = 100,
-  .photo_en = PBL_GPIO(STM32_GPIOA, 3, 0),
-  .als_adc_channel = ADC_Channel_2,
-  .als_adc_pin = PBL_GPIO(STM32_GPIOA, 2, 0),
   .backlight_on_percent = 45,
 };
 
@@ -86,49 +63,6 @@ static const BoardConfigAccel BOARD_CONFIG_ACCEL = {
     PBL_GPIO(STM32_GPIOG, 6, 0),
   },
 };
-
-static const BoardConfigMag BOARD_CONFIG_MAG = {
-  .mag_config = {
-    .axes_offsets[AXIS_X] = 1,
-    .axes_offsets[AXIS_Y] = 0,
-    .axes_offsets[AXIS_Z] = 2,
-    .axes_inverts[AXIS_X] = true,
-    .axes_inverts[AXIS_Y] = true,
-    .axes_inverts[AXIS_Z] = false,
-  },
-};
-
-// Vibe: H-bridge driven by TIM10 CH1, enabled by PF4
-static const BoardConfigActuator BOARD_CONFIG_VIBE = {
-  .pwm =
-      {
-        .output = PBL_GPIO(STM32_GPIOB, 8, 0),
-        .timer = TIM10,
-        .rcc = RCC_APB2Periph_TIM10,
-        .apb2 = true,
-        .af = GPIO_AF_TIM10,
-        .channel = 1,
-      },
-  .ctl = PBL_GPIO(STM32_GPIOF, 4, 0),
-  .hbridge = true,
-};
-
-// Backlight: TIM12 CH1
-static const BacklightPwmConfig BACKLIGHT_PWM = {
-  .pwm =
-      {
-        .output = PBL_GPIO(STM32_GPIOB, 14, 0),
-        .timer = TIM12,
-        .rcc = RCC_APB1Periph_TIM12,
-        .af = GPIO_AF_TIM12,
-        .channel = 1,
-      },
-  .max_duty_cycle_percent = 100,
-};
-
-// MAG3110 data ready, active high
-static const struct pbl_gpio BOARD_MAG_INT = PBL_GPIO(STM32_GPIOF, 14, 0);
-extern const struct pbl_i2c_dev *const I2C_MAG3110;
 
 extern const struct pbl_dma_stm32_stream ICE40LP_TX_DMA;
 

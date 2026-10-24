@@ -41,7 +41,7 @@ config AMBIENT_LIGHT_LUX_TABLE
     depends on AMBIENT_LIGHT_STM32_ADC
     help
       Convert raw levels to lux by interpolating between calibration points
-      in the board's ambient_light_lux_table, for a sensor whose response
+      in the sensor's pbl_als_scale table, for a sensor whose response
       is far from linear (a phototransistor that flattens out in bright
       light), instead of the linear offset/num/den conversion.
 

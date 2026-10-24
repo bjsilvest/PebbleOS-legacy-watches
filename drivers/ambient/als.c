@@ -107,8 +107,32 @@ void pbl_als_resume(const struct pbl_als *als) {
 }
 
 bool pbl_als_has_lux(const struct pbl_als *als) {
+#ifdef CONFIG_AMBIENT_LIGHT_LUX_TABLE
+  if (als->scale != nullptr && als->scale->table_len != 0U) {
+    return true;
+  }
+#endif
   return als->scale != nullptr && als->scale->den != 0U;
 }
+
+#ifdef CONFIG_AMBIENT_LIGHT_LUX_TABLE
+static uint32_t prv_table_to_lux(const struct pbl_als_scale *scale, uint32_t level) {
+  const struct pbl_als_lux_point *table = scale->table;
+  const uint8_t len = scale->table_len;
+
+  if (level <= table[0].level) {
+    return table[0].lux;
+  }
+  for (uint8_t i = 1U; i < len; i++) {
+    const struct pbl_als_lux_point *lo = &table[i - 1U];
+    const struct pbl_als_lux_point *hi = &table[i];
+    if (level <= hi->level) {
+      return lo->lux + ((hi->lux - lo->lux) * (level - lo->level)) / (hi->level - lo->level);
+    }
+  }
+  return table[len - 1U].lux;
+}
+#endif
 
 uint32_t pbl_als_to_lux(const struct pbl_als *als, uint32_t level) {
   const struct pbl_als_scale *scale = als->scale;
@@ -117,6 +141,11 @@ uint32_t pbl_als_to_lux(const struct pbl_als *als, uint32_t level) {
   if (!pbl_als_has_lux(als)) {
     return level;
   }
+#ifdef CONFIG_AMBIENT_LIGHT_LUX_TABLE
+  if (scale->table_len != 0U) {
+    return prv_table_to_lux(scale, level);
+  }
+#endif
 
   if (level <= scale->offset) {
     return 0U;
