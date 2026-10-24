@@ -91,13 +91,16 @@ static const struct pbl_gpio_port_ops s_ops = {
   .set = prv_set,
 };
 
-#define GPIO_STM32_DEFINE(sym, _name, _regs, _index)                                         \
-  PBL_DEVICE_STATE_DEFINE(sym);                                                              \
-  const struct pbl_gpio_stm32 sym = {                                                        \
-    .port = {.dev = PBL_DEVICE_INIT(sym, _name, prv_init, nullptr, nullptr), .ops = &s_ops}, \
-    .regs = (_regs),                                                                         \
-    .index = (_index),                                                                       \
-  };                                                                                         \
+#define GPIO_STM32_DEFINE(sym, _name, _regs, _index)                     \
+  PBL_DEVICE_STATE_DEFINE(sym);                                          \
+  const struct pbl_gpio_stm32 sym = {                                    \
+    .port =                                                              \
+        {.dev = PBL_DEVICE_INIT(sym, _name, prv_init, nullptr, nullptr), \
+         .ops = &s_ops,                                                  \
+         .num_pins = 16},                                                \
+    .regs = (_regs),                                                     \
+    .index = (_index),                                                   \
+  };                                                                     \
   PBL_DEVICE_REGISTER(sym, &sym.port.dev)
 
 GPIO_STM32_DEFINE(pbl_gpio_stm32_a, "gpio_a", GPIOA, 0);
