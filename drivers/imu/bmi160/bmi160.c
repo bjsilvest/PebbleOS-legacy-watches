@@ -6,6 +6,7 @@
 #include "bmi160_private.h"
 #include "bmi160_regs.h"
 
+#include <errno.h>
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -13,15 +14,18 @@
 
 #include <pbl/drivers/accel.h>
 #include <pbl/drivers/exti.h>
+#include <pbl/drivers/imu/bmi160/bmi160.h>
 #include <pbl/drivers/rtc.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/delay.h>
+#include <pbl/kernel/fatal.h>
 #include <pbl/logging/logging.h>
+#include <pbl/services/new_timer/new_timer.h>
 #include <pbl/util/math.h>
+#include <pbl/util/misc.h>
 #include <pbl/util/size.h>
 
 #include <board/board.h>
-#include <pbl/kernel/delay.h>
-#include <pbl/kernel/assert.h>
-#include <pbl/kernel/fatal.h>
 
 #define BMI160_DEBUG 0
 
@@ -42,6 +46,21 @@ typedef enum {
   BMI160_SCALE_8G = 8,
   BMI160_SCALE_16G = 16,
 } Bmi160Scale;
+
+static const struct pbl_bmi160 *s_dev;
+
+static void prv_work_cb(void *data) {
+  void (*work)(void) = data;
+
+  pbl_accel_lock(&s_dev->accel);
+  work();
+  pbl_accel_unlock(&s_dev->accel);
+}
+
+//! Run driver work on the timer task, with the device lock held
+static void prv_queue_work_from_isr(void (*work)(void)) {
+  new_timer_add_work_callback_from_isr(prv_work_cb, (void *)work);
+}
 
 static int16_t s_raw_unit_to_mgs = 8192;
 
@@ -333,7 +352,11 @@ static void prv_handle_motion_interrupts(void) {
         prv_get_axis_direction(int0_status, int2_status, BMI160_INT_STATUS_2_ANYM_SIGN,
                                BMI160_INT_STATUS_2_ANYM_FIRST_X, &direction);
     BMI160_DBG("Anymotion on axis %" PRIu8 " in direction %" PRId32, axis, direction);
-    accel_cb_shake_detected(axis, direction);
+    pbl_accel_report_event(&s_dev->accel, &(const struct pbl_accel_event){
+                                            .type = PBL_ACCEL_EVENT_SHAKE,
+                                            .axis = axis,
+                                            .direction = direction,
+                                          });
   }
   bool double_tap = ((int0_status & BMI160_INT_STATUS_0_D_TAP_MASK) != 0);
   if (double_tap) {
@@ -343,7 +366,11 @@ static void prv_handle_motion_interrupts(void) {
                                BMI160_INT_STATUS_2_TAP_FIRST_X, &direction);
     if (double_tap) {
       BMI160_DBG("Double tap on axis %" PRIu8 " in direction %" PRId32, axis, direction);
-      accel_cb_double_tap_detected(axis, direction);
+      pbl_accel_report_event(&s_dev->accel, &(const struct pbl_accel_event){
+                                              .type = PBL_ACCEL_EVENT_DOUBLE_TAP,
+                                              .axis = axis,
+                                              .direction = direction,
+                                            });
     }
   } else if (!anymotion) {
     BMI160_DBG("Wahh, no motion/tap?: INT0: 0x%" PRIx8 ", INT2: 0x%" PRIx8, int0_status,
@@ -373,7 +400,7 @@ static void prv_dump_int_stats(void) {
 static void bmi160_IRQ1_handler(void) {
   if (!s_accel_outstanding_motion_work) {
     s_accel_outstanding_motion_work = true;
-    accel_offload_work_from_isr(prv_handle_motion_interrupts);
+    prv_queue_work_from_isr(prv_handle_motion_interrupts);
   } else {
     BMI160_DBG("%s", "We fell behind on motion interrupt handling!");
   }
@@ -452,7 +479,7 @@ static void prv_drain_fifo(void) {
     start_time += curr_sampling_interval_us;
 
     BMI160_DBG("%2d: %" PRId16 " %" PRId16 " %" PRId16, i, data.x, data.y, data.z);
-    accel_cb_new_sample(&data);
+    pbl_accel_report_sample(&s_dev->accel, &data);
   }
   bmi160_end_burst();
 
@@ -483,7 +510,7 @@ static void prv_handle_data(void) {
   if ((status & BMI160_STATUS_DRDY_ACC_MASK) != 0) {
     AccelDriverSample data;
     prv_read_curr_accel_data(&data);
-    accel_cb_new_sample(&data);
+    pbl_accel_report_sample(&s_dev->accel, &data);
   } else {
     BMI160_DBG("Unexpected int status: 0x%" PRIx8 " 0x%x", bmi160_read_reg(BMI160_REG_INT_STATUS_1),
                status);
@@ -493,7 +520,7 @@ static void prv_handle_data(void) {
 static void bmi160_IRQ2_handler(void) {
   if (!s_accel_outstanding_data_work) {
     s_accel_outstanding_data_work = true;
-    accel_offload_work_from_isr(prv_handle_data);
+    prv_queue_work_from_isr(prv_handle_data);
   } else {
     BMI160_DBG("%s", "We fell behind on data handling");
   }
@@ -536,7 +563,9 @@ static void prv_update_accel_interrupts(bool enable) {
   }
 }
 
-void accel_init(void) {
+static int prv_init(const struct pbl_accel *accel) {
+  s_dev = container_of(accel, const struct pbl_bmi160, accel);
+
   bmi160_spi_init();
 
   pbl_gpio_configure(&BOARD_CONFIG_ACCEL.accel_int_gpios[0], PBL_GPIO_INPUT);
@@ -551,7 +580,7 @@ void accel_init(void) {
   if (!bmi160_query_whoami()) {
     // e.g. under emulation; leave it alone rather than crash.
     PBL_LOG_ERR("Failed to query BMI160");
-    return;
+    return -ENODEV;
   }
   prv_run_command(BMI160_CMD_SOFTRESET);
   bmi160_enable_spi_mode();
@@ -559,12 +588,8 @@ void accel_init(void) {
   prv_set_accel_scale(BMI160_SCALE_4G);
 
   bmi160_set_accel_power_mode(BMI160_Accel_Mode_Normal);
-}
 
-void accel_power_up(void) {
-}
-
-void accel_power_down(void) {
+  return 0;
 }
 
 bool bmi160_query_whoami(void) {
@@ -699,13 +724,15 @@ static void prv_disable_operating_mode(AccelOperatingMode mode) {
   prv_configure_operating_mode();
 }
 
-uint32_t accel_set_sampling_interval(uint32_t interval_us) {
+static int prv_set_sampling_interval(const struct pbl_accel *accel, uint32_t interval_us,
+                                     uint32_t *actual_us) {
   BMI160SampleRate sample_rate = prv_get_supported_sample_rate(interval_us);
   prv_enable_operating_mode(AccelOperatingModeData, sample_rate);
-  return prv_get_min_sampling_interval_us();
+  *actual_us = prv_get_min_sampling_interval_us();
+  return 0;
 }
 
-uint32_t accel_get_sampling_interval(void) {
+static uint32_t prv_get_sampling_interval(const struct pbl_accel *accel) {
   uint32_t curr_sampling_interval_us = prv_get_min_sampling_interval_us();
 #if BMI160_DEBUG
   PBL_ASSERTN(curr_sampling_interval_us == prv_get_sampling_interval_from_hw());
@@ -744,7 +771,7 @@ static void prv_configure_accel_sampling(bool enable_int, bool use_fifo) {
   s_fifo_in_use = use_fifo;
 }
 
-void accel_set_num_samples(uint32_t num_samples) {
+static int prv_set_num_samples(const struct pbl_accel *accel, uint32_t num_samples) {
   uint8_t fifo_frame_size = prv_get_fifo_frame_size(); // x,y,z accel data
   uint16_t max_num_samples = (BMI160_FIFO_LEN_BYTES / fifo_frame_size);
   max_num_samples = (max_num_samples / BMI160_FIFO_WM_UNIT_BYTES) * BMI160_FIFO_WM_UNIT_BYTES;
@@ -781,14 +808,16 @@ void accel_set_num_samples(uint32_t num_samples) {
   bool enable_int = num_samples != 0;
   bool use_fifo = num_samples > 1;
   prv_configure_accel_sampling(enable_int, use_fifo);
+
+  return 0;
 }
 
-int accel_peek(AccelDriverSample *data) {
+static int prv_peek(const struct pbl_accel *accel, AccelDriverSample *data) {
   prv_read_curr_accel_data(data);
   return 0;
 }
 
-void accel_set_shake_sensitivity_high(bool sensitivity_high) {
+static void prv_set_shake_sensitivity_high(bool sensitivity_high) {
   // Configure the threshold level at which the BMI160 will think shake has occurred
   const AccelConfig *cfg = &BOARD_CONFIG_ACCEL.accel_config;
   uint8_t threshold = s_shake_threshold ?: cfg->shake_thresholds[AccelThresholdHigh];
@@ -798,7 +827,12 @@ void accel_set_shake_sensitivity_high(bool sensitivity_high) {
   prv_write_reg(BMI160_REG_INT_MOTION_1, threshold);
 }
 
-void accel_set_shake_sensitivity_percent(uint8_t percent) {
+static int prv_set_shake_sensitivity_high_op(const struct pbl_accel *accel, bool high) {
+  prv_set_shake_sensitivity_high(high);
+  return 0;
+}
+
+static int prv_set_shake_sensitivity_percent(const struct pbl_accel *accel, uint8_t percent) {
   // Higher is more sensitive. The settings default (55, "Medium") keeps the
   // stock threshold, 100 is the stock high sensitivity one, 0 twice the stock.
   const int medium = 55;
@@ -814,6 +848,8 @@ void accel_set_shake_sensitivity_percent(uint8_t percent) {
   }
   s_shake_threshold = MIN(threshold, UINT8_MAX);
   prv_write_reg(BMI160_REG_INT_MOTION_1, s_shake_threshold);
+
+  return 0;
 }
 
 static void prv_enable_shake_detection(void) {
@@ -831,7 +867,7 @@ static void prv_enable_shake_detection(void) {
 
   // configure the anymotion interrupt to fire after 4 successcive
   // samples are over the threhold specified
-  accel_set_shake_sensitivity_high(false /* sensitivity_high */);
+  prv_set_shake_sensitivity_high(false /* sensitivity_high */);
   prv_write_reg(BMI160_REG_INT_MOTION_0, 0x3 << BMI160_INT_MOTION_1_ANYM_DUR_SHIFT);
 
   // We temporarily latch the interrupt & do not clear it for anymotion interrupts to
@@ -898,11 +934,11 @@ static void prv_disable_double_tap_detection(void) {
   prv_disable_operating_mode(AccelOperatingModeDoubleTapDetection);
 }
 
-void accel_enable_shake_detection(bool on) {
+static int prv_set_shake_detection(const struct pbl_accel *accel, bool on) {
   PBL_LOG_DBG("enable shake detection %d", on);
   if (s_shake_detection_enabled == on) {
     // the requested change matches what we already have!
-    return;
+    return 0;
   }
 
   prv_update_accel_interrupts(on);
@@ -913,13 +949,15 @@ void accel_enable_shake_detection(bool on) {
   }
 
   s_shake_detection_enabled = on;
+
+  return 0;
 }
 
-void accel_enable_double_tap_detection(bool on) {
+static int prv_set_double_tap_detection(const struct pbl_accel *accel, bool on) {
   PBL_LOG_DBG("enable double tap detection %d", on);
   if (s_double_tap_detection_enabled == on) {
     // the requested change matches what we already have!
-    return;
+    return 0;
   }
 
   prv_update_accel_interrupts(on);
@@ -930,27 +968,30 @@ void accel_enable_double_tap_detection(bool on) {
   }
 
   s_double_tap_detection_enabled = on;
+
+  return 0;
 }
 
-bool accel_get_shake_detection_enabled(void) {
-  return s_shake_detection_enabled;
-}
-
-bool accel_get_double_tap_detection_enabled(void) {
-  return s_double_tap_detection_enabled;
-}
-
-void accel_set_rotated(bool rotated) {
+static int prv_set_rotated(const struct pbl_accel *accel, bool rotated) {
   s_rotated_180 = rotated;
+  return 0;
 }
 
-uint32_t accel_get_max_num_samples(void) {
+static uint32_t prv_get_max_num_samples(const struct pbl_accel *accel) {
   const uint16_t max_num_samples = BMI160_FIFO_LEN_BYTES / prv_get_fifo_frame_size();
   return (max_num_samples / BMI160_FIFO_WM_UNIT_BYTES) * BMI160_FIFO_WM_UNIT_BYTES;
 }
 
-void accel_toggle_power_mode(void) {
-  static bool enable_low_power = false;
-  prv_accel_enable_undersampling(enable_low_power);
-  enable_low_power = !enable_low_power;
-}
+const struct pbl_accel_ops pbl_bmi160_ops = {
+  .init = prv_init,
+  .set_rotated = prv_set_rotated,
+  .set_sampling_interval = prv_set_sampling_interval,
+  .get_sampling_interval = prv_get_sampling_interval,
+  .set_num_samples = prv_set_num_samples,
+  .get_max_num_samples = prv_get_max_num_samples,
+  .peek = prv_peek,
+  .set_shake_detection = prv_set_shake_detection,
+  .set_double_tap_detection = prv_set_double_tap_detection,
+  .set_shake_sensitivity_high = prv_set_shake_sensitivity_high_op,
+  .set_shake_sensitivity_percent = prv_set_shake_sensitivity_percent,
+};

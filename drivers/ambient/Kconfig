@@ -36,6 +36,15 @@ config AMBIENT_LIGHT_THRESHOLD_LOCAL
       from other watches (the original Pebble's reads ~235 in the dark), so
       a value synced from another watch model cannot keep the backlight off.
 
+config AMBIENT_LIGHT_LUX_TABLE
+    bool "Convert levels to lux with a board table"
+    depends on AMBIENT_LIGHT_STM32_ADC
+    help
+      Convert raw levels to lux by interpolating between calibration points
+      in the sensor's pbl_als_scale table, for a sensor whose response
+      is far from linear (a phototransistor that flattens out in bright
+      light), instead of the linear offset/num/den conversion.
+
 config AMBIENT_LIGHT_QEMU
     bool "QEMU"
     default y if SOC_QEMU
