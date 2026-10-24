@@ -297,7 +297,7 @@ int pbl_as3701b_init(const struct pbl_device *dev) {
 
 //! A full power off would cut every rail and lose the RTC; enter standby
 //! instead, keeping LDO2 (the backup domain) on.
-bool pmic_power_off(void) {
+int pmic_power_off(void) {
   // Only wake on charger detect.
   const uint8_t int_mask = (uint8_t)~(PmicInt1_ChDet);
   prv_write_register(PmicRegisters_INT_MASK_1, int_mask);
@@ -313,7 +313,7 @@ bool pmic_power_off(void) {
     while (1) {
     }
   }
-  return false;
+  return -EIO;
 }
 
 //! Cuts every rail, losing the backup domain. pmic_power_off() is usually
