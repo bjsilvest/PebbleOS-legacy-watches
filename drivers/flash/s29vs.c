@@ -20,9 +20,10 @@
 #include <pbl/util/size.h>
 
 #include <flash_region/flash_region.h>
-#include <kernel/util/delay.h>
+#include <pbl/kernel/delay.h>
 #include <stm32f4xx.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 #include <system/status_codes.h>
 
 #define MHZ_TO_HZ(mhz) ((mhz) * 1000000U)
@@ -160,7 +161,7 @@ static uint8_t prv_poll_for_ready(FlashAddress sector_base_addr) {
   uint8_t status;
   while (((status = prv_read_status_register(sector_base_addr)) & S29VSStatusBit_DeviceReady) ==
          0) {
-    delay_us(10);
+    pbl_busy_wait_us(10);
   }
 
   return (status);
@@ -314,9 +315,9 @@ static void prv_hw_init(void) {
   // We have configured the pins, lets perform a full HW reset to put the chip
   // in a good state
   GPIO_WriteBit(GPIOD, GPIO_Pin_2, Bit_RESET);
-  delay_us(10); // only needs to be 50ns according to data sheet
+  pbl_busy_wait_us(10); // only needs to be 50ns according to data sheet
   GPIO_WriteBit(GPIOD, GPIO_Pin_2, Bit_SET);
-  delay_us(30); // need 200ns + 10us before CE can be pulled low
+  pbl_busy_wait_us(30); // need 200ns + 10us before CE can be pulled low
 
   flash_impl_set_burst_mode(false);
 }

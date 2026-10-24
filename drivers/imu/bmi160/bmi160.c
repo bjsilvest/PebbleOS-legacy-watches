@@ -19,9 +19,9 @@
 #include <pbl/util/size.h>
 
 #include <board/board.h>
-#include <kernel/util/delay.h>
-#include <kernel/util/sleep.h>
-#include <system/passert.h>
+#include <pbl/kernel/delay.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 #define BMI160_DEBUG 0
 
@@ -114,9 +114,9 @@ static void prv_write_reg(uint8_t reg, uint8_t value) {
   if (s_accel_power_mode == BMI160_Accel_Mode_Normal ||
       s_gyro_power_mode == BMI160_Gyro_Mode_Normal) {
     // Apparently this delays for ~3.5 us. Unconfirmed.
-    delay_us(5);
+    pbl_busy_wait_us(5);
   } else {
-    psleep(2); // must sleep >= 450us
+    pbl_sleep_ms(2); // must sleep >= 450us
   }
 }
 

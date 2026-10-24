@@ -29,7 +29,7 @@
 
 #include <board/board.h>
 #include <kernel/events.h>
-#include <kernel/util/delay.h>
+#include <pbl/kernel/delay.h>
 #include <stm32f4xx.h>
 
 #define CMD_FRAME_BEGIN 0x5
@@ -126,7 +126,7 @@ static bool prv_wait_not_busy(void) {
     if (!prv_busy()) {
       return true;
     }
-    delay_us(10);
+    pbl_busy_wait_us(10);
   }
   return false;
 }
@@ -141,10 +141,10 @@ static bool prv_program(void) {
   pbl_gpio_set(scs, true);
   pbl_gpio_set(creset, false);
   // CRESET must stay low for 200 ns.
-  delay_us(10);
+  pbl_busy_wait_us(10);
   pbl_gpio_set(creset, true);
   // The iCE40 needs 800 us of housekeeping after reset.
-  delay_us(1000);
+  pbl_busy_wait_us(1000);
 
   prv_spi_write(ice40lp_bitstream_start, ice40lp_bitstream_end - ice40lp_bitstream_start);
 
@@ -160,7 +160,7 @@ static bool prv_program(void) {
       done = true;
       break;
     }
-    delay_us(100);
+    pbl_busy_wait_us(100);
   }
   if (!done) {
     PBL_LOG_ERR("FPGA CDONE not high after programming");
@@ -172,9 +172,9 @@ static bool prv_program(void) {
 
 static void prv_power_enable(void) {
   // 1 ms between rails; the PMIC brings up VLCD (3.2 V) first.
-  delay_us(2000);
+  pbl_busy_wait_us(2000);
   pbl_gpio_set(&BOARD_CONFIG_DISPLAY.rail_6v6, true);
-  delay_us(2000);
+  pbl_busy_wait_us(2000);
   pbl_gpio_set(&BOARD_CONFIG_DISPLAY.rail_4v5, true);
 }
 
@@ -231,7 +231,7 @@ static void prv_send_frame(const uint8_t *fb) {
   }
 
   pbl_gpio_set(scs, true);
-  delay_us(5);
+  pbl_busy_wait_us(5);
   const uint8_t cmd = CMD_FRAME_BEGIN;
   prv_spi_write(&cmd, 1);
 
@@ -336,7 +336,7 @@ static void prv_start_dma_frame(const uint8_t *fb) {
 
   soc_stm32_stop_block();
   pbl_gpio_set(&cfg->scs, true);
-  delay_us(5);
+  pbl_busy_wait_us(5);
   const uint8_t cmd = CMD_FRAME_BEGIN;
   prv_spi_write(&cmd, 1);
   SPI_I2S_DMACmd(cfg->spi, SPI_I2S_DMAReq_Tx, ENABLE);

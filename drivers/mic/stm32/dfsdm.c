@@ -15,8 +15,9 @@
 #include <pbl/util/math.h>
 
 #include <kernel/events.h>
-#include <kernel/util/sleep.h>
-#include <system/passert.h>
+#include <pbl/kernel/delay.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 PBL_LOG_MODULE_DEFINE(driver_mic, CONFIG_DRIVER_MIC_LOG_LEVEL);
 
@@ -89,7 +90,7 @@ static void prv_dfsdm_configure(MicDevice *this) {
 static void prv_dfsdm_enable(MicDevice *this) {
   DFSDM_Command(ENABLE);
   DFSDM_ChannelCmd(this->channel, ENABLE);
-  psleep(this->power_on_delay_ms);
+  pbl_sleep_ms(this->power_on_delay_ms);
 
   DFSDM_DMATransferConfig(this->filter, DFSDM_DMAConversionMode_Regular, ENABLE);
   DFSDM_FilterCmd(this->filter, ENABLE);

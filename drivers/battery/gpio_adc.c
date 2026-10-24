@@ -16,7 +16,8 @@
 
 #include <board/board.h>
 #include <kernel/events.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 #define USB_CONN_DEBOUNCE_MS 400
 

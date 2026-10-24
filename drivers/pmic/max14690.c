@@ -20,9 +20,9 @@
 
 #include <board/board.h>
 #include <kernel/events.h>
-#include <kernel/util/delay.h>
-#include <kernel/util/sleep.h>
-#include <system/passert.h>
+#include <pbl/kernel/delay.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 PBL_LOG_MODULE_DEFINE(driver_pmic, CONFIG_DRIVER_PMIC_LOG_LEVEL);
 
@@ -135,7 +135,7 @@ static bool prv_set_ldo(uint8_t config_reg, bool enable) {
   }
   if (enable) {
     // The LDOs take 2.6 ms to ramp.
-    psleep(3);
+    pbl_sleep_ms(3);
   }
   return true;
 }
@@ -247,7 +247,7 @@ static void prv_mon_select(const PmicMonConfig *config) {
   // 4:1 is 0b00, 1:1 is 0b11.
   prv_set_mon_config_register(((4 - config->ratio) << 4) | config->source);
   // Let the reading settle: the line has some capacitance.
-  delay_us(200);
+  pbl_busy_wait_us(200);
 }
 
 static void prv_mon_release(void) {

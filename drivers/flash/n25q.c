@@ -16,9 +16,10 @@
 
 #include <board/board.h>
 #include <flash_region/flash_region.h>
-#include <kernel/util/delay.h>
+#include <pbl/kernel/delay.h>
 #include <stm32f4xx.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 #include <system/status_codes.h>
 
 PBL_LOG_MODULE_DECLARE(driver_flash, CONFIG_DRIVER_FLASH_LOG_LEVEL);
@@ -76,7 +77,7 @@ static void prv_deselect(void) {
   }
   pbl_gpio_set(&BOARD_CONFIG_NOR_SPI.scs, false);
   // tSHSL: 50 ns between commands
-  delay_us(1);
+  pbl_busy_wait_us(1);
 }
 
 static uint8_t prv_xfer(uint8_t byte) {
@@ -207,7 +208,7 @@ status_t flash_impl_init(bool coredump_mode) {
   flash_impl_use();
   // The flash may still be in deep power-down from before a reset
   prv_cmd(CMD_WAKE);
-  delay_us(WAKE_DELAY_US);
+  pbl_busy_wait_us(WAKE_DELAY_US);
   s_deep_sleep = false;
   prv_wait_ready();
   prv_cmd(CMD_CLEAR_FLAG_STATUS_REG);
@@ -285,7 +286,7 @@ status_t flash_impl_exit_low_power_mode(void) {
   }
   flash_impl_use();
   prv_cmd(CMD_WAKE);
-  delay_us(WAKE_DELAY_US);
+  pbl_busy_wait_us(WAKE_DELAY_US);
   s_deep_sleep = false;
   flash_impl_release();
   return S_SUCCESS;

@@ -19,10 +19,10 @@
 
 #include <board/board.h>
 #include <flash_region/flash_region.h>
-#include <kernel/util/delay.h>
-#include <kernel/util/sleep.h>
+#include <pbl/kernel/delay.h>
 #include <stm32f4xx.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 #include <system/status_codes.h>
 
 //! Address value which signifies no address being sent
@@ -209,7 +209,7 @@ static bool prv_poll_bit(QSPIPort *dev, uint8_t instruction, uint8_t bit_mask, b
       PBL_LOG_ERR("Timeout polling QSPI flash status");
       return false;
     }
-    delay_us(1);
+    pbl_busy_wait_us(1);
   }
 
   QSPI_AbortRequest();
@@ -272,9 +272,9 @@ void qspi_flash_init(QSPIFlash *dev, QSPIFlashPart *part, bool coredump_mode) {
   prv_write_cmd_no_addr(dev, part->instructions.reset);
 
   if (coredump_mode) {
-    delay_us(part->reset_latency_ms * 1000);
+    pbl_busy_wait_us(part->reset_latency_ms * 1000);
   } else {
-    psleep(part->reset_latency_ms);
+    pbl_sleep_ms(part->reset_latency_ms);
   }
 
   prv_indirect_write_no_addr_1line(part->instructions.enter_quad_mode);
@@ -322,7 +322,7 @@ status_t qspi_flash_erase_suspend(QSPIFlash *dev, uint32_t addr) {
   prv_write_cmd_no_addr(dev, dev->state->part->instructions.erase_suspend);
 
   if (dev->state->part->suspend_to_read_latency_us) {
-    delay_us(dev->state->part->suspend_to_read_latency_us);
+    pbl_busy_wait_us(dev->state->part->suspend_to_read_latency_us);
   }
 
   return S_SUCCESS;
@@ -370,7 +370,7 @@ void qspi_flash_set_lower_power_mode(QSPIFlash *dev, bool active) {
   }
   prv_write_cmd_no_addr(dev, instruction);
   if (delay) {
-    delay_us(delay);
+    pbl_busy_wait_us(delay);
   }
 }
 

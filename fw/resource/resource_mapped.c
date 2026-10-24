@@ -10,7 +10,8 @@
 #include <pbl/kernel/irq.h>
 
 #include <flash_region/flash_region.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 #if defined(CONFIG_MMAP_RESOURCES) && defined(FLASH_MEMORY_MAPPABLE_ADDRESS)
 // Per task, so a process that exits holding mapped bytes releases them.

@@ -19,9 +19,10 @@
 
 #include <board/board.h>
 #include <kernel/events.h>
-#include <kernel/util/delay.h>
+#include <pbl/kernel/delay.h>
 #include <stm32f4xx.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 #define DISP_MODE_WRITE 0x01U
 #define DISP_MODE_CLEAR 0x04U
@@ -83,7 +84,7 @@ static void prv_spi_write(const uint8_t *buf, size_t len) {
 static void prv_pulse_vcom(void *data) {
   pbl_gpio_set(&BOARD_CONFIG_DISPLAY.extcomin, true);
   // At least 1 us high
-  delay_us(2);
+  pbl_busy_wait_us(2);
   pbl_gpio_set(&BOARD_CONFIG_DISPLAY.extcomin, false);
 }
 

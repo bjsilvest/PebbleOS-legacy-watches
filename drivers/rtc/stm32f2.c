@@ -25,7 +25,8 @@
 #include <pbl/services/time.h>
 
 #include <stm32f4xx.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 #include <system/rtc_registers.h>
 
 PBL_LOG_MODULE_DEFINE(driver_rtc, CONFIG_DRIVER_RTC_LOG_LEVEL);

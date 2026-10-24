@@ -22,7 +22,7 @@
 #include <pbl/util/size.h>
 
 #include <board/board.h>
-#include <kernel/util/sleep.h>
+#include <pbl/kernel/delay.h>
 
 PBL_LOG_MODULE_DEFINE(driver_accel_lis3dh, CONFIG_DRIVER_IMU_LOG_LEVEL);
 
@@ -348,7 +348,7 @@ static bool prv_peek_raw(uint8_t raw[SAMPLE_SIZE]) {
   if (!powered) {
     // One sample at 100 Hz: 1 ms to start, then 10 ms per sample.
     prv_write(REG_CTRL1, (uint8_t)(prv_odr_bits(100U) << 4) | CTRL1_XYZ_EN);
-    psleep(12);
+    pbl_sleep_ms(12);
   }
   const bool ok = prv_read(REG_OUT_X_L, raw, SAMPLE_SIZE);
   if (!powered) {

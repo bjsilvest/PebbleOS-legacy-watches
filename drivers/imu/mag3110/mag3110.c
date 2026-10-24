@@ -18,8 +18,9 @@
 
 #include <board/board.h>
 #include <kernel/events.h>
-#include <kernel/util/sleep.h>
-#include <system/passert.h>
+#include <pbl/kernel/delay.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 PBL_LOG_MODULE_DEFINE(driver_mag, CONFIG_DRIVER_IMU_LOG_LEVEL);
 
@@ -44,7 +45,7 @@ static void prv_rail(bool on) {
   if (on) {
     pbl_regulator_enable(BOARD_MAG_RAIL);
     // Supply up and the chip out of its 1.7 ms power-on reset.
-    psleep(10);
+    pbl_sleep_ms(10);
   } else {
     pbl_regulator_disable(BOARD_MAG_RAIL);
   }
@@ -101,7 +102,7 @@ static bool prv_enter_standby_mode(void) {
       uint8_t raw_data[7];
       return prv_read(DR_STATUS_REG, sizeof(raw_data), raw_data);
     }
-    psleep(2);
+    pbl_sleep_ms(2);
   }
   return false;
 }
