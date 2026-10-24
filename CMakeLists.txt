@@ -116,7 +116,8 @@ add_custom_command(
   COMMAND ${PBL_TOOLCHAIN_ENV} ${PYTHON_EXECUTABLE} ${PBL_BASE}/tools/cmake/generate.py version
           --template ${PBL_BASE}/include/pbl/version.h.in
           --output ${version_h}
-  DEPENDS ${PBL_BASE}/include/pbl/version.h.in
+          --config ${PBL_DOTCONFIG}
+  DEPENDS ${PBL_BASE}/include/pbl/version.h.in ${PBL_DOTCONFIG}
   WORKING_DIRECTORY ${PBL_BASE}
   COMMENT "Checking the firmware version"
   VERBATIM

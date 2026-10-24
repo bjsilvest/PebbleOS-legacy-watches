@@ -25,7 +25,7 @@ def _is_dirty():
     ) != 0
 
 
-def get_git_revision():
+def get_git_revision(suffix=""):
     # One process for both: the version rule runs on every build.
     timestamp, commit = _git("log", "-1", "--format=%ct%n%h", "HEAD").split("\n")
 
@@ -36,6 +36,13 @@ def get_git_revision():
     except subprocess.CalledProcessError:
         tag = "v9.9.9-dev"
         print(f"Git tag not found, using {tag}", file=sys.stderr)
+    # Right after the version numbers, e.g. v4.42.0-lite-tintin.1, unless the
+    # tag already carries it there.
+    if suffix:
+        numbers = re.match(r"v[\d.]*\d", tag)
+        end = numbers.end() if numbers else len(tag)
+        if not tag.startswith(suffix, end):
+            tag = tag[:end] + suffix + tag[end:]
 
     # The tag must follow the documented form. See
     # https://github.com/pebble/tintin/wiki/Firmware,-PRF-&-Bootloader-Versions

@@ -59,8 +59,8 @@ def max_resources_size(config):
     return 256 * BYTES_PER_K
 
 
-def version_info():
-    revision = gitinfo.get_git_revision()
+def version_info(config):
+    revision = gitinfo.get_git_revision(config.get("CONFIG_FW_VERSION_SUFFIX", ""))
     if revision["TAG"] != "?":
         return revision["TAG"], int(revision["TIMESTAMP"]), revision["COMMIT"]
     return "dev", 0, ""
@@ -144,7 +144,7 @@ def cmd_bundle(args):
     import mkbundle
 
     config = read_config(args.config)
-    version_string, version_ts, version_commit = version_info()
+    version_string, version_ts, version_commit = version_info(config)
     fw_type = "recovery" if enabled(config, "CONFIG_RECOVERY_FW") else "normal"
     slot = args.slot if fw_type == "normal" and args.slot != -1 else None
 

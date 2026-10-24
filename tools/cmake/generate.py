@@ -48,7 +48,8 @@ def read_config(path):
 
 
 def cmd_version(args):
-    revision = gitinfo.get_git_revision()
+    config = read_config(args.config)
+    revision = gitinfo.get_git_revision(config.get("CONFIG_FW_VERSION_SUFFIX", ""))
     # Truncate the commit to fit in the versions struct. It may become
     # ambiguous, but that beats failing the build over a long hash.
     revision["COMMIT"] = revision["COMMIT"][:7]
@@ -347,6 +348,7 @@ def main():
     p = sub.add_parser("version")
     p.add_argument("--template", required=True)
     p.add_argument("--output", required=True)
+    p.add_argument("--config", required=True)
     p.set_defaults(func=cmd_version)
 
     p = sub.add_parser("app-registry")

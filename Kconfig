@@ -193,6 +193,13 @@ config RESOURCES_COMPACT_FONTS
       glyph hash tables, and RLE4 encoded glyphs where that is smaller.
       Glyph lookups and decoding cost a little more.
 
+config FW_VERSION_SUFFIX
+    string
+    help
+      Added after the version numbers of the firmware version and the
+      bundle name, to mark a firmware that leaves out features of the
+      full one: "-lite" gives v4.42.0-lite-tintin.1.
+
 config BUNDLE_HWREV
     string
     help
