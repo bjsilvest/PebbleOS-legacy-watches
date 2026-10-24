@@ -9,10 +9,10 @@
 #include <pbl/bluetooth/types.h>
 #include <pbl/logging/logging.h>
 #endif
+#include <pbl/kernel/assert.h>
 
 #include <host/ble_hs_id.h>
 #include <services/gap/ble_svc_gap.h>
-#include <system/passert.h>
 
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
 PBL_LOG_MODULE_DECLARE(bt, CONFIG_BT_LOG_LEVEL);

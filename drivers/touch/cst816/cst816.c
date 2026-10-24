@@ -1,12 +1,14 @@
 /* SPDX-FileCopyrightText: 2025 Core Devices LLC */
 /* SPDX-License-Identifier: Apache-2.0 */
 
-#include <pbl/drivers/exti.h>
 #include <pbl/drivers/gpio.h>
 #include <pbl/drivers/i2c.h>
+#include <pbl/drivers/intc.h>
 #include <pbl/drivers/rtc.h>
 #include <pbl/drivers/touch/touch_sensor.h>
 #include <pbl/input/input.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/delay.h>
 #include <pbl/kernel/types.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/analytics/analytics.h>
@@ -18,8 +20,6 @@
 #include <board/board.h>
 #include <cst816_fw.h>
 #include <kernel/events.h>
-#include <kernel/util/sleep.h>
-#include <system/passert.h>
 
 PBL_LOG_MODULE_DEFINE(driver_touch_cst816, CONFIG_DRIVER_TOUCH_LOG_LEVEL);
 
@@ -71,6 +71,7 @@ PBL_LOG_MODULE_DEFINE(driver_touch_cst816, CONFIG_DRIVER_TOUCH_LOG_LEVEL);
  * previous one therefore marks a fresh sleep->awake transition. */
 #define CST816_WAKE_SPACING_MS 2000
 
+static struct pbl_irq_spec s_int_irq;
 static bool s_callback_scheduled = false;
 static bool s_palm_down = false;
 static bool s_palm_click_pending = false;
@@ -80,7 +81,20 @@ static bool s_activity_since_check = false;
 static RtcTicks s_last_irq_ticks = 0;
 static PBL_MUTEX_DEFINE(s_i2c_lock);
 
-static void prv_exti_cb(void);
+static void prv_int_handler(void *arg);
+
+// Not connected until the line is requested
+static void prv_int_set_enabled(bool enabled) {
+  if (!pbl_irq_spec_is_connected(&s_int_irq)) {
+    return;
+  }
+
+  if (enabled) {
+    (void)pbl_intc_enable(&s_int_irq);
+  } else {
+    (void)pbl_intc_disable(&s_int_irq);
+  }
+}
 static void cst816_hw_reset(void);
 static void prv_watchdog_cb(void *data);
 
@@ -130,17 +144,17 @@ static bool prv_write_data(uint16_t register_address, const uint8_t *datum, uint
 
 static bool cst816_enter_bootmode(void) {
   pbl_gpio_set(&CST816->reset, true);
-  psleep(CST816_RESET_CYCLE_TIME);
+  pbl_sleep_ms(CST816_RESET_CYCLE_TIME);
   pbl_gpio_set(&CST816->reset, false);
-  psleep(CST816_RESET_CYCLE_TIME);
+  pbl_sleep_ms(CST816_RESET_CYCLE_TIME);
 
   uint8_t retry_cnt = 10;
   while (retry_cnt--) {
     uint8_t cmd = CST816_BOOT_MODE_CMD;
     bool rv = prv_write_data(CST816_BOOT_MODE_REG, &cmd, 1, 0);
-    psleep(CST816_REG_WR_DELAY_TIME);
+    pbl_sleep_ms(CST816_REG_WR_DELAY_TIME);
     rv &= prv_read_data(CST816_BOOT_FLAG_REG, &cmd, 1, 0);
-    psleep(CST816_REG_WR_DELAY_TIME);
+    pbl_sleep_ms(CST816_REG_WR_DELAY_TIME);
 
     if (cmd == CST816_BOOT_FLAG_VAL) {
       return true;
@@ -153,7 +167,7 @@ static bool cst816_enter_bootmode(void) {
 static uint16_t cst816_read_checksum(void) {
   uint8_t cmd = 0;
   bool rv = prv_write_data(CST816_BOOT_FLAG_REG, &cmd, 1, 0);
-  psleep(CST816_FW_CHECKSUM_CAL_TIME);
+  pbl_sleep_ms(CST816_FW_CHECKSUM_CAL_TIME);
 
   uint8_t data[2];
   rv &= prv_read_data(CST816_FW_CHECKSUM_REG, data, 2, 0);
@@ -174,22 +188,22 @@ static bool cst816_fw_update(void) {
       PBL_LOG_DBG("fw start_addr:%d length:%d", start_addr, length);
       uint8_t addr[2] = {start_addr & 0xff, start_addr >> 8};
       bool rv = prv_write_data(CST816_FW_START_ADDR_REG, addr, 2, 0);
-      psleep(CST816_REG_WR_DELAY_TIME);
+      pbl_sleep_ms(CST816_REG_WR_DELAY_TIME);
       if (!prv_write_data(CST816_FW_PAGE_REG, app_bin + fw_offset,
                           length >= CST816_FW_PAGE_SIZE ? CST816_FW_PAGE_SIZE : length, 0)) {
         PBL_LOG_ERR("cst816 update fw error by iic");
         return false;
       }
-      psleep(CST816_REG_WR_DELAY_TIME);
+      pbl_sleep_ms(CST816_REG_WR_DELAY_TIME);
       uint8_t cmd = 0xEE;
       rv = prv_write_data(CST816_FW_PAGE_DONE, &cmd, 1, 0);
-      psleep(CST816_FW_WR_TIME);
+      pbl_sleep_ms(CST816_FW_WR_TIME);
       for (int t = 0;; t++) {
         if (t > 50) {
           PBL_LOG_ERR("cst816 update fw error by writing timeout");
           return false;
         }
-        psleep(CST816_RESET_CYCLE_TIME);
+        pbl_sleep_ms(CST816_RESET_CYCLE_TIME);
         uint8_t ready;
         rv = prv_read_data(CST816_FW_PAGE_STATE, &ready, 1, 0);
         if (rv && ready == CST816_FW_PAGE_READY) {
@@ -225,16 +239,18 @@ static bool cst816_fw_update(void) {
 static void cst816_hw_reset(void) {
   pbl_mutex_lock(&s_i2c_lock, PBL_FOREVER);
   pbl_gpio_set(&CST816->reset, true);
-  psleep(CST816_RESET_CYCLE_TIME);
+  pbl_sleep_ms(CST816_RESET_CYCLE_TIME);
   pbl_gpio_set(&CST816->reset, false);
-  psleep(CST816_POR_DELAY_TIME);
+  pbl_sleep_ms(CST816_POR_DELAY_TIME);
   pbl_mutex_unlock(&s_i2c_lock);
 }
 
 void touch_sensor_init(void) {
   uint8_t chip_id;
   uint8_t fw_version;
+  struct pbl_irq_spec irq;
   bool rv;
+  int ret;
 
   pbl_gpio_configure(&CST816->reset, PBL_GPIO_OUTPUT);
 
@@ -268,8 +284,31 @@ void touch_sensor_init(void) {
     }
   }
 
-  // initialize exti
-  exti_configure_pin(CST816->int_exti, ExtiTrigger_Falling, prv_exti_cb);
+  ret = pbl_gpio_configure(&CST816->int_gpio, PBL_GPIO_INPUT);
+  if (ret != 0) {
+    PBL_LOG_ERR("Could not configure the interrupt input (%d)", ret);
+    return;
+  }
+
+  ret = pbl_gpio_to_irq(&CST816->int_gpio, PBL_IRQ_TYPE_EDGE_FALLING, &irq);
+  if (ret != 0) {
+    PBL_LOG_ERR("Interrupt input cannot interrupt (%d)", ret);
+    return;
+  }
+
+  ret = pbl_device_init(&irq.intc->dev);
+  if (ret != 0) {
+    PBL_LOG_ERR("Interrupt controller unavailable");
+    return;
+  }
+
+  ret = pbl_intc_request(&irq, prv_int_handler, nullptr);
+  if (ret != 0) {
+    PBL_LOG_ERR("Could not request the interrupt (%d)", ret);
+    return;
+  }
+
+  s_int_irq = irq;
 
   touch_sensor_set_enabled(false);
 }
@@ -311,7 +350,7 @@ static void prv_process_pending_messages(void *context) {
   if (!rv) {
     PBL_LOG_ERR("Failed to read gesture ID, trying to recover");
     prv_report_sample(false, 0, 0);
-    exti_disable(CST816->int_exti);
+    prv_int_set_enabled(false);
     touch_sensor_set_enabled(true);
     return;
   }
@@ -321,7 +360,7 @@ static void prv_process_pending_messages(void *context) {
   if (!rv) {
     PBL_LOG_ERR("Failed to read touch data, trying to recover");
     prv_report_sample(false, 0, 0);
-    exti_disable(CST816->int_exti);
+    prv_int_set_enabled(false);
     touch_sensor_set_enabled(true);
     return;
   }
@@ -380,7 +419,7 @@ static void prv_process_pending_messages(void *context) {
   }
 }
 
-static void prv_exti_cb(void) {
+static void prv_int_handler(void *arg) {
   if (s_callback_scheduled) {
     return;
   }
@@ -399,11 +438,11 @@ static void prv_idle_reset_worker(void *context) {
     return;
   }
 
-  exti_disable(CST816->int_exti);
+  prv_int_set_enabled(false);
   cst816_hw_reset();
   s_callback_scheduled = false;
   s_activity_since_check = true;
-  exti_enable(CST816->int_exti);
+  prv_int_set_enabled(true);
 }
 
 // Runs on the regular-timer (NewTimers) task; keep it cheap, just offload.
@@ -427,7 +466,7 @@ void touch_sensor_set_enabled(bool enabled) {
   s_palm_click_pending = false;
 
   if (enabled) {
-    exti_enable(CST816->int_exti);
+    prv_int_set_enabled(true);
     s_enabled = true;
     s_activity_since_check = true;
     if (!regular_timer_is_scheduled(&s_watchdog_timer)) {
@@ -440,6 +479,6 @@ void touch_sensor_set_enabled(bool enabled) {
     }
     uint8_t data = CST816_POWER_MODE_SLEEP;
     prv_write_data(CST816_POWER_MODE_REG, &data, 1, 1);
-    exti_disable(CST816->int_exti);
+    prv_int_set_enabled(false);
   }
 }

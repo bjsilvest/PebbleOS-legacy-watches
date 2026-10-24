@@ -182,50 +182,6 @@ bool timeline_resources_is_system(TimelineResourceId timeline_id) {
 // Stubs
 /////////////////////
 
-#include <stubs_alarm.h>
-#include <stubs_alerts.h>
-#include <stubs_analytics.h>
-#include <stubs_app_cache.h>
-#include <stubs_app_manager.h>
-#include <stubs_app_timer.h>
-#include <stubs_app_window_stack.h>
-#include <stubs_bluetooth_ctl.h>
-#include <stubs_bootbits.h>
-#include <stubs_click.h>
-#include <stubs_clock.h>
-#include <stubs_do_not_disturb.h>
-#include <stubs_event_service_client.h>
-#include <stubs_events.h>
-#include <stubs_health_util.h>
-#include <stubs_i18n.h>
-#include <stubs_kino_player.h>
-#include <stubs_layer.h>
-#include <stubs_logging.h>
-#include <stubs_memory_layout.h>
-#include <stubs_music.h>
-#include <stubs_mutex.h>
-#include <stubs_notification_storage.h>
-#include <stubs_passert.h>
-#include <stubs_pbl_malloc.h>
-#include <stubs_pebble_process_info.h>
-#include <stubs_pebble_tasks.h>
-#include <stubs_serial.h>
-#include <stubs_session.h>
-#include <stubs_sleep.h>
-#include <stubs_status_bar_layer.h>
-#include <stubs_syscalls.h>
-#include <stubs_system_theme.h>
-#include <stubs_task_wdt.h>
-#include <stubs_tick.h>
-#include <stubs_time.h>
-#include <stubs_watchface.h>
-#include <stubs_weather_service.h>
-#include <stubs_weather_types.h>
-#include <stubs_window_manager.h>
-#include <stubs_window_stack.h>
-#include <stubs_workout_service.h>
-#include <stubs_workout_utils.h>
-
 GColor shell_prefs_get_theme_highlight_color(void) {
   // Black and white displays always highlight in black
   return PBL_IF_COLOR_ELSE(GColorWhite, GColorBlack);
@@ -586,10 +542,10 @@ void test_launcher_menu_layer__cell_heights_at_least_minimum(void) {
     s_content_size = size;
     const LauncherMenuLayerStyle *style = launcher_menu_layer_get_style();
 #if PBL_RECT
-    cl_assert(style->cell_height >= LAUNCHER_MENU_LAYER_MIN_CELL_HEIGHT);
+    cl_assert(style->cell_height >= SYSTEM_THEME_LAUNCHER_MIN_CELL_HEIGHT);
 #else
-    cl_assert(style->focused_cell_height >= LAUNCHER_MENU_LAYER_MIN_FOCUSED_CELL_HEIGHT);
-    cl_assert(style->unfocused_cell_height >= LAUNCHER_MENU_LAYER_MIN_UNFOCUSED_CELL_HEIGHT);
+    cl_assert(style->focused_cell_height >= SYSTEM_THEME_LAUNCHER_MIN_FOCUSED_CELL_HEIGHT);
+    cl_assert(style->unfocused_cell_height >= SYSTEM_THEME_LAUNCHER_MIN_UNFOCUSED_CELL_HEIGHT);
 #endif
   }
 }

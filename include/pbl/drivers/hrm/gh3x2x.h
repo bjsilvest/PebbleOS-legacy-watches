@@ -3,9 +3,9 @@
 
 #pragma once
 
-#include <pbl/drivers/exti.h>
 #include <pbl/drivers/gpio.h>
 #include <pbl/drivers/i2c.h>
+#include <pbl/drivers/intc.h>
 
 #include <applib/app_timer.h>
 
@@ -53,7 +53,7 @@ typedef const struct HRMDevice {
   /** Sensor I2C port. */
   const struct pbl_i2c_dev *i2c;
   /** Sensor interrupt line. */
-  ExtiConfig int_exti;
+  struct pbl_irq_spec int_irq;
   /** Sensor interrupt line, as an input. */
   struct pbl_gpio int_input;
   /** Sensor reset line, optional. */
@@ -63,7 +63,7 @@ typedef const struct HRMDevice {
 /**
  * @brief Queue tuning protocol data received over BLE for processing on the system task.
  *
- * Only with @c CONFIG_BT_GH3X2X_TUNING_SERVICE.
+ * Only with @c CONFIG_BT_SERVICE_GH3X2X_TUNING.
  *
  * @param context Heap buffer holding a 32-bit length followed by the data; freed once processed.
  * @return True if queued.

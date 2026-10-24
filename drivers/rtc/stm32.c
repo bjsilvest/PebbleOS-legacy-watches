@@ -15,9 +15,10 @@
 #include <pbl/logging/logging.h>
 #include <pbl/services/time.h>
 
-#include <kernel/util/delay.h>
+#include <pbl/kernel/delay.h>
 #include <stm32f4xx.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 #include <system/rtc_registers.h>
 
 PBL_LOG_MODULE_DEFINE(driver_rtc, CONFIG_DRIVER_RTC_LOG_LEVEL);
@@ -56,7 +57,7 @@ static void prv_lse_start(void) {
       PBL_LOG_INFO("LSE oscillator started after %d ms", i);
       return;
     }
-    delay_us(1000);
+    pbl_busy_wait_us(1000);
   }
 
   PBL_LOG_ERR("LSE oscillator did not start");

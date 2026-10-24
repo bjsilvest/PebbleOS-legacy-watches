@@ -11,14 +11,9 @@
 #include <pbl/util/list.h>
 
 #include <process_management/app_run_state.h>
-#include <system/passert.h>
 
 // Stubs
 ///////////////////////////////////////
-#include <stubs_logging.h>
-#include <stubs_passert.h>
-#include <stubs_pbl_malloc.h>
-#include <stubs_rand_ptr.h>
 
 // Fakes
 ///////////////////////////////////////

@@ -8,6 +8,8 @@
 #include <pbl/drivers/flash/flash_guard.h>
 #include <pbl/drivers/flash/flash_impl.h>
 #include <pbl/drivers/flash/flash_internal.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/delay.h>
 #include <pbl/kernel/mutex.h>
 #include <pbl/kernel/sem.h>
 #include <pbl/kernel/types.h>
@@ -18,9 +20,7 @@
 #include <pbl/util/math.h>
 
 #include <flash_region/flash_region.h>
-#include <kernel/util/sleep.h>
 #include <process_management/worker_manager.h>
-#include <system/passert.h>
 
 PBL_LOG_MODULE_DEFINE(driver_flash, CONFIG_DRIVER_FLASH_LOG_LEVEL);
 
@@ -72,7 +72,7 @@ static void prv_erase_pause(void) {
   if (s_erase.in_progress && !s_erase.suspended) {
     // If an erase is in progress, make sure it gets at least a minimum time slice to progress.
     // If not, the successive kicking of the suspend timer could starve it out completely
-    psleep(100);
+    pbl_sleep_ms(100);
     pbl_task_wdt_feed_thread(pebble_task_get_thread(s_erase.task));
     status_t status = flash_impl_erase_suspend(s_erase.address);
     PBL_ASSERT(PASSED(status), "Erase suspend failure: %" PRId32, status);
@@ -142,7 +142,7 @@ void flash_write_bytes(const uint8_t *buffer, uint32_t start_addr, uint32_t buff
         "flash_impl_write_page_begin failed: %d", written);
     status_t status;
     while ((status = flash_impl_get_write_status()) == E_BUSY) {
-      psleep(0);
+      pbl_sleep_ms(0);
     }
 #ifdef TEST_FLASH_LOCK_PROTECTION
     if (s_assert_write_error) {
@@ -156,13 +156,8 @@ void flash_write_bytes(const uint8_t *buffer, uint32_t start_addr, uint32_t buff
     buffer += written;
     start_addr += written;
     buffer_size -= written;
-    // Give higher-priority tasks a chance to access the flash in between
-    // each page write.
-    // TODO: uncomment the lines below to resolve PBL-17503
-    // if (buffer_size) {
-    //   pbl_mutex_unlock(&s_flash_lock);
-    //   pbl_mutex_lock(&s_flash_lock, PBL_FOREVER);
-    // }
+    // TODO: release the lock between page writes so higher-priority tasks can
+    // access the flash.
   }
   pbl_mutex_unlock(&s_flash_lock);
 }
@@ -307,13 +302,13 @@ static void prv_flash_erase_blocking(uint32_t sector_addr, bool is_subsector) {
   uint32_t remaining_ms =
       prv_flash_erase_start(sector_addr, prv_blocking_erase_complete, nullptr, is_subsector, 0);
   while (remaining_ms) {
-    psleep(remaining_ms);
+    pbl_sleep_ms(remaining_ms);
     total_time_spent_waiting_ms += remaining_ms;
 
     remaining_ms = prv_flash_erase_poll();
 
-    // check to see if the cb responsible for resuming erases should have run
-    // but is blocked. See PBL-25741 for details
+    // Resume the erase here if the timer callback responsible for it is
+    // overdue, as its task may be blocked.
     uint32_t erase_suspend_time_remaining;
     if (new_timer_scheduled(s_erase_suspend_timer, &erase_suspend_time_remaining) &&
         (erase_suspend_time_remaining == 0)) {
@@ -388,7 +383,7 @@ void flash_erase_bulk(void) {
   pbl_mutex_lock(&s_flash_lock, PBL_FOREVER);
   flash_impl_erase_bulk_begin();
   while (flash_impl_erase_is_in_progress()) {
-    psleep(10);
+    pbl_sleep_ms(10);
   }
   pbl_mutex_unlock(&s_flash_lock);
 }
@@ -418,7 +413,7 @@ void flash_stop(void) {
     prv_erase_resume();
     pbl_mutex_unlock(&s_flash_lock);
     while (__atomic_load_n(&s_erase.in_progress, __ATOMIC_SEQ_CST)) {
-      psleep(10);
+      pbl_sleep_ms(10);
     }
   }
 }

@@ -8,6 +8,9 @@
 
 #include <pbl/bluetooth/hci_uart.h>
 #include <pbl/drivers/uart.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/delay.h>
+#include <pbl/kernel/fatal.h>
 #include <pbl/kernel/irq.h>
 #include <pbl/kernel/mutex.h>
 #include <pbl/kernel/sem.h>
@@ -23,8 +26,6 @@
 #include <pbl/soc/stm32/sleep.h>
 #endif
 #include <kernel/pebble_tasks.h>
-#include <kernel/util/delay.h>
-#include <system/passert.h>
 
 // clang-format off
 #include <os/os_mbuf.h>
@@ -426,7 +427,7 @@ static int prv_hci_frame_cb(uint8_t pkt_type, void *data) {
       prv_note_smp('<', data);
       return ble_transport_to_hs_acl(data);
     default:
-      WTF;
+      pbl_panic();
   }
 
   return -1;
@@ -664,7 +665,7 @@ static void prv_try_sleep(void) {
   pbl_irq_unlock();
 
   // Let a byte already on the wire land and the UART idle interrupt hand it on.
-  delay_us(50);
+  pbl_busy_wait_us(50);
 
   pbl_irq_lock();
   if (prv_idle_locked()) {
@@ -893,7 +894,7 @@ static void prv_write_irq(const uint8_t *data, size_t len) {
       // byte in its FIFO, so look again briefly before sleeping.
       s_tx_flow_waits++;
       for (int i = 0; i < TX_FLOW_SPIN_TRIES && !da1468x_rts_ready(); i++) {
-        delay_us(TX_FLOW_SPIN_US);
+        pbl_busy_wait_us(TX_FLOW_SPIN_US);
       }
       if (da1468x_rts_ready()) {
         continue;

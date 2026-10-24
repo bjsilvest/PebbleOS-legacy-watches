@@ -11,6 +11,7 @@
 #include <applib/ui/window_stack.h>
 #include <applib/ui/window_stack_private.h>
 #include <clar.h>
+#include <fff.h>
 #include <kernel/util/segment.h>
 #include <popups/crashed_ui.h>
 #include <process_management/app_install_manager.h>
@@ -18,6 +19,7 @@
 #include <process_management/app_run_state.h>
 #include <process_management/process_manager.h>
 #include <resource/resource_ids.auto.h>
+#include <stubs_thread.h>
 
 // Fakes
 #include <fake_new_timer.h>
@@ -25,35 +27,6 @@
 #include <fake_rtc.h>
 
 // Stubs
-#include <stubs_accel_service.h>
-#include <stubs_analytics.h>
-#include <stubs_animation_service.h>
-#include <stubs_app_fetch_endpoint.h>
-#include <stubs_app_state.h>
-#include <stubs_applib_resource.h>
-#include <stubs_cache.h>
-#include <stubs_compositor.h>
-#include <stubs_dialog.h>
-#include <stubs_events.h>
-#include <stubs_expandable_dialog.h>
-#include <stubs_gettext.h>
-#include <stubs_i18n.h>
-#include <stubs_logging.h>
-#include <stubs_modal_manager.h>
-#include <stubs_mpu.h>
-#include <stubs_mutex.h>
-#include <stubs_passert.h>
-#include <stubs_persist.h>
-#include <stubs_print.h>
-#include <stubs_rand_ptr.h>
-#include <stubs_resources.h>
-#include <stubs_serial.h>
-#include <stubs_simple_dialog.h>
-#include <stubs_syscall_internal.h>
-#include <stubs_thread.h>
-#include <stubs_tick.h>
-#include <stubs_timeline_peek.h>
-#include <stubs_worker_manager.h>
 
 // Fake "Apps"
 ///////////////////////////////////////////////////////////
@@ -106,8 +79,6 @@ static PebbleProcessMdFlash s_borked_app = {
 
 static PebbleEvent s_last_to_app_event;
 
-static uint32_t s_app_task_control_reg;
-
 // Fakes
 ///////////////////////////////////////////////////////////
 
@@ -148,6 +119,8 @@ char __APP_RAM__[1024 * 128];
 char __APP_RAM_end__;
 char __WORKER_RAM__[1024 * 12];
 char __WORKER_RAM_end__;
+
+const void *const g_pbl_system_tbl[] = {nullptr};
 
 MemorySegment prv_get_app_ram_segment(void) {
   return (MemorySegment){__APP_RAM__, &__APP_RAM__[1024 * 128]};
@@ -227,9 +200,6 @@ const PebbleProcessMd *app_fetch_ui_get_app_info(void) {
 void app_message_close(void) {
 }
 
-void ble_app_cleanup(void) {
-}
-
 void dls_inactivate_sessions(PebbleTask task) {
 }
 
@@ -254,7 +224,10 @@ const PebbleProcessMd *system_app_state_machine_get_default_app(void) {
 void launcher_cancel_force_quit(void) {
 }
 
-void light_reset_user_controlled(void) {
+void light_touch_up(void) {
+}
+
+void light_reset_user_controlled_by_task(PebbleTask task) {
 }
 
 void light_set_system_color(void) {
@@ -305,9 +278,6 @@ const PebbleProcessMd *system_app_state_machine_get_last_registered_app(void) {
   return (PebbleProcessMd *)&s_root_app;
 }
 void system_app_state_machine_register_app_launch(const PebbleProcessMd *app) {
-}
-
-void health_tracking_ui_register_app_launch(AppInstallId app_id) {
 }
 
 void sys_vibe_history_stop_collecting(void) {
@@ -372,11 +342,8 @@ const CompositorTransition *shell_get_close_compositor_animation(AppInstallId cu
 }
 
 // Both crash UI paths relaunch the default watchface once
-static int s_watchface_launch_default_count;
 
-void watchface_launch_default(const CompositorTransition *animation) {
-  s_watchface_launch_default_count++;
-}
+FAKE_VOID_FUNC(watchface_launch_default, const CompositorTransition *);
 
 void process_heap_set_exception_handlers(Heap *heap, const PebbleProcessMd *app_md) {
 }
@@ -389,9 +356,9 @@ void test_app_manager__initialize(void) {
   app_manager_init();
 
   s_last_to_app_event = (PebbleEvent){};
-  s_watchface_launch_default_count = 0;
+  RESET_FAKE(watchface_launch_default);
 
-  s_app_task_control_reg = 0x1; // Just leave everything as unprivileged
+  stub_control_reg(0x1); // Just leave everything as unprivileged
 }
 
 void test_app_manager__start_first(void) {
@@ -435,7 +402,7 @@ void test_app_manager__start_third_party_and_crash_back_to_root(void) {
   app_manager_close_current_app(false /* gracefully */);
 
   cl_assert(app_manager_get_current_app_md() == (PebbleProcessMd *)&s_root_app);
-  cl_assert_equal_i(s_watchface_launch_default_count, 1);
+  cl_assert_equal_i(watchface_launch_default_fake.call_count, 1);
 }
 
 void test_app_manager__start_borked_app(void) {
@@ -502,7 +469,7 @@ void test_app_manager__requested_forced_close_launches_the_requested_app(void) {
   app_manager_close_current_app(false /* gracefully */);
 
   cl_assert(app_manager_get_current_app_md() == (PebbleProcessMd *)&s_launch_app);
-  cl_assert_equal_i(s_watchface_launch_default_count, 0);
+  cl_assert_equal_i(watchface_launch_default_fake.call_count, 0);
 }
 
 // A second launch while the requested close is pending doesn't turn it into a crash
@@ -522,7 +489,7 @@ void test_app_manager__second_launch_keeps_a_pending_request(void) {
   app_manager_close_current_app(false /* gracefully */);
 
   cl_assert(app_manager_get_current_app_md() == (PebbleProcessMd *)&s_root_app);
-  cl_assert_equal_i(s_watchface_launch_default_count, 0);
+  cl_assert_equal_i(watchface_launch_default_fake.call_count, 0);
 }
 
 // Same, with the app stoppable at once
@@ -536,7 +503,7 @@ void test_app_manager__requested_forced_close_outside_a_syscall_launches_the_req
   });
 
   cl_assert(app_manager_get_current_app_md() == (PebbleProcessMd *)&s_launch_app);
-  cl_assert_equal_i(s_watchface_launch_default_count, 0);
+  cl_assert_equal_i(watchface_launch_default_fake.call_count, 0);
 }
 
 // The request covers only that close, so a later crash is still a crash
@@ -547,7 +514,7 @@ void test_app_manager__crash_after_a_requested_forced_close_is_still_a_crash(voi
   app_manager_close_current_app(false /* gracefully */);
 
   cl_assert(app_manager_get_current_app_md() == (PebbleProcessMd *)&s_root_app);
-  cl_assert_equal_i(s_watchface_launch_default_count, 1);
+  cl_assert_equal_i(watchface_launch_default_fake.call_count, 1);
 }
 
 void test_app_manager__watchface_crash_on_close(void) {

@@ -19,10 +19,6 @@ extern size_t app_inbox_service_num_success_for_tag(AppInboxServiceTag tag);
 
 #include <fake_kernel_malloc.h>
 #include <fake_pebble_tasks.h>
-#include <stubs_logging.h>
-#include <stubs_mutex.h>
-#include <stubs_passert.h>
-#include <stubs_syscall_internal.h>
 
 #define BUFFER_SIZE                (32)
 #define NOT_PERMITTED_MSG_HANDLER  ((AppInboxMessageHandler)~0)
@@ -196,15 +192,15 @@ void test_app_inbox__app_inbox_create_and_register_oom(void) {
 }
 
 void test_app_inbox__app_inbox_create_and_register_msg_handler_not_permitted(void) {
-  // The syscall_failed() fake will trigger passert:
-  cl_assert_passert(app_inbox_create_and_register(BUFFER_SIZE, 1, NOT_PERMITTED_MSG_HANDLER,
-                                                  test_dropped_handler));
+  // The pbl_syscall_fail() fake will trigger a panic:
+  cl_assert_panic(app_inbox_create_and_register(BUFFER_SIZE, 1, NOT_PERMITTED_MSG_HANDLER,
+                                                test_dropped_handler));
 }
 
 void test_app_inbox__app_inbox_create_and_register_drop_handler_not_permitted(void) {
-  // The syscall_failed() fake will trigger passert:
-  cl_assert_passert(app_inbox_create_and_register(BUFFER_SIZE, 1, test_message_handler,
-                                                  NOT_PERMITTED_DROP_HANDLER));
+  // The pbl_syscall_fail() fake will trigger a panic:
+  cl_assert_panic(app_inbox_create_and_register(BUFFER_SIZE, 1, test_message_handler,
+                                                NOT_PERMITTED_DROP_HANDLER));
 }
 
 void test_app_inbox__app_inbox_create_and_register_happy_case(void) {

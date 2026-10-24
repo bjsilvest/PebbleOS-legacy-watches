@@ -10,7 +10,8 @@
 #include <pbl/drivers/uart/stm32.h>
 #include <pbl/kernel/irq.h>
 
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 // Fixed point precision for the baud rate divider, as the ST library uses.
 #define DIV_PRECISION (100)

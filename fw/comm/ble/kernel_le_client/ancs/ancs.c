@@ -10,7 +10,9 @@
 
 #include <string.h>
 
+#include <pbl/kernel/assert.h>
 #include <pbl/kernel/compiler.h>
+#include <pbl/kernel/fatal.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/evented_timer.h>
 #include <pbl/services/notifications/ancs/ancs_notifications.h>
@@ -25,7 +27,6 @@
 #include <kernel/event_loop.h>
 #include <kernel/pbl_malloc.h>
 #include <system/hexdump.h>
-#include <system/passert.h>
 
 PBL_LOG_MODULE_DECLARE(bt, CONFIG_BT_LOG_LEVEL);
 
@@ -151,7 +152,7 @@ static bool prv_can_transition_state(ANCSClientState new_state) {
       return (new_state == ANCSClientStateRequestedNotification ||
               new_state == ANCSClientStateIdle);
     default:
-      WTF;
+      pbl_panic();
   }
 }
 
@@ -495,10 +496,10 @@ static void prv_resubscribe_to_ancs(void) {
     if (charx != PBL_BT_CHARACTERISTIC_INVALID) {
       // Unsubscribe to clear the local state (ignore errors -- the subscription
       // may already have been cleaned up)
-      gatt_client_subscriptions_subscribe(charx, BLESubscriptionNone, GAPLEClientKernel);
+      gatt_client_subscriptions_subscribe(charx, BLESubscriptionNone);
 
-      const enum pbl_bt_errno e = gatt_client_subscriptions_subscribe(
-          charx, BLESubscriptionNotifications, GAPLEClientKernel);
+      const enum pbl_bt_errno e =
+          gatt_client_subscriptions_subscribe(charx, BLESubscriptionNotifications);
       if (e != PBL_BT_ERRNO_OK) {
         PBL_LOG_ERR("Failed to resubscribe to ANCS charx %d: %d", c, e);
       }
@@ -696,7 +697,7 @@ static void prv_reassembly_handle_complete_response(const uint8_t *data, const s
       prv_handle_notification_attributes_response(data, length);
       return;
     default:
-      // WTF;
+      // pbl_panic();
       prv_reset_and_next();
       return;
   }
@@ -959,7 +960,7 @@ void ancs_handle_subscribe(pbl_bt_characteristic_t subscribed_characteristic,
   if (characteristic_id != ANCSCharacteristicNotification &&
       characteristic_id != ANCSCharacteristicData) {
     // Only Notification and Data characteristics are expected to be subscribed to
-    WTF;
+    pbl_panic();
   }
 
   if (error == PBL_BT_GATT_ERROR_SUCCESS) {
@@ -1008,8 +1009,8 @@ void ancs_handle_service_discovered(pbl_bt_characteristic_t *characteristics) {
   // Subscribe to Data, then to Notification characteristics. Reject the service
   // if subscribing fails instead of asserting (e.g. a "fake ANCS" without CCCD).
   for (int c = ANCSCharacteristicData; c >= ANCSCharacteristicNotification; --c) {
-    const enum pbl_bt_errno e = gatt_client_subscriptions_subscribe(
-        characteristics[c], BLESubscriptionNotifications, GAPLEClientKernel);
+    const enum pbl_bt_errno e =
+        gatt_client_subscriptions_subscribe(characteristics[c], BLESubscriptionNotifications);
     if (e != PBL_BT_ERRNO_OK) {
       PBL_LOG_WRN("Failed to subscribe ANCS charx %d (err=%d), ignoring service", c, e);
       ancs_invalidate_all_references();
@@ -1138,7 +1139,7 @@ void ancs_handle_read_or_notification(pbl_bt_characteristic_t characteristic, co
       handler = prv_handle_ds_notification;
       break;
     default:
-      WTF;
+      pbl_panic();
   }
   handler(value_length, value);
 }
@@ -1178,8 +1179,7 @@ void ancs_handle_write_response(pbl_bt_characteristic_t characteristic,
 
 static bool prv_write_control_point_request(const CPDSMessage *cmd, size_t size) {
   const pbl_bt_characteristic_t cp = s_ancs_client->characteristics[ANCSCharacteristicControl];
-  const enum pbl_bt_errno error =
-      gatt_client_op_write(cp, (const uint8_t *)cmd, size, GAPLEClientKernel);
+  const enum pbl_bt_errno error = gatt_client_op_write(cp, (const uint8_t *)cmd, size);
 
   PBL_LOG_DBG("Writing to control point:");
   PBL_HEXDUMP(LOG_LEVEL_DEBUG, (const uint8_t *)cmd, size);

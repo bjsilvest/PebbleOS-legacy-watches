@@ -51,6 +51,7 @@
 #include <applib/ui/dialogs/dialog.h>
 #include <applib/ui/dialogs/expandable_dialog.h>
 #include <applib/ui/dialogs/simple_dialog.h>
+#include <applib/ui/preferred_durations.h>
 #include <applib/ui/ui.h>
 #include <applib/ui/window.h>
 #include <applib/ui/window_manager.h>
@@ -762,7 +763,7 @@ static void prv_push_muted_dialog(void) {
   const char *msg = i18n_get("Muted", dialog);
   dialog_set_text(dialog, msg);
   dialog_set_icon(dialog, RESOURCE_ID_RESULT_MUTE_LARGE);
-  dialog_set_timeout(dialog, DIALOG_TIMEOUT_DEFAULT);
+  dialog_set_timeout(dialog, preferred_result_display_duration());
   i18n_free(msg, dialog);
   simple_dialog_push(simple_dialog, prv_get_window_stack());
 }
@@ -856,8 +857,8 @@ static void prv_mute_notification_1_hour(ActionMenu *action_menu,
 static void prv_mute_notification_today(ActionMenu *action_menu,
                                         const ActionMenuItem *action_menu_item, void *context) {
   time_t now = rtc_get_time();
-  struct tm now_tm;
-  localtime_r(&now, &now_tm);
+  struct pbl_tm now_tm;
+  pbl_localtime_r(&now, &now_tm);
   const int seconds_until_midnight =
       (24 * 3600) - (now_tm.tm_hour * 3600 + now_tm.tm_min * 60 + now_tm.tm_sec);
   prv_mute_notification_timed(action_menu_item, seconds_until_midnight);

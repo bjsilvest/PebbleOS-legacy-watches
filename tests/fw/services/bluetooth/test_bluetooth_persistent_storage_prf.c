@@ -19,17 +19,6 @@ typedef struct GAPLEConnection GAPLEConnection;
 #include <fake_pbl_malloc.h>
 #include <fake_regular_timer.h>
 #include <fake_spi_flash.h>
-#include <stubs_bluetooth_analytics.h>
-#include <stubs_bluetopia_interface.h>
-#include <stubs_bt_lock.h>
-#include <stubs_gap_le_advert.h>
-#include <stubs_gatt_client_discovery.h>
-#include <stubs_gatt_client_subscriptions.h>
-#include <stubs_hexdump.h>
-#include <stubs_logging.h>
-#include <stubs_mutex.h>
-#include <stubs_passert.h>
-#include <stubs_pebble_pairing_service.h>
 
 typedef bool (*BondingSyncFilterCb)(const struct pbl_bt_bonding *bonding, void *ctx);
 const struct pbl_bt_bonding *bonding_sync_find(BondingSyncFilterCb cb, void *ctx) {
@@ -172,7 +161,6 @@ void test_bluetooth_persistent_storage_prf__ble_store_and_get(void) {
   // Re-pair device 1 again:
   // In case the device is the same as the existing pairing, make sure the operation is "change"
   // and not "delete"  to avoid disconnecting just because the existing pairing is deleted.
-  // For bug details see https://pebbletechnology.atlassian.net/browse/PBL-24690
   prv_reset_change_op_tracking();
   id_1 = bt_persistent_storage_store_ble_pairing(&pairing_1, true /* is_gateway */, nullptr,
                                                  false /* requires_address_pinning */,

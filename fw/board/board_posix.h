@@ -25,9 +25,6 @@ typedef struct {
   uint8_t backlight_on_percent;
   uint32_t ambient_light_dark_threshold;
   uint32_t ambient_k_delta_threshold;
-  uint32_t ambient_light_lux_dark_offset;
-  uint32_t ambient_light_lux_num;
-  uint32_t ambient_light_lux_den;
 #ifdef CONFIG_BACKLIGHT_HAS_COLOR
   uint32_t backlight_default_color;
 #endif
@@ -50,15 +47,6 @@ typedef struct {
 typedef struct {
   uint8_t default_motion_sensitivity;
 } BoardConfigAccel;
-
-typedef struct {
-  int axes_offsets[3];
-  bool axes_inverts[3];
-} MagConfig;
-
-typedef struct {
-  const MagConfig mag_config;
-} BoardConfigMag;
 
 typedef const struct UARTDevice UARTDevice;
 typedef const struct QSPIPort QSPIPort;

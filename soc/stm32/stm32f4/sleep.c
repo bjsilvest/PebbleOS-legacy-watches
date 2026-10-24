@@ -4,7 +4,8 @@
 #include <pbl/kernel/irq.h>
 #include <pbl/soc/stm32/sleep.h>
 
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 static int s_block_count;
 

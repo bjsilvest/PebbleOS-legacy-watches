@@ -9,7 +9,8 @@
 #include <pbl/soc/stm32/sleep.h>
 
 #include <stm32f4xx.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 //! APB1 timers whose output is enabled, by index (TIM2 = 0 ... TIM14 = 8).
 static uint32_t s_enabled_mask;

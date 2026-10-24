@@ -12,8 +12,8 @@
 #include <process_management/app_install_types.h>
 #include <process_management/process_manager.h>
 #include <shell/system_theme.h>
+#include <shell/system_theme_style.h>
 #include <syscall/syscall.h>
-#include <system/passert.h>
 
 /////////////////////////////////
 // System Provided Cell Types
@@ -24,52 +24,6 @@
 //////////////////////
 // Basic menu cell
 
-typedef struct MenuCellDimensions {
-  int16_t basic_cell_height;
-  int16_t app_basic_cell_height;
-  int16_t small_cell_height;
-  int16_t horizontal_inset;
-  int16_t title_subtitle_left_margin;
-} MenuCellDimensions;
-
-static const MenuCellDimensions s_menu_cell_dimensions[NumPreferredContentSizes] = {
-  [PreferredContentSizeSmall] =
-      {
-        .basic_cell_height = PBL_IF_RECT_ELSE(42, 44),
-        .app_basic_cell_height = 44,
-        .small_cell_height = 34,
-        .horizontal_inset = 5,
-        .title_subtitle_left_margin = 30,
-      },
-  [PreferredContentSizeMedium] =
-      {
-        .basic_cell_height = 44,
-        .app_basic_cell_height = 44,
-        .small_cell_height = 34,
-        .horizontal_inset = 5,
-        .title_subtitle_left_margin = 30,
-      },
-  [PreferredContentSizeLarge] =
-      {
-#if defined(CONFIG_PLATFORM_FLINT)
-        .basic_cell_height = 60,
-#else
-        .basic_cell_height = PBL_IF_RECT_ELSE(50, 61),
-#endif
-        .app_basic_cell_height = 61,
-        .small_cell_height = 42,
-        .horizontal_inset = 10,
-        .title_subtitle_left_margin = 34,
-      },
-  [PreferredContentSizeExtraLarge] = {
-    .basic_cell_height = PBL_IF_RECT_ELSE(64, 85),
-    .app_basic_cell_height = 85,
-    .small_cell_height = 52,
-    .horizontal_inset = 10,
-    .title_subtitle_left_margin = 34,
-  },
-};
-
 //! Third-party apps keep the runtime platform's default size so their layouts are unaffected by
 //! the user's preferred content size.
 static bool prv_use_platform_default_size(void) {
@@ -77,11 +31,11 @@ static bool prv_use_platform_default_size(void) {
          !app_install_id_from_system(sys_process_manager_get_current_process_id());
 }
 
-static const MenuCellDimensions *prv_get_cell_dimensions(void) {
+static const SystemThemeMenuCellStyle *prv_get_cell_style(void) {
   const PreferredContentSize size =
       prv_use_platform_default_size() ? system_theme_get_default_content_size_for_runtime_platform()
                                       : system_theme_get_content_size();
-  return &s_menu_cell_dimensions[size];
+  return &system_theme_get_style_for_size(size)->menu_cell;
 }
 
 bool menu_text_scroll_is_allowed(void) {
@@ -118,30 +72,29 @@ void menu_text_scroll_draw_text(GContext *ctx, const char *text, GFont font, con
 }
 
 int16_t menu_cell_basic_cell_height(void) {
-  const MenuCellDimensions *dimensions = prv_get_cell_dimensions();
-  return prv_use_platform_default_size() ? dimensions->app_basic_cell_height
-                                         : dimensions->basic_cell_height;
+  const SystemThemeMenuCellStyle *style = prv_get_cell_style();
+  return prv_use_platform_default_size() ? style->app_basic_cell_height : style->basic_cell_height;
 }
 
 int16_t menu_cell_small_cell_height(void) {
-  return prv_get_cell_dimensions()->small_cell_height;
+  return prv_get_cell_style()->small_cell_height;
 }
 
 int16_t menu_cell_small_cell_height_for_size(PreferredContentSize size) {
-  return s_menu_cell_dimensions[size].small_cell_height;
+  return system_theme_get_style_for_size(size)->menu_cell.small_cell_height;
 }
 
 int16_t menu_cell_basic_horizontal_inset(void) {
-  return prv_get_cell_dimensions()->horizontal_inset;
+  return prv_get_cell_style()->horizontal_inset;
 }
 
 int16_t menu_cell_basic_horizontal_inset_for_size(PreferredContentSize size) {
-  return s_menu_cell_dimensions[size].horizontal_inset;
+  return system_theme_get_style_for_size(size)->menu_cell.horizontal_inset;
 }
 
 #if PBL_RECT
 static int16_t prv_title_subtitle_left_margin(void) {
-  return prv_get_cell_dimensions()->title_subtitle_left_margin;
+  return prv_get_cell_style()->title_subtitle_left_margin;
 }
 #endif
 
@@ -580,7 +533,6 @@ static PBL_ALWAYS_INLINE void prv_menu_cell_basic_draw_custom_two_columns_round(
 
 static PBL_ALWAYS_INLINE void prv_menu_cell_basic_draw_custom_round(
     GContext *ctx, const Layer *cell_layer, const MenuCellLayerConfig *config) {
-  // TODO PBL-23041: When round MenuLayer animations are enabled, we need a "is_selected" function
   const bool cell_is_selected = menu_cell_layer_is_highlighted(cell_layer);
   const bool draw_two_columns =
       (config->value || (config->icon && ((GAlign)config->icon_align == GAlignRight)));
@@ -608,7 +560,6 @@ static PBL_ALWAYS_INLINE void prv_draw_cell(GContext *ctx, const Layer *cell_lay
       ctx, cell_layer, config);
 }
 
-//! TODO: PBL-21467 Replace with MenuCellLayer
 void menu_cell_layer_draw(GContext *ctx, const Layer *cell_layer,
                           const MenuCellLayerConfig *config) {
   prv_draw_cell(ctx, cell_layer, config);

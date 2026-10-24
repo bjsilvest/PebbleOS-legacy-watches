@@ -2,6 +2,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 #include <pbl/drivers/button_id.h>
+#include <pbl/kernel/assert.h>
 #include <pbl/kernel/compiler.h>
 #include <pbl/services/touch/touch.h>
 
@@ -24,7 +25,7 @@
 #include <process_management/app_manager.h>
 #include <process_management/process_loader.h>
 #include <process_state/app_state/app_state.h>
-#include <system/passert.h>
+#include <syscall/syscall.h>
 #include <tinymt32.h>
 
 #if defined(CONFIG_MALLOC_INSTRUMENTATION) && defined(CONFIG_SHELL)
@@ -34,9 +35,9 @@
 typedef struct {
   Heap heap;
 
-  struct tm gmtime_tm;
-  struct tm localtime_tm;
-  char localtime_zone[TZ_LEN];
+  struct pbl_tm gmtime_tm;
+  struct pbl_tm localtime_tm;
+  char localtime_zone[PBL_TZ_LEN];
 
   tinymt32_t rand_seed;
 
@@ -62,8 +63,6 @@ typedef struct {
   GContext graphics_context;
 
   EventServiceInfo event_service_state;
-
-  BLEAppState ble_app_state;
 
   AccelServiceState accel_state;
 
@@ -232,12 +231,12 @@ static const TouchNavOps s_app_touch_nav_ops = {
 // Twin subscription effects for the app task. The subscribe/reconcile state machine lives in
 // touch_nav.c; these ops bind it to the app task's touch service slot and nav state.
 static bool prv_app_twin_pref_enabled(void *ctx) {
-  return touch_nav_enabled();
+  return sys_touch_nav_enabled();
 }
 
 static bool prv_app_twin_master_enabled(void *ctx) {
   // The master "Touch" switch IS the global touch kill: an opted-in app follows it alone.
-  return touch_service_is_globally_enabled();
+  return sys_touch_service_is_enabled();
 }
 
 static void prv_app_twin_install_handler(void *ctx) {
@@ -245,11 +244,11 @@ static void prv_app_twin_install_handler(void *ctx) {
   touch_service_set_system_handler(touch_nav_dispatch, &s_app_state_ptr->touch_nav_state);
   // Mark the app twin live so the dispatch gate and touch-driven backlight treat this app as
   // navigating even when system nav (the Touch Navigation sub-pref) is off.
-  touch_set_app_nav_active(true);
+  sys_touch_set_app_nav_active(true);
 }
 
 static void prv_app_twin_remove_handler(void *ctx) {
-  touch_set_app_nav_active(false);
+  sys_touch_set_app_nav_active(false);
   recognizer_manager_cancel_and_reset(&s_app_state_ptr->recognizer_manager);
   touch_service_set_system_handler(nullptr, nullptr);
 }
@@ -300,8 +299,6 @@ PBL_NOINLINE void app_state_init(void) {
   graphics_context_init(&s_app_state_ptr->graphics_context, &s_app_state_ptr->framebuffer,
                         init_mode);
 
-  ble_init_app_state();
-
   accel_service_state_init(app_state_get_accel_state());
 
   plugin_service_state_init(app_state_get_plugin_service());
@@ -348,10 +345,10 @@ Heap *app_state_get_heap(void) {
   return &s_app_state_ptr->heap;
 }
 
-struct tm *app_state_get_gmtime_tm(void) {
+struct pbl_tm *app_state_get_gmtime_tm(void) {
   return &s_app_state_ptr->gmtime_tm;
 }
-struct tm *app_state_get_localtime_tm(void) {
+struct pbl_tm *app_state_get_localtime_tm(void) {
   return &s_app_state_ptr->localtime_tm;
 }
 char *app_state_get_localtime_zone(void) {
@@ -375,10 +372,6 @@ AnimationState *app_state_get_animation_state() {
 
 AppMessageCtx *app_state_get_app_message_ctx(void) {
   return &s_app_state_ptr->app_message_ctx;
-}
-
-BLEAppState *app_state_get_ble_app_state(void) {
-  return &s_app_state_ptr->ble_app_state;
 }
 
 ClickManager *app_state_get_click_manager() {

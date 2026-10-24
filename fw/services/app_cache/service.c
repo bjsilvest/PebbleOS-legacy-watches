@@ -21,7 +21,6 @@
 #include <shell/normal/quick_launch.h>
 #include <shell/normal/watchface.h>
 #include <shell/prefs.h>
-#include <system/passert.h>
 
 PBL_LOG_MODULE_DEFINE(service_app_cache, CONFIG_SERVICE_APP_CACHE_LOG_LEVEL);
 
@@ -32,7 +31,7 @@ PBL_LOG_MODULE_DEFINE(service_app_cache, CONFIG_SERVICE_APP_CACHE_LOG_LEVEL);
 //! application.
 //!
 //! A priority can also be calculated for each entry. It is calculated by a simple last used
-//! algorithm (TODO Improve: PBL-13209) which will help determine which application
+//! algorithm which will help determine which application
 //! needs to be evicted in order to free up more space for other application binaries.
 //!
 //! When an entry is added into the app cache, it means the binaries now reside on the watch. On
@@ -49,16 +48,8 @@ PBL_LOG_MODULE_DEFINE(service_app_cache, CONFIG_SERVICE_APP_CACHE_LOG_LEVEL);
 //! each cache entry is ~16 bytes, 4000 / 16 = 250 apps
 #define APP_CACHE_MAX_SIZE 4000
 
-//! Keep enough room for the maximum sized application based on platform, plus a little more room.
-//! Source: https://pebbletechnology.atlassian.net/wiki/display/DEV/PBW+3.0
-//! Silk's filesystem is only 5.25 MiB: with a 4 MiB buffer every newly cached
-//! app was evicted again right away, so a watchface fetched in a loop.
-#if defined(CONFIG_BOARD_ASTERIX) || defined(CONFIG_BOARD_OBELIX) || defined(CONFIG_BOARD_SILK) || \
-    defined(UNITTEST)
+//! Keep enough room for the maximum sized application, plus a little more room.
 #define APP_SPACE_BUFFER PBL_KIB(300)
-#else
-#define APP_SPACE_BUFFER PBL_MIB(4)
-#endif
 
 #define MAX_PRIORITY ((uint32_t)~0)
 
@@ -366,10 +357,8 @@ static void prv_app_cache_find_and_delete_orphans(PFSFileListEntry **resource_li
   }
 }
 
-// The bug addressed in PBL-34010 caused resource files to remain in the filesystem even
-// after the associated application had been deleted.  This function attempts to find such
-// orphaned files and remove them.  Note: further to the bug in PBL-34010, this function will
-// remove any resource files that are not related to apps currently in the cache.
+// Remove any resource files that are not related to apps currently in the cache, e.g. left
+// behind after the associated application had been deleted.
 static void prv_purge_orphaned_resource_files(void) {
   // create a list of all app resource files in the filesystem
   PFSFileListEntry *resource_files = pfs_create_file_list(is_app_resource_file_name);

@@ -62,7 +62,7 @@ void arch_init(void) {
 
 void arch_thread_init(struct pbl_thread *t, void (*entry)(void *), void *arg) {
   struct posix_thread *pt = calloc(1, sizeof(*pt));
-  KERNEL_ASSERT(pt != nullptr);
+  PBL_ASSERTN(pt != nullptr);
   pthread_cond_init(&pt->wake, nullptr);
   pt->entry = entry;
   pt->arg = arg;
@@ -129,6 +129,10 @@ void arch_thread_aborted(struct pbl_thread *t) {
 
 bool arch_in_isr(void) {
   return posix_in_isr;
+}
+
+uint32_t arch_cycles_per_sec(void) {
+  return 1000000000U;
 }
 
 void arch_irq_disable(void) {

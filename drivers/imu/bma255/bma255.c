@@ -17,7 +17,8 @@
 
 #include <board/board.h>
 #include <kernel/util/sleep.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 #define BMA255_DEBUG 0
 

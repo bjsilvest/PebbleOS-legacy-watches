@@ -639,7 +639,7 @@ static void prv_push_reward(time_t now_utc, const RewardNotifConfig *notif_confi
   prv_save_state(notif_config->settings_key, &notif_config->state->last_triggered_utc,
                  sizeof(notif_config->state->last_triggered_utc));
 
-  PBL_LOG_DBG("Saved reward state: %ld", notif_config->state->last_triggered_utc);
+  PBL_LOG_DBG("Saved reward state: %ld", (long)notif_config->state->last_triggered_utc);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -818,7 +818,7 @@ static void prv_do_sleep_reward(time_t now_utc) {
 // Format a time given in seconds after midnight
 static void prv_strcat_formatted_time(int32_t time_seconds, char *out_buf, size_t buf_length,
                                       const void *i18n_owner) {
-  struct tm time = (struct tm){
+  struct pbl_tm time = (struct pbl_tm){
     .tm_hour = time_seconds / PBL_SEC_PER_HOUR,
     .tm_min = (time_seconds % PBL_SEC_PER_HOUR) / PBL_SEC_PER_MIN
   };
@@ -827,7 +827,7 @@ static void prv_strcat_formatted_time(int32_t time_seconds, char *out_buf, size_
       clock_is_24h_style() ? i18n_get("%H:%M", i18n_owner) : i18n_get("%l:%M%p", i18n_owner);
 
   char time_str_buf[TIME_BUFFER_LENGTH];
-  strftime(time_str_buf, TIME_BUFFER_LENGTH, format, &time);
+  pbl_strftime_r(time_str_buf, TIME_BUFFER_LENGTH, format, &time);
   safe_strcat(out_buf, string_strip_leading_whitespace(time_str_buf), buf_length);
 }
 
@@ -1004,7 +1004,7 @@ static void prv_do_sleep_notification(time_t now_utc, time_t sleep_exit_utc,
   // Notify about the pin after a certain amount of time
   const time_t since_exited = now_utc - sleep_exit_utc;
   if (since_exited < s_sleep_summary_settings.summary.sleep.trigger_notif_seconds) {
-    PBL_LOG_DBG("Not notifying sleep pin - not trigger time yet (%ld)", since_exited);
+    PBL_LOG_DBG("Not notifying sleep pin - not trigger time yet (%ld)", (long)since_exited);
     return;
   }
 
@@ -1092,7 +1092,7 @@ static void prv_do_sleep_summary(time_t now_utc) {
       sleep_enter_utc == s_sleep_pin_state.first_enter_utc) {
     // Notify about the sleep pin
     prv_do_sleep_notification(now_utc, sleep_exit_utc, sleep_total_seconds);
-    PBL_LOG_DBG("Not adding sleep pin - already checked session %ld", sleep_exit_utc);
+    PBL_LOG_DBG("Not adding sleep pin - already checked session %ld", (long)sleep_exit_utc);
     return;
   }
 
@@ -1896,7 +1896,6 @@ void prv_process_activity_sessions(time_t now_utc) {
       }
       switch (sessions[i].type) {
         case ActivitySessionType_Nap:
-          // PBL-36355 Disable nap notifications
           // Nap notifications are disabled until we get better at detecting naps
           // Re-enable nap session unit tests when re-enabling nap session notifications
           break;
@@ -2046,8 +2045,9 @@ void activity_insights_init(time_t now_utc) {
     s_sleep_pin_state.notified = true;
   }
 
-  PBL_LOG_DBG("Last sleep reward state: %ld", s_sleep_reward_state.common.last_triggered_utc);
-  PBL_LOG_DBG("Last activity reward state: %ld", s_activity_reward_state.common.last_triggered_utc);
+  PBL_LOG_DBG("Last sleep reward state: %ld", (long)s_sleep_reward_state.common.last_triggered_utc);
+  PBL_LOG_DBG("Last activity reward state: %ld",
+              (long)s_activity_reward_state.common.last_triggered_utc);
 
   // Recalculate metric stats
   activity_insights_recalculate_stats();

@@ -20,3 +20,11 @@ config REGULATOR_GPIO
     select REGULATOR
     help
       Support for rails switched by a single enable output.
+
+if REGULATOR
+
+module = DRIVER_REGULATOR
+module-str = Regulator
+source "subsys/logging/Kconfig.template.log_level"
+
+endif # REGULATOR

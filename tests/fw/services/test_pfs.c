@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: 2024 Google LLC */
 /* SPDX-License-Identifier: Apache-2.0 */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -15,17 +16,6 @@
 #include <fake_rtc.h>
 #include <fake_spi_flash.h>
 #include <flash_region/flash_region.h>
-#include <stubs_analytics.h>
-#include <stubs_logging.h>
-#include <stubs_mutex.h>
-#include <stubs_passert.h>
-#include <stubs_pbl_malloc.h>
-#include <stubs_pebble_tasks.h>
-#include <stubs_print.h>
-#include <stubs_serial.h>
-#include <stubs_sleep.h>
-#include <stubs_task_wdt.h>
-#include <system/passert.h>
 
 #define PFS_SECTOR_SIZE 4096
 
@@ -940,8 +930,6 @@ static bool prv_file_exists(char *name) {
 
 extern void test_override_last_written_page(uint16_t start_page);
 extern void test_force_recalc_of_gc_region(void);
-// PBL-20973
-//
 // On boot, we scan pfs for the last page which was written. We then scan for a garbage collection
 // sector (requirement is that no files exist in the entire sector) & use the last page as a
 // starting point for where we will create initialize new files.

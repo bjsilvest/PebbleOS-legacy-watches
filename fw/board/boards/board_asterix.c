@@ -1,10 +1,14 @@
 /* SPDX-FileCopyrightText: 2025 Core Devices LLC */
 /* SPDX-License-Identifier: Apache-2.0 */
 
+#include <pbl/drivers/ambient/opt3001.h>
 #include <pbl/drivers/audio.h>
+#include <pbl/drivers/backlight/pwm.h>
 #include <pbl/drivers/flash/qspi_flash_definitions.h>
 #include <pbl/drivers/i2c.h>
 #include <pbl/drivers/i2c/nrf5.h>
+#include <pbl/drivers/imu/lsm6dso/lsm6dso.h>
+#include <pbl/drivers/imu/mmc5603nj/mmc5603nj.h>
 #include <pbl/drivers/mic.h>
 #include <pbl/drivers/mic/nrf5/pdm_definitions.h>
 #include <pbl/drivers/pmic/npm1300.h>
@@ -12,7 +16,9 @@
 #include <pbl/drivers/regulator/npm1300.h>
 #include <pbl/drivers/rtc.h>
 #include <pbl/drivers/speaker/nrf5/da7212_definitions.h>
+#include <pbl/drivers/temperature/nrf5.h>
 #include <pbl/drivers/uart/nrf5.h>
+#include <pbl/drivers/vibe/drv2604.h>
 #include <pbl/kernel/irq.h>
 #include <pbl/logging/logging.h>
 
@@ -23,7 +29,6 @@
 // QSPI
 #include <hal/nrf_clock.h>
 #include <hal/nrf_gpio.h>
-#include <nrfx_gpiote.h>
 #include <nrfx_pdm.h>
 #include <nrfx_twim.h>
 
@@ -77,9 +82,6 @@ PBL_IRQ_CONNECT(SPIM3, NRFX_SPIM_DEFAULT_CONFIG_IRQ_PRIORITY, nrfx_spim_3_irq_ha
 
 /* PERIPHERAL ID 10 */
 
-/* EXTI */
-PBL_IRQ_CONNECT(GPIOTE, NRFX_GPIOTE_DEFAULT_CONFIG_IRQ_PRIORITY, nrfx_gpiote_0_irq_handler, , 0);
-
 /* nPM1300 */
 PBL_I2C_NRF5_DEFINE(s_i2c_npmc_iic1, "i2c_npmc_iic1", 1, NRF_TWIM_FREQ_400K,
                     PBL_GPIO(NRF5_GPIO_P0, 14, 0), PBL_GPIO(NRF5_GPIO_P0, 15, 0), nullptr);
@@ -89,7 +91,7 @@ PBL_IRQ_CONNECT(SPI1_SPIM1_SPIS1_TWI1_TWIM1_TWIS1, NRFX_TWIM_DEFAULT_CONFIG_IRQ_
 
 PBL_NPM1300_DEFINE(s_npm1300, &s_i2c_npmc_iic1.bus, 0x6B);
 PBL_NPM1300_CHARGER_DEFINE(s_npm1300_charger, &s_npm1300, &NPM1300_CONFIG,
-                           {NRFX_GPIOTE_INSTANCE(0), 1, NRF_GPIO_PIN_MAP(1, 12)});
+                           PBL_IRQ_SPEC(NRF5_GPIO_P1_INTC, 12, PBL_IRQ_TYPE_EDGE_RISING));
 
 const struct pbl_npm1300_charger *const NPM1300_CHARGER = &s_npm1300_charger;
 
@@ -106,52 +108,31 @@ PBL_I2C_NRF5_DEFINE(s_i2c_iic2, "i2c_iic2", 0, NRF_TWIM_FREQ_400K, PBL_GPIO(NRF5
 PBL_IRQ_CONNECT(SPI0_SPIM0_SPIS0_TWI0_TWIM0_TWIS0, NRFX_TWIM_DEFAULT_CONFIG_IRQ_PRIORITY,
                 nrfx_twim_0_irq_handler, , 0);
 
-static const struct pbl_i2c_dev I2C_SLAVE_DRV2604 = PBL_I2C_DEV(&s_i2c_iic2.bus, 0x5A);
+PBL_DRV2604_DEFINE(s_drv2604, &s_i2c_iic2.bus, 0x5A, PBL_GPIO(NRF5_GPIO_P0, 2, 0));
 
-const struct pbl_i2c_dev *const I2C_DRV2604 = &I2C_SLAVE_DRV2604;
+const struct pbl_vibe *const VIBE = &s_drv2604.vibe;
 
-static const struct pbl_i2c_dev I2C_SLAVE_OPT3001 = PBL_I2C_DEV(&s_i2c_iic2.bus, 0x44);
+PBL_OPT3001_DEFINE(s_opt3001, &s_i2c_iic2.bus, 0x44, nullptr, .always_on = true);
 
-const struct pbl_i2c_dev *const I2C_OPT3001 = &I2C_SLAVE_OPT3001;
+const struct pbl_als *const ALS = &s_opt3001.als;
 
 static const struct pbl_i2c_dev I2C_SLAVE_DA7212 = PBL_I2C_DEV(&s_i2c_iic2.bus, 0x1A);
 
 const struct pbl_i2c_dev *const I2C_DA7212 = &I2C_SLAVE_DA7212;
 
-static const struct pbl_i2c_dev I2C_SLAVE_MMC5603NJ = PBL_I2C_DEV(&s_i2c_iic2.bus, 0x30);
+PBL_LSM6DSO_DEFINE(s_lsm6dso, &s_i2c_iic2.bus, 0x6A,
+                   .int1 = PBL_IRQ_SPEC(NRF5_GPIO_P1_INTC, 13, PBL_IRQ_TYPE_EDGE_RISING),
+                   .int1_in = PBL_GPIO(NRF5_GPIO_P1, 13, 0),
+                   .axis_map = {[AXIS_X] = 1, [AXIS_Y] = 0, [AXIS_Z] = 2},
+                   .axis_dir = {[AXIS_X] = 1, [AXIS_Y] = 1, [AXIS_Z] = 1});
 
-const struct pbl_i2c_dev *const I2C_MMC5603NJ = &I2C_SLAVE_MMC5603NJ;
+const struct pbl_accel *const ACCEL = &s_lsm6dso.accel;
 
-static const struct pbl_i2c_dev I2C_SLAVE_BMP390 = PBL_I2C_DEV(&s_i2c_iic2.bus, 0x76);
+PBL_MMC5603NJ_DEFINE(s_mmc5603nj, &s_i2c_iic2.bus, 0x30,
+                     .axis_map = {[AXIS_X] = 1, [AXIS_Y] = 0, [AXIS_Z] = 2},
+                     .axis_dir = {[AXIS_X] = 1, [AXIS_Y] = -1, [AXIS_Z] = 1});
 
-const struct pbl_i2c_dev *const I2C_BMP390 = &I2C_SLAVE_BMP390;
-
-static LSM6DSOState s_lsm6dso_state;
-
-static const LSM6DSOConfig s_lsm6dso_config = {
-  .state = &s_lsm6dso_state,
-  .i2c = PBL_I2C_DEV(&s_i2c_iic2.bus, 0x6A),
-  .int1 =
-      {
-        .peripheral = NRFX_GPIOTE_INSTANCE(0),
-        .channel = 7,
-        .gpio_pin = NRF_GPIO_PIN_MAP(1, 13),
-      },
-  .int1_in = PBL_GPIO(NRF5_GPIO_P1, 13, 0),
-  .axis_map =
-      {
-        [AXIS_X] = 1,
-        [AXIS_Y] = 0,
-        [AXIS_Z] = 2,
-      },
-  .axis_dir = {
-    [AXIS_X] = 1,
-    [AXIS_Y] = 1,
-    [AXIS_Z] = 1,
-  },
-};
-
-const LSM6DSOConfig *const LSM6DSO = &s_lsm6dso_config;
+const struct pbl_mag *const MAG = &s_mmc5603nj.mag;
 
 PBL_IRQ_CONNECT(I2S, 5, nrfx_i2s_0_irq_handler, , 0);
 
@@ -201,7 +182,16 @@ AudioDevice *const AUDIO = (AudioDevice *)&s_audio_device;
 
 /* asterix shares SPI with flash, which we don't support */
 
-PwmState BACKLIGHT_PWM_STATE;
+static PwmState s_backlight_pwm_state;
+
+PBL_BACKLIGHT_PWM_DEFINE(s_backlight, .enable = PBL_GPIO(NRF5_GPIO_P1, 8, 0),
+                         .pwm =
+                             {.state = &s_backlight_pwm_state,
+                              .output = PBL_GPIO(NRF5_GPIO_P0, 26, 0),
+                              .peripheral = NRFX_PWM_INSTANCE(0)},
+                         .max_duty_cycle_percent = 67);
+
+const struct pbl_backlight *const BACKLIGHT = &s_backlight.backlight;
 PBL_IRQ_CONNECT(PWM0, NRFX_PWM_DEFAULT_CONFIG_IRQ_PRIORITY, nrfx_pwm_0_irq_handler, , 0);
 
 PBL_IRQ_CONNECT(RTC1, 7, rtc_irq_handler, , 0);
@@ -214,8 +204,6 @@ const Npm1300Config NPM1300_CONFIG = {
 
 void board_early_init(void) {
   PBL_LOG_ERR("asterix early init");
-
-  NRF_NVMC->ICACHECNF |= NVMC_ICACHECNF_CACHEEN_Msk;
 
   nrf_clock_lf_src_set(NRF_CLOCK, NRF_CLOCK_LFCLK_XTAL);
   nrf_clock_event_clear(NRF_CLOCK, NRF_CLOCK_EVENT_LFCLKSTARTED);
@@ -235,3 +223,5 @@ void board_init(void) {
   pbl_i2c_write_block(I2C_DA7212, 2, da7212_powerdown);
   pbl_i2c_release(I2C_DA7212);
 }
+
+const struct pbl_temp *const DIE_TEMP = NRF5_TEMP;

@@ -16,7 +16,8 @@
 
 #include <kernel/events.h>
 #include <kernel/util/sleep.h>
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 PBL_LOG_MODULE_DEFINE(driver_mic, CONFIG_DRIVER_MIC_LOG_LEVEL);
 

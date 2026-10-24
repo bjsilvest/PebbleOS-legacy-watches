@@ -11,17 +11,12 @@
 #include <pbl/task_wdt/task_wdt.h>
 
 #include <clar.h>
+#include <fff.h>
 #include <kernel_test.h>
-#include <stubs_passert.h>
 #include <system/reboot_reason.h>
 
 // The subsystem on the POSIX kernel: time only moves when every thread is
 // blocked, so the watchdog thread's periodic sleep drives the clock.
-
-[[noreturn]] void pbl_kernel_assert_failed(const char *filename, int line) {
-  fprintf(stderr, "kernel assert at %s:%d\n", filename, line);
-  abort();
-}
 
 void pbl_task_wdt_reset_for_test(void);
 
@@ -33,7 +28,6 @@ static struct pbl_thread s_threads[4];
 #define GRACE_MS   CONFIG_TASK_WDT_GRACE_MS
 #define TIMEOUT_MS 2000
 
-static int s_hw_feeds;
 static RebootReason s_reason;
 
 static int s_callbacks;
@@ -58,9 +52,7 @@ void pbl_log(uint8_t log_level, const char *src_filename, int src_line_number, c
              ...) {
 }
 
-void watchdog_feed(void) {
-  s_hw_feeds++;
-}
+FAKE_VOID_FUNC(watchdog_feed);
 
 void reboot_reason_set(RebootReason *reason) {
   if (s_reason.code == RebootReasonCode_Unknown) {
@@ -115,7 +107,7 @@ static void prv_sleep_ms(uint32_t ms) {
 void test_task_wdt__initialize(void) {
   memset(s_threads, 0, sizeof(s_threads));
   memset(&s_reason, 0, sizeof(s_reason));
-  s_hw_feeds = 0;
+  RESET_FAKE(watchdog_feed);
   s_callbacks = 0;
   s_callback_channel = -1;
   s_first_callback_ms = 0;
@@ -148,7 +140,7 @@ void test_task_wdt__fed_channel_never_expires(void) {
   cl_assert(!s_reset);
   // Ten half-timeouts of feeding is 10 s: the hardware watchdog got fed
   // once per check period throughout.
-  cl_assert(s_hw_feeds >= 10 * (TIMEOUT_MS / 2) / PERIOD_MS - 1);
+  cl_assert(watchdog_feed_fake.call_count >= 10 * (TIMEOUT_MS / 2) / PERIOD_MS - 1);
 }
 
 static int s_work;
@@ -381,4 +373,38 @@ void test_task_wdt__waiting_is_per_thread(void) {
   cl_assert(s_reset);
   cl_assert_equal_i(s_callback_channel, 1);
   cl_assert_equal_i(s_reason.data8[0], 0x1);
+}
+
+static struct pbl_sem s_wake;
+static uint32_t s_woken_ms;
+
+static void prv_starved_waiter_entry(void *arg) {
+  cl_assert(pbl_task_wdt_add(nullptr, TIMEOUT_MS, prv_callback, nullptr) >= 0);
+  pbl_task_wdt_set_waiting(true);
+  pbl_sem_take(&s_wake, PBL_FOREVER);
+  pbl_task_wdt_set_waiting(false);
+  pbl_test_kernel_stop();
+}
+
+static void prv_hog_entry(void *arg) {
+  prv_sleep_ms(10 * TIMEOUT_MS);
+  cl_assert_equal_i(s_callbacks, 0);
+  pbl_sem_give(&s_wake);
+  s_woken_ms = prv_now_ms();
+  while (s_callbacks == 0 && prv_now_ms() < s_woken_ms + 10 * TIMEOUT_MS) {
+    pbl_test_tick(1);
+  }
+  pbl_test_kernel_stop();
+}
+
+void test_task_wdt__woken_waiting_channel_expires_when_starved(void) {
+  pbl_sem_init(&s_wake, 0, 1);
+  prv_spawn(0, "waiter", prv_starved_waiter_entry, nullptr);
+  struct pbl_thread *hog = prv_spawn(1, "hog", prv_hog_entry, nullptr);
+  pbl_thread_prio_set(hog, 3);
+  pbl_test_kernel_run();
+  cl_assert_equal_i(s_callbacks, 1);
+  cl_assert_equal_i(s_callback_channel, 0);
+  cl_assert(s_first_callback_ms >= s_woken_ms + TIMEOUT_MS);
+  cl_assert(s_first_callback_ms < s_woken_ms + TIMEOUT_MS + 2 * PERIOD_MS);
 }

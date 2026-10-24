@@ -46,3 +46,9 @@
 [submodule "third_party/hal_stm32/stm32-sdk"]
 	path = third_party/hal_stm32/stm32-sdk
 	url = https://github.com/pebble-dev/stm32-sdk.git
+[submodule "third_party/fff/fff"]
+	path = third_party/fff/fff
+	url = https://github.com/meekrosoft/fff
+[submodule "third_party/samsa/samsa"]
+	path = third_party/samsa/samsa
+	url = https://github.com/coredevices/samsa.git

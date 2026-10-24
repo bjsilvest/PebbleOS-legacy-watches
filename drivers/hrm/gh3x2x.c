@@ -19,7 +19,6 @@
 #include <gh_demo_inner.h>
 #include <goodix_hba.h>
 #include <kernel/events.h>
-#include <kernel/util/delay.h>
 #endif // CONFIG_GH3X2X_ALGO
 
 PBL_LOG_MODULE_DEFINE(driver_hrm_gh3x2x, CONFIG_DRIVER_HRM_LOG_LEVEL);
@@ -104,7 +103,7 @@ static void gh3026_int_callback_function(void *context) {
   Gh3x2xDemoInterruptProcess();
 }
 
-static void gh3026_int_irq_callback(void) {
+static void gh3026_int_irq_callback(void *arg) {
   hal_gh3x2x_int_handler_call_back();
 
   if (s_hrm_int_flag == false) {
@@ -115,8 +114,33 @@ static void gh3026_int_irq_callback(void) {
 }
 
 void gh3026_int_pin_init(void) {
-  exti_configure_pin(HRM->int_exti, ExtiTrigger_Falling, gh3026_int_irq_callback);
-  exti_enable(HRM->int_exti);
+  int ret;
+
+  ret = pbl_device_init(&HRM->int_irq.intc->dev);
+  if (ret != 0) {
+    PBL_LOG_ERR("Interrupt controller unavailable");
+    return;
+  }
+
+  // Called again on each sensor initialization
+  (void)pbl_intc_free(&HRM->int_irq);
+
+  ret = pbl_gpio_configure(&HRM->int_input, PBL_GPIO_INPUT);
+  if (ret != 0) {
+    PBL_LOG_ERR("Could not configure the interrupt input (%d)", ret);
+    return;
+  }
+
+  ret = pbl_intc_request(&HRM->int_irq, gh3026_int_irq_callback, nullptr);
+  if (ret != 0) {
+    PBL_LOG_ERR("Could not request the interrupt (%d)", ret);
+    return;
+  }
+
+  ret = pbl_intc_enable(&HRM->int_irq);
+  if (ret != 0) {
+    PBL_LOG_ERR("Could not enable the interrupt (%d)", ret);
+  }
 }
 
 void gh3x2x_print_fmt(const char *fmt, ...) {
@@ -253,7 +277,7 @@ void gh3x2x_wear_evt_notify(bool is_wear) {
   HRM->state->is_wear = is_wear;
 }
 
-#ifdef CONFIG_BT_GH3X2X_TUNING_SERVICE
+#ifdef CONFIG_BT_SERVICE_GH3X2X_TUNING
 void gh3x2x_timer_init(uint32_t period_ms) {
   if (HRM) {
     HRM->state->timer_period_ms = period_ms;

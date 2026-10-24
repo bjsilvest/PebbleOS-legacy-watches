@@ -11,7 +11,8 @@
 #include <pbl/soc/stm32/sleep.h>
 #include <pbl/util/misc.h>
 
-#include <system/passert.h>
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 
 #define I2C_NORMAL_MODE_CLOCK_SPEED_MAX 100000
 

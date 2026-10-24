@@ -13,11 +13,6 @@
 #include <fake_pbl_malloc.h>
 #include <fake_pebble_tasks.h>
 #include <fake_system_task.h>
-#include <stubs_analytics.h>
-#include <stubs_do_not_disturb.h>
-#include <stubs_logging.h>
-#include <stubs_passert.h>
-#include <stubs_rtc.h>
 
 // Alerts preferences: speaker unmuted, no volume cap
 bool alerts_preferences_get_speaker_muted(void) {
