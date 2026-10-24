@@ -981,6 +981,19 @@ void alerts_preferences_handle_blob_db_event(PebbleBlobDBEvent *event) {
     }
   }
 
+  for (unsigned int i = 0; matched_key == nullptr && i < DND_NUM_SCHEDULE_SLOTS; i++) {
+    const char *slot_key = s_dnd_schedule_slot_keys[i];
+    const size_t slot_key_len = strlen(slot_key);
+    if ((key_len == (int)slot_key_len || key_len == (int)(slot_key_len + 1)) &&
+        memcmp(key, slot_key, slot_key_len) == 0) {
+      prv_reload_schedule_slot(&file, i, key, key_len);
+      matched_key = slot_key;
+    }
+  }
+
+  if (matched_key) {
+    prv_mirror_legacy_schedule(&file, matched_key);
+  }
   settings_file_close(&file);
   pbl_mutex_unlock(&s_mutex);
 

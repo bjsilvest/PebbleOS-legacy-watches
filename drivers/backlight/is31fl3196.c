@@ -4,18 +4,19 @@
 
 // ISSI IS31FL3196 six channel LED driver of the Pebble Steel: OUT1-3 drive the
 // backlight, OUT4-6 the red, green and blue status LED. Register use as in the
-// stock led_controller.c. The chip runs only while BOARD_BACKLIGHT_SDB is
-// active (its SDB pin high), which brings the shutdown current down when both
-// are off.
+// stock led_controller.c. The chip runs only while its SDB line is active
+// (high), which brings the shutdown current down when both are off.
+
+#include <errno.h>
 
 #include <pbl/drivers/backlight.h>
+#include <pbl/drivers/backlight/is31fl3196.h>
 #include <pbl/drivers/gpio.h>
 #include <pbl/drivers/i2c.h>
 #include <pbl/drivers/status_led.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/battery/battery_curve.h>
-
-#include <board/board.h>
+#include <pbl/util/misc.h>
 
 PBL_LOG_MODULE_DEFINE(driver_backlight_is31fl3196, CONFIG_DRIVER_BACKLIGHT_LOG_LEVEL);
 
@@ -41,12 +42,13 @@ PBL_LOG_MODULE_DEFINE(driver_backlight_is31fl3196, CONFIG_DRIVER_BACKLIGHT_LOG_L
 #define STATUS_LED_COLOR_CHARGING       0x0F2300U
 #define STATUS_LED_COLOR_FULLY_CHARGED  0x003C00U
 
+static const struct pbl_is31fl3196 *s_dev;
 static bool s_initialized;
 static uint8_t s_brightness;
 static uint32_t s_status_color;
 
 static bool prv_write_register(uint8_t reg, uint8_t value) {
-  return pbl_i2c_write_register_block(I2C_IS31FL3196, reg, 1, &value) == 0;
+  return pbl_i2c_write_register_block(&s_dev->i2c, reg, 1, &value) == 0;
 }
 
 // Writes OUT1-3 or OUT4-6 from 0xRRGGBB (OUTn+0 = red) and latches them.
@@ -55,29 +57,31 @@ static void prv_write_outputs(uint8_t first_reg, uint32_t rgb) {
     return;
   }
 
-  pbl_gpio_set(&BOARD_BACKLIGHT_SDB, true);
+  pbl_gpio_set(&s_dev->sdb, true);
 
-  pbl_i2c_use(I2C_IS31FL3196);
+  pbl_i2c_use(&s_dev->i2c);
   bool ret = true;
   for (int i = 0; i < 3; i++) {
     ret &= prv_write_register(first_reg + i, (uint8_t)(rgb >> (16 - 8 * i)));
   }
   ret &= prv_write_register(IS31FL3196_REG_DATA_UPDATE, IS31FL3196_LATCH);
-  pbl_i2c_release(I2C_IS31FL3196);
+  pbl_i2c_release(&s_dev->i2c);
   if (!ret) {
     PBL_LOG_ERR("IS31FL3196 write failed (i2c)");
   }
 
   if (s_brightness == 0U && s_status_color == 0U) {
-    pbl_gpio_set(&BOARD_BACKLIGHT_SDB, false);
+    pbl_gpio_set(&s_dev->sdb, false);
   }
 }
 
-void backlight_init(void) {
-  pbl_gpio_configure(&BOARD_BACKLIGHT_SDB, PBL_GPIO_OUTPUT_INACTIVE);
-  pbl_gpio_set(&BOARD_BACKLIGHT_SDB, true);
+static int prv_init(const struct pbl_backlight *bl) {
+  s_dev = container_of(bl, const struct pbl_is31fl3196, backlight);
 
-  pbl_i2c_use(I2C_IS31FL3196);
+  pbl_gpio_configure(&s_dev->sdb, PBL_GPIO_OUTPUT_INACTIVE);
+  pbl_gpio_set(&s_dev->sdb, true);
+
+  pbl_i2c_use(&s_dev->i2c);
   // A missing controller must not be fatal: a dark backlight beats a boot
   // loop.
   if (!prv_write_register(IS31FL3196_REG_RESET, IS31FL3196_LATCH)) {
@@ -92,9 +96,12 @@ void backlight_init(void) {
       PBL_LOG_ERR("IS31FL3196 init write failed (i2c)");
     }
   }
-  pbl_i2c_release(I2C_IS31FL3196);
+  pbl_i2c_release(&s_dev->i2c);
 
-  pbl_gpio_set(&BOARD_BACKLIGHT_SDB, false);
+  pbl_gpio_set(&s_dev->sdb, false);
+
+  // A dark backlight beats a boot loop, so the device stays usable either way.
+  return 0;
 }
 
 static void prv_apply_brightness(void) {
@@ -102,26 +109,35 @@ static void prv_apply_brightness(void) {
   prv_write_outputs(IS31FL3196_REG_PWM_OUT1, pwm << 16 | pwm << 8 | pwm);
 }
 
-void backlight_set_brightness(uint8_t brightness) {
+static int prv_set_brightness(const struct pbl_backlight *bl, uint8_t brightness) {
   if (brightness > 100U) {
     brightness = 100U;
   }
   s_brightness = brightness;
   prv_apply_brightness();
+
+  return 0;
 }
 
-uint8_t backlight_get_level(uint8_t brightness) {
-  // 255-step PWM: every brightness value is distinct.
-  return brightness;
-}
-
-void backlight_refresh(void) {
+static int prv_refresh(const struct pbl_backlight *bl) {
   if (s_brightness != 0U) {
     prv_apply_brightness();
   }
+
+  return 0;
 }
 
+const struct pbl_backlight_ops pbl_is31fl3196_ops = {
+  .init = prv_init,
+  .set_brightness = prv_set_brightness,
+  .refresh = prv_refresh,
+};
+
 void status_led_set(StatusLedState state) {
+  if (s_dev == nullptr) {
+    return;
+  }
+
   static const uint32_t s_colors[] = {
     [StatusLedState_Off] = 0,
     [StatusLedState_Charging] = STATUS_LED_COLOR_CHARGING,
@@ -136,7 +152,7 @@ void status_led_set(StatusLedState state) {
 
   // The lit LED's load lowers the measured battery voltage.
   battery_curve_set_compensation(BATTERY_CURVE_COMPENSATE_STATUS_LED,
-                                 color ? BOARD_STATUS_LED_COMPENSATION_MV : 0);
+                                 color ? s_dev->status_led_compensation_mv : 0);
 
   prv_write_outputs(IS31FL3196_REG_PWM_OUT4, color);
 }

@@ -20,6 +20,7 @@
 #include <pbl/drivers/rtc.h>
 #include <pbl/kernel/irq.h>
 #include <pbl/kernel/sched.h>
+#include <pbl/kernel/time.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/regular_timer.h>
 #include <pbl/services/time.h>

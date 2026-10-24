@@ -5,56 +5,30 @@
 //! Vibe motor switched by a GPIO (original Pebble): on or off, no strength.
 
 #include <pbl/drivers/vibe.h>
-#include <pbl/logging/logging.h>
+#include <pbl/drivers/vibe/gpio.h>
 #include <pbl/services/battery/battery_monitor.h>
+#include <pbl/util/misc.h>
 
-#include <board/board.h>
-#include <system/status_codes.h>
-
-static bool s_initialized;
-
-void vibe_init(void) {
-  if (s_initialized) {
-    return;
-  }
-  pbl_gpio_configure(&BOARD_CONFIG_VIBE.ctl, PBL_GPIO_OUTPUT_INACTIVE);
-  s_initialized = true;
+static const struct pbl_vibe_gpio *prv_get(const struct pbl_vibe *vibe) {
+  return container_of(vibe, const struct pbl_vibe_gpio, vibe);
 }
 
-void vibe_set_strength(int8_t strength) {
+static int prv_init(const struct pbl_vibe *vibe) {
+  return pbl_gpio_configure(&prv_get(vibe)->ctl, PBL_GPIO_OUTPUT_INACTIVE);
 }
 
-void vibe_ctl(bool on) {
-  if (!s_initialized) {
-    return;
-  }
+static int prv_start(const struct pbl_vibe *vibe, int8_t strength) {
+  (void)strength;
 
-  if (on && battery_monitor_critical_lockout()) {
-    on = false;
-  }
-
-  PBL_LOG_DBG("Vibe status <%s>", on ? "on" : "off");
-  pbl_gpio_set(&BOARD_CONFIG_VIBE.ctl, on);
+  return pbl_gpio_set(&prv_get(vibe)->ctl, !battery_monitor_critical_lockout());
 }
 
-void vibe_force_off(void) {
-  if (!s_initialized) {
-    return;
-  }
-  pbl_gpio_set(&BOARD_CONFIG_VIBE.ctl, false);
+static int prv_stop(const struct pbl_vibe *vibe) {
+  return pbl_gpio_set(&prv_get(vibe)->ctl, false);
 }
 
-int8_t vibe_get_braking_strength(void) {
-  return VIBE_STRENGTH_OFF;
-}
-
-status_t vibe_calibrate(void) {
-  return E_INVALID_OPERATION;
-}
-
-uint8_t vibe_get_calibration(void) {
-  return 0;
-}
-
-void vibe_apply_calibration(uint8_t cali) {
-}
+const struct pbl_vibe_ops pbl_vibe_gpio_ops = {
+  .init = prv_init,
+  .start = prv_start,
+  .stop = prv_stop,
+};

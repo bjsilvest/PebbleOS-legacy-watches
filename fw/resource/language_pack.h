@@ -8,7 +8,7 @@
 #include <stdint.h>
 
 // Slot zero preserves the existing language-pack resource IDs and filename.
-#define LANGUAGE_PACK_COUNT           4
+#define LANGUAGE_PACK_COUNT           CONFIG_LANGUAGE_PACK_SLOTS
 #define LANGUAGE_PACK_RESOURCE_BASE   0x2000
 #define LANGUAGE_PACK_RESOURCE_STRIDE 32
 #define LANGUAGE_PACK_ADD_FILENAME    "lang-add"
@@ -21,7 +21,8 @@ static inline uint32_t language_pack_resource_id(uint8_t slot, uint32_t resource
 }
 
 static inline const char *language_pack_filename(uint8_t slot) {
-  static const char *const names[LANGUAGE_PACK_COUNT] = {"lang", "lang1", "lang2", "lang3"};
+  static const char *const names[] = {"lang", "lang1", "lang2", "lang3"};
+  static_assert(LANGUAGE_PACK_COUNT <= sizeof(names) / sizeof(names[0]));
   return slot < LANGUAGE_PACK_COUNT ? names[slot] : NULL;
 }
 

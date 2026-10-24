@@ -17,5 +17,5 @@ void __assert_func(const char *file, int line, const char *func, const char *e) 
 }
 
 void __assert_no_args(void) {
-  PBL_ASSERTN_LR(0, (uint32_t)(uintptr_t)PBL_RETURN_ADDRESS(0));
+  pbl_fatal_error_handler((uintptr_t)PBL_RETURN_ADDRESS(0));
 }

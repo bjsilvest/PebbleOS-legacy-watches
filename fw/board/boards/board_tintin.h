@@ -11,11 +11,7 @@
 // controls; bb2 has the vibe on another pin; v1_5 and v2_0 have the debug UART
 // on other pins; v2_0 has its backlight on an I2C LED controller.
 
-#ifdef CONFIG_BACKLIGHT_PWM
-#include <pbl/drivers/backlight/pwm.h>
-#endif
 #include <pbl/drivers/i2c.h>
-#include <pbl/drivers/regulator/gpio.h>
 #include <pbl/services/imu/units.h>
 
 #define BT_VENDOR_ID   0x0154
@@ -32,9 +28,6 @@ static const BoardConfig BOARD_CONFIG = {
   .ambient_light_dark_threshold = 3180,
 #endif
   .ambient_k_delta_threshold = 96,
-  .photo_en = PBL_GPIO(STM32_GPIOD, 2, 0),
-  .als_adc_channel = ADC_Channel_12,
-  .als_adc_pin = PBL_GPIO(STM32_GPIOC, 2, 0),
 #ifdef CONFIG_BOARD_TINTIN_V2_0
   .backlight_on_percent = 100,
 #else
@@ -90,37 +83,6 @@ static const BoardConfigAccel BOARD_CONFIG_ACCEL = {
   },
 };
 
-// Vibe: switched, no strength control
-static const BoardConfigActuator BOARD_CONFIG_VIBE = {
-#ifdef CONFIG_BOARD_TINTIN_BB2
-  .ctl = PBL_GPIO(STM32_GPIOB, 13, 0),
-#else
-  .ctl = PBL_GPIO(STM32_GPIOB, 0, 0),
-#endif
-};
-
-#ifdef CONFIG_BACKLIGHT_IS31FL3196
-// Backlight and status LED: IS31FL3196 on I2C1, shutdown line on PB5
-// (active = running)
-extern const struct pbl_i2c_dev *const I2C_IS31FL3196;
-static const struct pbl_gpio BOARD_BACKLIGHT_SDB = PBL_GPIO(STM32_GPIOB, 5, 0);
-// Battery voltage drop while the status LED is lit
-#define BOARD_STATUS_LED_COMPENSATION_MV 30
-#else
-// Backlight: TIM3 CH2
-static const BacklightPwmConfig BACKLIGHT_PWM = {
-  .pwm =
-      {
-        .output = PBL_GPIO(STM32_GPIOB, 5, 0),
-        .timer = TIM3,
-        .rcc = RCC_APB1Periph_TIM3,
-        .af = GPIO_AF_TIM3,
-        .channel = 2,
-      },
-  .max_duty_cycle_percent = 100,
-};
-#endif
-
 static const BoardConfigSharpDisplay BOARD_CONFIG_DISPLAY = {
   .spi = SPI2,
   .spi_rcc = RCC_APB1Periph_SPI2,
@@ -152,24 +114,6 @@ extern UARTDevice *const DBG_UART;
 
 // LIS3DH on I2C1 (PB8 SCL, PB7 SDA)
 extern const struct pbl_i2c_dev *const I2C_LIS3DH;
-
-// MAG3110 on I2C2 (PB10 SCL, PB11 SDA), whose 2.5 V rail (PH0) also feeds
-// the unused Apple MFi chip; on only while the magnetometer is in use.
-static const BoardConfigMag BOARD_CONFIG_MAG = {
-  .mag_config = {
-    .axes_offsets[AXIS_X] = 1,
-    .axes_offsets[AXIS_Y] = 0,
-    .axes_offsets[AXIS_Z] = 2,
-    .axes_inverts[AXIS_X] = false,
-    .axes_inverts[AXIS_Y] = true,
-    .axes_inverts[AXIS_Z] = true,
-  },
-};
-// Data ready, active high
-static const struct pbl_gpio BOARD_MAG_INT = PBL_GPIO(STM32_GPIOC, 4, 0);
-extern const struct pbl_i2c_dev *const I2C_MAG3110;
-extern const struct pbl_gpio_regulator BOARD_RAIL_2V5;
-#define BOARD_MAG_RAIL (&BOARD_RAIL_2V5.reg)
 
 #ifdef CONFIG_BT_HCI_UART
 // CC2564A HCI: USART1 with hardware flow control.

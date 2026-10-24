@@ -10,21 +10,40 @@
 //! batch of one uses the data ready interrupt. With neither data nor shake
 //! detection wanted, the chip is powered down.
 
+#include <errno.h>
 #include <inttypes.h>
 #include <string.h>
 
 #include <pbl/drivers/accel.h>
 #include <pbl/drivers/exti.h>
 #include <pbl/drivers/i2c.h>
+#include <pbl/drivers/imu/lis3dh/lis3dh.h>
 #include <pbl/drivers/rtc.h>
+#include <pbl/kernel/delay.h>
 #include <pbl/logging/logging.h>
+#include <pbl/services/new_timer/new_timer.h>
 #include <pbl/util/math.h>
+#include <pbl/util/misc.h>
 #include <pbl/util/size.h>
 
 #include <board/board.h>
-#include <pbl/kernel/delay.h>
 
 PBL_LOG_MODULE_DEFINE(driver_accel_lis3dh, CONFIG_DRIVER_IMU_LOG_LEVEL);
+
+static const struct pbl_lis3dh *s_dev;
+
+static void prv_work_cb(void *data) {
+  void (*work)(void) = data;
+
+  pbl_accel_lock(&s_dev->accel);
+  work();
+  pbl_accel_unlock(&s_dev->accel);
+}
+
+//! Run driver work on the timer task, with the device lock held
+static void prv_queue_work_from_isr(void (*work)(void)) {
+  new_timer_add_work_callback_from_isr(prv_work_cb, (void *)work);
+}
 
 #define REG_WHO_AM_I    0x0fU
 #define REG_CTRL1       0x20U
@@ -247,7 +266,7 @@ static void prv_handle_data(void) {
   memcpy(s_last_raw, &s_fifo_buf[(count - 1U) * SAMPLE_SIZE], SAMPLE_SIZE);
   s_last_us = now_us;
   const AccelRawBatch batch = prv_batch(s_fifo_buf, count, now_us);
-  accel_cb_new_samples(&batch);
+  pbl_accel_report_samples(&s_dev->accel, &batch);
 }
 
 static void prv_handle_shake(void) {
@@ -264,7 +283,11 @@ static void prv_handle_shake(void) {
       if (cfg->axes_inverts[axis] != (s_rotated_180 && axis != AXIS_Z)) {
         direction = -direction;
       }
-      accel_cb_shake_detected(axis, direction);
+      pbl_accel_report_event(&s_dev->accel, &(const struct pbl_accel_event){
+                                                .type = PBL_ACCEL_EVENT_SHAKE,
+                                                .axis = axis,
+                                                .direction = direction,
+                                              });
       return;
     }
   }
@@ -273,24 +296,26 @@ static void prv_handle_shake(void) {
 static void prv_int1_handler(void) {
   if (!s_data_work_pending) {
     s_data_work_pending = true;
-    accel_offload_work_from_isr(prv_handle_data);
+    prv_queue_work_from_isr(prv_handle_data);
   }
 }
 
 static void prv_int2_handler(void) {
   if (!s_shake_work_pending) {
     s_shake_work_pending = true;
-    accel_offload_work_from_isr(prv_handle_shake);
+    prv_queue_work_from_isr(prv_handle_shake);
   }
 }
 
-void accel_init(void) {
+static int prv_init(const struct pbl_accel *accel) {
   uint8_t whoami = 0U;
+
+  s_dev = container_of(accel, const struct pbl_lis3dh, accel);
   prv_read(REG_WHO_AM_I, &whoami, 1U);
   s_present = (whoami == WHO_AM_I_VAL);
   if (!s_present) {
     PBL_LOG_ERR("LIS3DH whoami 0x%x, expecting 0x%x", whoami, WHO_AM_I_VAL);
-    return;
+    return -ENODEV;
   }
 
   // Block data update, +/-4 g, high resolution; interrupts active high.
@@ -301,9 +326,14 @@ void accel_init(void) {
   exti_configure_pin(prv_exti(0), ExtiTrigger_Rising, prv_int1_handler);
   exti_configure_pin(prv_exti(1), ExtiTrigger_Rising, prv_int2_handler);
   prv_configure();
+
+  return 0;
 }
 
-uint32_t accel_set_sampling_interval(uint32_t interval_us) {
+static uint32_t prv_get_sampling_interval(const struct pbl_accel *accel);
+
+static int prv_set_sampling_interval(const struct pbl_accel *accel, uint32_t interval_us,
+                                     uint32_t *actual_us) {
   // The longest interval no longer than asked for, else the shortest.
   uint32_t hz = s_rates[ARRAY_LENGTH(s_rates) - 1].hz;
   for (size_t i = 0; i < ARRAY_LENGTH(s_rates); i++) {
@@ -319,27 +349,29 @@ uint32_t accel_set_sampling_interval(uint32_t interval_us) {
     s_data_hz = hz;
     prv_configure();
   }
-  return accel_get_sampling_interval();
+  *actual_us = prv_get_sampling_interval(accel);
+  return 0;
 }
 
-uint32_t accel_get_sampling_interval(void) {
+static uint32_t prv_get_sampling_interval(const struct pbl_accel *accel) {
   return 1000000U / s_data_hz;
 }
 
-uint32_t accel_get_max_num_samples(void) {
+static uint32_t prv_get_max_num_samples(const struct pbl_accel *accel) {
   return FIFO_DEPTH;
 }
 
-void accel_set_num_samples(uint32_t num_samples) {
+static int prv_set_num_samples(const struct pbl_accel *accel, uint32_t num_samples) {
   num_samples = MIN(num_samples, FIFO_DEPTH);
   if (num_samples == s_num_samples) {
-    return;
+    return 0;
   }
   if (s_num_samples > 1U) {
     prv_handle_data(); // flush what is queued
   }
   s_num_samples = num_samples;
   prv_configure();
+  return 0;
 }
 
 //! Read the output registers, powering the chip up for one sample if off.
@@ -357,9 +389,9 @@ static bool prv_peek_raw(uint8_t raw[SAMPLE_SIZE]) {
   return ok;
 }
 
-int accel_peek(AccelDriverSample *data) {
+static int prv_peek(const struct pbl_accel *accel, AccelDriverSample *data) {
   if (!s_present) {
-    return -1;
+    return -ENODEV;
   }
   uint8_t raw[SAMPLE_SIZE];
   uint64_t when_us;
@@ -370,7 +402,7 @@ int accel_peek(AccelDriverSample *data) {
     memcpy(raw, s_last_raw, sizeof(raw));
     when_us = s_last_us;
   } else if (!prv_peek_raw(raw)) {
-    return -1;
+    return -EIO;
   } else {
     when_us = prv_now_us();
   }
@@ -391,27 +423,25 @@ int accel_peek(AccelDriverSample *data) {
   return 0;
 }
 
-void accel_enable_shake_detection(bool on) {
+static int prv_set_shake_detection(const struct pbl_accel *accel, bool on) {
   if (on != s_shake_enabled) {
     s_shake_enabled = on;
     prv_configure();
   }
+  return 0;
 }
 
-bool accel_get_shake_detection_enabled(void) {
-  return s_shake_enabled;
-}
-
-void accel_set_shake_sensitivity_high(bool sensitivity_high) {
+static int prv_set_shake_sensitivity_high(const struct pbl_accel *accel, bool sensitivity_high) {
   const AccelConfig *cfg = &BOARD_CONFIG_ACCEL.accel_config;
   const uint8_t threshold = sensitivity_high ? cfg->shake_thresholds[AccelThresholdLow]
                                              : prv_shake_threshold();
   if (s_present) {
     prv_write(REG_CLICK_THS, CLICK_THS_LIR | MIN(threshold, 0x7fU));
   }
+  return 0;
 }
 
-void accel_set_shake_sensitivity_percent(uint8_t percent) {
+static int prv_set_shake_sensitivity_percent(const struct pbl_accel *accel, uint8_t percent) {
   // Higher is more sensitive. The settings default (55, "Medium") keeps the
   // stock threshold, 100 is the stock high sensitivity one.
   const int medium = 55;
@@ -429,15 +459,23 @@ void accel_set_shake_sensitivity_percent(uint8_t percent) {
   if (s_present) {
     prv_write(REG_CLICK_THS, CLICK_THS_LIR | s_shake_threshold);
   }
+  return 0;
 }
 
-void accel_enable_double_tap_detection(bool on) {
-}
-
-bool accel_get_double_tap_detection_enabled(void) {
-  return false;
-}
-
-void accel_set_rotated(bool rotated) {
+static int prv_set_rotated(const struct pbl_accel *accel, bool rotated) {
   s_rotated_180 = rotated;
+  return 0;
 }
+
+const struct pbl_accel_ops pbl_lis3dh_ops = {
+  .init = prv_init,
+  .set_rotated = prv_set_rotated,
+  .set_sampling_interval = prv_set_sampling_interval,
+  .get_sampling_interval = prv_get_sampling_interval,
+  .set_num_samples = prv_set_num_samples,
+  .get_max_num_samples = prv_get_max_num_samples,
+  .peek = prv_peek,
+  .set_shake_detection = prv_set_shake_detection,
+  .set_shake_sensitivity_high = prv_set_shake_sensitivity_high,
+  .set_shake_sensitivity_percent = prv_set_shake_sensitivity_percent,
+};

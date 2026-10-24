@@ -2,9 +2,19 @@
 /* SPDX-FileCopyrightText: 2026 Brian Silvestri */
 /* SPDX-License-Identifier: Apache-2.0 */
 
+#include <pbl/drivers/ambient/stm32_adc.h>
+#ifdef CONFIG_BACKLIGHT_IS31FL3196
+#include <pbl/drivers/backlight/is31fl3196.h>
+#else
+#include <pbl/drivers/backlight/pwm.h>
+#endif
 #include <pbl/drivers/i2c/stm32.h>
+#include <pbl/drivers/imu/lis3dh/lis3dh.h>
+#include <pbl/drivers/imu/mag3110/mag3110.h>
 #include <pbl/drivers/regulator/gpio.h>
+#include <pbl/drivers/temperature/stm32.h>
 #include <pbl/drivers/uart/stm32.h>
+#include <pbl/drivers/vibe/gpio.h>
 #include <pbl/kernel/irq.h>
 
 #include <board/board.h>
@@ -77,9 +87,29 @@ PBL_IRQ_CONNECT(I2C1_ER, 12, pbl_i2c_stm32_er_irq_handler, &s_i2c1, 0);
 static const struct pbl_i2c_dev I2C_SLAVE_LIS3DH = PBL_I2C_DEV(&s_i2c1.bus, 0x19);
 const struct pbl_i2c_dev *const I2C_LIS3DH = &I2C_SLAVE_LIS3DH;
 
+// Accelerometer: LIS3DH, see BOARD_CONFIG_ACCEL
+PBL_LIS3DH_DEFINE(s_lis3dh, &s_i2c1.bus);
+const struct pbl_accel *const ACCEL = &s_lis3dh.accel;
+
 #ifdef CONFIG_BACKLIGHT_IS31FL3196
-static const struct pbl_i2c_dev I2C_SLAVE_IS31FL3196 = PBL_I2C_DEV(&s_i2c1.bus, 0x64);
-const struct pbl_i2c_dev *const I2C_IS31FL3196 = &I2C_SLAVE_IS31FL3196;
+// Backlight and status LED: IS31FL3196, shutdown line on PB5 (active = running)
+PBL_IS31FL3196_DEFINE(s_is31fl3196, &s_i2c1.bus, 0x64, .sdb = PBL_GPIO(STM32_GPIOB, 5, 0),
+                      // Battery voltage drop while the status LED is lit
+                      .status_led_compensation_mv = 30);
+const struct pbl_backlight *const BACKLIGHT = &s_is31fl3196.backlight;
+#else
+// Backlight: TIM3 CH2
+PBL_BACKLIGHT_PWM_DEFINE(s_backlight,
+                         .pwm =
+                             {
+                               .output = PBL_GPIO(STM32_GPIOB, 5, 0),
+                               .timer = TIM3,
+                               .rcc = RCC_APB1Periph_TIM3,
+                               .af = GPIO_AF_TIM3,
+                               .channel = 2,
+                             },
+                         .max_duty_cycle_percent = 100);
+const struct pbl_backlight *const BACKLIGHT = &s_backlight.backlight;
 #endif
 
 // I2C2: magnetometer (and the unused MFi chip), on a switched 2.5 V rail
@@ -93,8 +123,27 @@ PBL_I2C_STM32_DEFINE(s_i2c2, "i2c2", I2C2, RCC_APB1Periph_I2C2, 400000,
 PBL_IRQ_CONNECT(I2C2_EV, 12, pbl_i2c_stm32_ev_irq_handler, &s_i2c2, 0);
 PBL_IRQ_CONNECT(I2C2_ER, 12, pbl_i2c_stm32_er_irq_handler, &s_i2c2, 0);
 
-static const struct pbl_i2c_dev I2C_SLAVE_MAG3110 = PBL_I2C_DEV(&s_i2c2.bus, 0x0e);
-const struct pbl_i2c_dev *const I2C_MAG3110 = &I2C_SLAVE_MAG3110;
+// Compass: MAG3110, data ready active high on PC4; the 2.5 V rail also feeds
+// the unused Apple MFi chip and is on only while the compass is in use.
+PBL_MAG3110_DEFINE(s_mag3110, &s_i2c2.bus, 0x0e, .int_gpio = PBL_GPIO(STM32_GPIOC, 4, 0),
+                   .supply = &BOARD_RAIL_2V5.reg, .axis_map = {1, 0, 2}, .axis_dir = {1, -1, -1});
+const struct pbl_mag *const MAG = &s_mag3110.mag;
+
+// Vibe: switched, no strength control
+#ifdef CONFIG_BOARD_TINTIN_BB2
+PBL_VIBE_GPIO_DEFINE(s_vibe, PBL_GPIO(STM32_GPIOB, 13, 0));
+#else
+PBL_VIBE_GPIO_DEFINE(s_vibe, PBL_GPIO(STM32_GPIOB, 0, 0));
+#endif
+const struct pbl_vibe *const VIBE = &s_vibe.vibe;
+
+// Ambient light: phototransistor on ADC1 channel 12, powered by PD2; raw
+// levels, no lux calibration
+PBL_ALS_STM32_ADC_DEFINE(s_als, nullptr, .enable = PBL_GPIO(STM32_GPIOD, 2, 0),
+                         .channel = ADC_Channel_12, .pin = PBL_GPIO(STM32_GPIOC, 2, 0));
+const struct pbl_als *const ALS = &s_als.als;
+
+const struct pbl_temp *const DIE_TEMP = STM32_TEMP;
 
 void board_early_init(void) {
   // The buttons' common line

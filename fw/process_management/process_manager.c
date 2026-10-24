@@ -109,7 +109,7 @@ static void prv_force_close_timer_callback(void *data) {
 // ---------------------------------------------------------------------------------------------
 // Right before a syscall drops privilege: a safe point to suspend a process the
 // kernel is trying to kill.
-void pbl_kernel_syscall_exit(void) {
+PBL_USED void pbl_kernel_syscall_exit(void) {
   PebbleTask task = pebble_task_get_current();
   ProcessContext *context = prv_get_context_for_task(task);
 
