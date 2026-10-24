@@ -464,7 +464,7 @@ static void prv_terminate_transfer(void *data) {
     return;
   }
   s_updating = false;
-  s_uccb();
+  s_uccb(true);
 }
 
 void display_update(NextRowCallback nrcb, UpdateCompleteCallback uccb) {
