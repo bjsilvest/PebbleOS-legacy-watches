@@ -7,6 +7,7 @@
 
 #include <time.h>
 
+#include <pbl/kernel/fatal.h>
 #include <pbl/services/blob_db/watch_app_prefs_db.h>
 #include <pbl/services/bluetooth/bluetooth_persistent_storage.h>
 #include <pbl/services/clock.h>
@@ -17,6 +18,7 @@
 
 #include <applib/app.h>
 #include <applib/ui/dialogs/simple_dialog.h>
+#include <applib/ui/preferred_durations.h>
 #include <applib/ui/ui.h>
 #include <applib/voice/transcription_dialog.h>
 #include <applib/voice/voice_window.h>
@@ -113,7 +115,7 @@ static void prv_push_success_dialog(void) {
   dialog_set_text(dialog, i18n_get("Added", dialog));
   dialog_set_icon(dialog, RESOURCE_ID_GENERIC_REMINDER_LARGE);
   dialog_set_background_color(dialog, GColorChromeYellow);
-  dialog_set_timeout(dialog, DIALOG_TIMEOUT_DEFAULT);
+  dialog_set_timeout(dialog, preferred_result_display_duration());
   app_simple_dialog_push(simple_dialog);
   i18n_free_all(dialog);
 }
@@ -194,11 +196,11 @@ static void prv_handle_dictation_event(PebbleEvent *e, void *context) {
       // rounded up to the nearest 15 min.
       // Ex: a reminder created at 10:08 AM with no specified time is due at 11:15 AM
       time_t utc_sec = rtc_get_time() + PBL_SEC_PER_HOUR + (15 * PBL_SEC_PER_MIN);
-      struct tm local_tm;
-      localtime_r(&utc_sec, &local_tm);
+      struct pbl_tm local_tm;
+      pbl_localtime_r(&utc_sec, &local_tm);
       local_tm.tm_min -= (local_tm.tm_min % 15);
       local_tm.tm_sec = 0;
-      data->timestamp = mktime(&local_tm);
+      data->timestamp = pbl_mktime(&local_tm);
     }
 
     // If the user doesn't accept the transcription, try again.
@@ -229,7 +231,7 @@ static void prv_appear(struct Window *window) {
       app_window_stack_pop_all(false);
       break;
     default:
-      WTF;
+      pbl_panic();
   }
 }
 

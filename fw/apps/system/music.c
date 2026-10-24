@@ -448,6 +448,14 @@ static Animation *prv_create_upwards_animation(MusicAppData *data) {
       nullptr);
 }
 
+static void prv_set_frame(void *subject, GRect frame) {
+  layer_set_frame_by_value(subject, frame);
+}
+
+static GRect prv_get_frame(void *subject) {
+  return layer_get_frame_by_value(subject);
+}
+
 static const PropertyAnimationImplementation s_frame_layer_implementation = {
   .base =
       {
@@ -456,10 +464,10 @@ static const PropertyAnimationImplementation s_frame_layer_implementation = {
   .accessors = {
     .setter =
         {
-          .grect = (const GRectSetter)layer_set_frame_by_value,
+          .grect = prv_set_frame,
         },
     .getter = {
-      .grect = (const GRectGetter)layer_get_frame_by_value,
+      .grect = prv_get_frame,
     },
   },
 };
@@ -1041,7 +1049,7 @@ static void prv_update_pos(void) {
   prv_update_track_progress(data);
 }
 
-static void prv_handle_tick_time(struct tm *time, TimeUnits units_changed) {
+static void prv_handle_tick_time(struct pbl_tm *time, TimeUnits units_changed) {
   if (music_get_playback_state() == MusicPlayStatePlaying) {
     prv_update_pos();
   }

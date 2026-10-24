@@ -3,6 +3,8 @@
 
 #include <pbl/services/blob_db/pin_db.h>
 #include <pbl/services/filesystem/pfs.h>
+#include <pbl/services/notifications/notifications.h>
+#include <pbl/services/phone_call_util.h>
 #include <pbl/services/regular_timer.h>
 #include <pbl/services/timeline/timeline.h>
 #include <pbl/util/list.h>
@@ -10,6 +12,7 @@
 #include <pbl/util/uuid.h>
 
 #include <clar.h>
+#include <process_management/pebble_process_md.h>
 
 // Fixture
 ////////////////////////////////////////////////////////////////
@@ -29,30 +32,6 @@ static TimezoneInfo tz = {
 
 // Stubs
 ////////////////////////////////////////////////////////////////
-#include <stubs_analytics.h>
-#include <stubs_app_cache.h>
-#include <stubs_app_install_manager.h>
-#include <stubs_app_manager.h>
-#include <stubs_blob_db.h>
-#include <stubs_blob_db_sync.h>
-#include <stubs_calendar.h>
-#include <stubs_event_service_client.h>
-#include <stubs_events.h>
-#include <stubs_fonts.h>
-#include <stubs_hexdump.h>
-#include <stubs_i18n.h>
-#include <stubs_layout_layer.h>
-#include <stubs_logging.h>
-#include <stubs_modal_manager.h>
-#include <stubs_mutex.h>
-#include <stubs_passert.h>
-#include <stubs_pebble_tasks.h>
-#include <stubs_rand_ptr.h>
-#include <stubs_regular_timer.h>
-#include <stubs_session.h>
-#include <stubs_sleep.h>
-#include <stubs_task_wdt.h>
-#include <stubs_window_stack.h>
 
 struct TimelineNode {
   ListNode node;

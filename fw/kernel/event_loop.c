@@ -51,6 +51,7 @@
 #include <pbl/services/touch/touch.h>
 #include <pbl/services/touch/touch_session.h>
 #endif
+#include <pbl/kernel/assert.h>
 #include <pbl/kernel/compiler.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/alarms/alarm.h>
@@ -68,7 +69,6 @@
 #include <shell/prefs.h>
 #include <shell/shell_event_loop.h>
 #include <system/bootbits.h>
-#include <system/passert.h>
 #include <system/testinfra.h>
 
 static const uint32_t FORCE_QUIT_HOLD_MS = 1500;
@@ -334,6 +334,7 @@ static PBL_NOINLINE void prv_minimal_event_handler(PebbleEvent *e) {
       } else if (e->touch.event.type == TouchEvent_PositionUpdate) {
         s_touch_contact_engaged = true;
         touch_session_extend();
+        light_touch_moved();
       } else if (e->touch.event.type == TouchEvent_Liftoff) {
         light_touch_up();
         // A contact that neither moved nor formed a gesture is indistinguishable from a false
@@ -519,10 +520,12 @@ static PBL_NOINLINE void prv_extended_event_handler(PebbleEvent *e) {
 
       // TODO: evaluate if these need to change on every time update
       do_not_disturb_handle_clock_change();
+#ifdef CONFIG_BACKLIGHT_HAS_COLOR
+      light_handle_clock_change();
+#endif
 #endif
       return;
     }
-    case PEBBLE_BLE_SCAN_EVENT:
     case PEBBLE_BLE_CONNECTION_EVENT:
     case PEBBLE_BLE_GATT_CLIENT_EVENT:
       kernel_le_client_handle_event(e);

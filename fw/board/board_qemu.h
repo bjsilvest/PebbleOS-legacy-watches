@@ -46,11 +46,6 @@ typedef struct {
   uint8_t backlight_on_percent;
   uint32_t ambient_light_dark_threshold;
   uint32_t ambient_k_delta_threshold;
-  // Raw-count -> lux conversion: lux = (level - offset) * num / den.
-  // den == 0 means no conversion available for this board.
-  uint32_t ambient_light_lux_dark_offset;
-  uint32_t ambient_light_lux_num;
-  uint32_t ambient_light_lux_den;
 #ifdef CONFIG_BACKLIGHT_HAS_COLOR
   // Default RGB backlight color (packed 0x00RRGGBB), applied when no app
   // override is set. User-preference overrides this via backlight_set_color().
@@ -81,15 +76,6 @@ typedef struct {
 typedef struct {
   uint8_t default_motion_sensitivity;
 } BoardConfigAccel;
-
-typedef struct {
-  int axes_offsets[3];
-  bool axes_inverts[3];
-} MagConfig;
-
-typedef struct {
-  const MagConfig mag_config;
-} BoardConfigMag;
 
 // QEMU MMIO peripheral base addresses
 #define QEMU_UART0_BASE      0x40000000

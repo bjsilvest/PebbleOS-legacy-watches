@@ -7,13 +7,6 @@
 #include <clar.h>
 
 // ---------------------------------------------------------------------------------------
-#include <stubs_attribute.h>
-#include <stubs_i18n.h>
-#include <stubs_notifications.h>
-#include <stubs_passert.h>
-#include <stubs_pbl_malloc.h>
-#include <stubs_rtc.h>
-#include <stubs_timeline_item.h>
 
 // Stubs
 ///////////////////////////////////////////////////////////

@@ -1,6 +1,7 @@
 /* SPDX-FileCopyrightText: 2024 Google LLC */
 /* SPDX-License-Identifier: Apache-2.0 */
 
+#include <pbl/drivers/vibe.h>
 #include <pbl/services/vibe_pattern.h>
 #include <pbl/util/size.h>
 
@@ -11,9 +12,6 @@
 #include <fake_pbl_malloc.h>
 #include <fake_pebble_tasks.h>
 #include <fake_rtc.h>
-#include <stubs_analytics.h>
-#include <stubs_logging.h>
-#include <stubs_passert.h>
 
 static struct pbl_mutex *s_last_locked_mutex;
 static struct pbl_mutex *s_history_mutex;
@@ -58,19 +56,28 @@ int32_t sys_vibe_get_vibe_strength(void);
 // stub
 static bool s_vibe_on = false;
 static int s_vibe_ctl_count = 0;
-void vibe_ctl(bool on) {
-  s_vibe_on = on;
-  s_vibe_ctl_count++;
-}
-
 static int8_t s_last_strength_set = 0;
 static int s_strength_set_count = 0;
-void vibe_set_strength(int8_t strength) {
+
+const struct pbl_vibe *const VIBE = nullptr;
+
+int pbl_vibe_start(const struct pbl_vibe *vibe, int8_t strength) {
   s_last_strength_set = strength;
   s_strength_set_count++;
+  s_vibe_on = true;
+  s_vibe_ctl_count++;
+  return 0;
 }
 
-uint32_t accel_get_max_num_samples(void) {
+int pbl_vibe_stop(const struct pbl_vibe *vibe) {
+  s_vibe_on = false;
+  s_vibe_ctl_count++;
+  return 0;
+}
+
+const struct pbl_accel *const ACCEL = nullptr;
+
+uint32_t pbl_accel_get_max_num_samples(const struct pbl_accel *accel) {
   return 32;
 }
 

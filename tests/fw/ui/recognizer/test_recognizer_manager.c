@@ -1,6 +1,8 @@
 /* SPDX-FileCopyrightText: 2024 Google LLC */
 /* SPDX-License-Identifier: Apache-2.0 */
 
+#include <stdio.h>
+
 #include <pbl/util/size.h>
 
 #include <applib/ui/layer.h>
@@ -14,18 +16,6 @@
 
 // Stubs
 #include "test_recognizer_impl.h"
-
-#include <stubs_app_state.h>
-#include <stubs_gbitmap.h>
-#include <stubs_graphics.h>
-#include <stubs_heap.h>
-#include <stubs_logging.h>
-#include <stubs_passert.h>
-#include <stubs_pbl_malloc.h>
-#include <stubs_pebble_tasks.h>
-#include <stubs_process_manager.h>
-#include <stubs_ui_window.h>
-#include <stubs_unobstructed_area.h>
 
 static RecognizerList *s_app_list;
 static Layer *s_active_layer;
@@ -839,8 +829,8 @@ void test_recognizer_manager__null_manager_register(void) {
   // The assert on the recognizer argument is preserved
   RecognizerManager manager;
   recognizer_manager_init(&manager);
-  cl_assert_passert(recognizer_manager_register_recognizer(&manager, nullptr));
-  cl_assert_passert(recognizer_manager_deregister_recognizer(&manager, nullptr));
+  cl_assert_panic(recognizer_manager_register_recognizer(&manager, nullptr));
+  cl_assert_panic(recognizer_manager_deregister_recognizer(&manager, nullptr));
 }
 
 void test_recognizer_manager__null_manager_state_change(void) {

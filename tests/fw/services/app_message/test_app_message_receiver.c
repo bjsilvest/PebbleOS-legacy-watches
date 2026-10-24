@@ -8,6 +8,7 @@
 #include <applib/app_message/app_message_receiver.h>
 #include <clar.h>
 #include <comm/bt_conn_mgr.h>
+#include <fff.h>
 #include <kernel/events.h>
 #include <process_management/app_install_types.h>
 
@@ -23,11 +24,6 @@ static const ReceiverImplementation *s_rcv_imp = &g_app_message_receiver_impleme
 
 #include <fake_kernel_malloc.h>
 #include <fake_system_task.h>
-#include <stubs_analytics.h>
-#include <stubs_logging.h>
-#include <stubs_mutex.h>
-#include <stubs_passert.h>
-#include <stubs_syscall_internal.h>
 
 bool process_manager_send_event_to_process(PebbleTask task, PebbleEvent *e) {
   cl_assert_equal_i(PEBBLE_CALLBACK_EVENT, e->type);
@@ -46,10 +42,7 @@ AppInbox **app_state_get_app_message_inbox(void) {
   return &s_app_message_inbox;
 }
 
-static bool s_communication_timestamp_updated;
-void app_install_mark_prioritized(AppInstallId install_id, bool can_expire) {
-  s_communication_timestamp_updated = true;
-}
+FAKE_VOID_FUNC(app_install_mark_prioritized, AppInstallId, bool);
 
 AppInstallId app_manager_get_current_app_id(void) {
   return INSTALL_ID_INVALID;
@@ -154,7 +147,7 @@ void test_app_message_receiver__initialize(void) {
   memset(s_app_message_pp_buffer, 0, sizeof(s_app_message_pp_buffer));
   fake_kernel_malloc_init();
   fake_kernel_malloc_enable_stats(true);
-  s_communication_timestamp_updated = false;
+  RESET_FAKE(app_install_mark_prioritized);
 }
 
 void test_app_message_receiver__cleanup(void) {
@@ -251,7 +244,7 @@ void test_app_message_receiver__receive_push(void) {
   cl_assert_equal_m(&s_push, s_app_message_pp_buffer, sizeof(s_push));
   cl_assert_equal_i(s_app_message_pp_received_length, sizeof(s_push));
 
-  cl_assert_equal_b(true, s_communication_timestamp_updated);
+  cl_assert_equal_i(app_install_mark_prioritized_fake.call_count, 1);
 
   prv_destroy_inbox();
 }
@@ -265,7 +258,7 @@ void test_app_message_receiver__receive_push_then_cleanup(void) {
 
   cl_assert_equal_i(s_app_message_pp_received_length, 0);
 
-  cl_assert_equal_b(true, s_communication_timestamp_updated);
+  cl_assert_equal_i(app_install_mark_prioritized_fake.call_count, 1);
 
   prv_destroy_inbox();
 }
@@ -303,7 +296,7 @@ void test_app_message_receiver__receive_push_buffer_overflow(void) {
   prv_destroy_inbox();
 }
 
-// Covers race as described here: PBL-41464
+// Covers this race:
 // 1. A part of a big app message is being received, causing it to get received in chunks.
 //    It's not received completely yet.
 // 2. app_message_outbox_closed is called.

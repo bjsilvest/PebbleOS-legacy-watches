@@ -6,15 +6,17 @@
 #include <fake_app_timer.h>
 #include <fake_pebble_tasks.h>
 #include <fake_rtc.h>
-#include <stubs_logging.h>
+#include <fff.h>
 
 // Stubs
 ////////////////////////////////////
 
-static int s_mark_dirty_count;
+FAKE_VOID_FUNC(layer_mark_dirty, Layer *);
 
-void layer_mark_dirty(Layer *layer) {
-  s_mark_dirty_count++;
+static bool s_scroll_allowed;
+
+bool menu_text_scroll_is_allowed(void) {
+  return s_scroll_allowed;
 }
 
 // Helpers
@@ -37,7 +39,8 @@ static AppTimer *prv_timer(void) {
 
 void test_menu_text_scroll__initialize(void) {
   fake_app_timer_init();
-  s_mark_dirty_count = 0;
+  RESET_FAKE(layer_mark_dirty);
+  s_scroll_allowed = true;
   prv_set_ms(0);
   s_content_layer = (Layer){};
   s_row_a = (Layer){.parent = &s_content_layer, .frame = GRect(0, 0, 200, 40)};
@@ -45,6 +48,7 @@ void test_menu_text_scroll__initialize(void) {
 }
 
 void test_menu_text_scroll__cleanup(void) {
+  s_scroll_allowed = true;
   menu_text_scroll_layer_deinit(&s_content_layer);
   fake_app_timer_deinit();
 }
@@ -82,13 +86,13 @@ void test_menu_text_scroll__redraws_until_drawing_stops(void) {
   // Still drawing: the timer marks the menu dirty and reschedules
   prv_set_ms(33);
   cl_assert(app_timer_trigger(prv_timer()));
-  cl_assert_equal_i(s_mark_dirty_count, 1);
+  cl_assert_equal_i(layer_mark_dirty_fake.call_count, 1);
   cl_assert(prv_timer());
 
   // The row stopped drawing (e.g. scrolled away or deselected): the timer stops
   prv_set_ms(1000);
   cl_assert(app_timer_trigger(prv_timer()));
-  cl_assert_equal_i(s_mark_dirty_count, 1);
+  cl_assert_equal_i(layer_mark_dirty_fake.call_count, 1);
   cl_assert(!prv_timer());
 }
 
@@ -103,4 +107,18 @@ void test_menu_text_scroll__deinit_cancels_timer(void) {
 
   menu_text_scroll_layer_deinit(&s_content_layer);
   cl_assert(!prv_timer());
+}
+
+// Third-party apps can't access the scroll state
+void test_menu_text_scroll__not_allowed_leaves_state_alone(void) {
+  s_scroll_allowed = false;
+  prv_set_ms(1300);
+  cl_assert_equal_i(menu_text_scroll_get_offset(&s_row_a, 60), 0);
+  cl_assert(!prv_timer());
+
+  s_scroll_allowed = true;
+  menu_text_scroll_get_offset(&s_row_a, 60);
+  s_scroll_allowed = false;
+  menu_text_scroll_layer_deinit(&s_content_layer);
+  cl_assert(prv_timer());
 }

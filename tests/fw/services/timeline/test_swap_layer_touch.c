@@ -17,13 +17,6 @@
 #include <fake_rtc.h>
 
 // Stubs
-#include <stubs_app_state.h>
-#include <stubs_click.h>
-#include <stubs_logging.h>
-#include <stubs_passert.h>
-#include <stubs_pebble_tasks.h>
-#include <stubs_process_manager.h>
-#include <stubs_unobstructed_area.h>
 
 // ---------------------------------------------------------------------------------------------
 // Light replacements for the heavy swap_layer.c collaborators that these unit tests never exercise

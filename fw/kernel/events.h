@@ -32,13 +32,13 @@
 #include <applib/app_launch_button.h>
 #include <applib/app_launch_reason.h>
 #include <applib/app_outbox.h>
-#include <applib/bluetooth/ble_client.h>
 #include <applib/health_service.h>
 #include <applib/plugin_service.h>
 #include <applib/tick_timer_service.h>
 #include <applib/ui/click.h>
 #include <applib/voice/dictation_session.h>
 #include <apps/system/app_fetch_ui.h>
+#include <comm/ble/gatt_client_subscriptions.h>
 #include <kernel/pebble_tasks.h>
 #include <process_management/app_install_types.h>
 
@@ -87,7 +87,6 @@ typedef enum {
   PEBBLE_COMPASS_DATA_EVENT,
   PEBBLE_PLUGIN_SERVICE_EVENT,
   PEBBLE_WORKER_LAUNCH_EVENT,
-  PEBBLE_BLE_SCAN_EVENT,
   PEBBLE_BLE_CONNECTION_EVENT,
   PEBBLE_BLE_GATT_CLIENT_EVENT,
   PEBBLE_BLE_DEVICE_NAME_UPDATED_EVENT,
@@ -193,7 +192,7 @@ typedef struct PBL_PACKED { // 6 bytes
 } PebbleSysNotificationEvent;
 
 typedef struct PBL_PACKED { // 4 bytes
-  time_t tick_time;         //!< Needs to be converted to 'struct tm' in the event service handler
+  time_t tick_time; //!< Needs to be converted to 'struct pbl_tm' in the event service handler
 } PebbleTickEvent;
 
 typedef struct PBL_PACKED { // 4 bytes
@@ -272,7 +271,6 @@ typedef enum {
   PebbleBLEGATTClientEventTypeDescriptorRead,
   PebbleBLEGATTClientEventTypeDescriptorWrite,
   PebbleBLEGATTClientEventTypeNotification,
-  PebbleBLEGATTClientEventTypeBufferEmpty,
   PebbleBLEGATTClientEventTypeNum,
 } PebbleBLEGATTClientEventType;
 
@@ -431,7 +429,7 @@ typedef struct PBL_PACKED { // 8 bytes
 } PebbleLaunchAppEvent;
 
 typedef struct PBL_PACKED { // 8 bytes
-  time_t alarm_time;        //!< Needs to be converted to 'struct tm' in the event service handler
+  time_t alarm_time; //!< Needs to be converted to 'struct pbl_tm' in the event service handler
   const char *alarm_label;
 } PebbleAlarmClockEvent;
 
@@ -814,9 +812,10 @@ typedef struct PBL_PACKED PBL_ALIGNED(sizeof(void *)) {
   PebbleEventType type : 8;
 } PebbleEvent;
 
-// Guard the on-target size. The bound assumes 4-byte pointers, so it only
-// applies to the firmware target; the host unit-test build has wider pointers.
-#if __SIZEOF_POINTER__ == 4
+// Guard the on-target size. The bound assumes 4-byte pointers and the
+// firmware C library's 32-bit time_t, so it only applies to the firmware
+// target; host builds have wider pointers or time_t.
+#if __SIZEOF_POINTER__ == 4 && !defined(CONFIG_LIBC_HOST)
 static_assert(sizeof(PebbleEvent) <= 12, "PebbleEvent grew; check the event union layout");
 #endif
 

@@ -5,8 +5,10 @@
 
 #include <pbl/bluetooth/responsiveness.h>
 #include <pbl/drivers/mic.h>
+#include <pbl/kernel/assert.h>
 #include <pbl/kernel/compiler.h>
 #include <pbl/kernel/mutex.h>
+#include <pbl/kernel/syscall.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/audio_endpoint.h>
 #include <pbl/services/comm_session/session.h>
@@ -21,8 +23,6 @@
 #include <kernel/events.h>
 #include <kernel/pbl_malloc.h>
 #include <process_management/app_manager.h>
-#include <syscall/syscall_internal.h>
-#include <system/passert.h>
 
 PBL_LOG_MODULE_DEFINE(service_voice, CONFIG_SERVICE_VOICE_LOG_LEVEL);
 
@@ -704,18 +704,19 @@ unlock:
   pbl_mutex_unlock(&s_lock);
 }
 
-DEFINE_SYSCALL(VoiceSessionId, sys_voice_start_dictation, VoiceEndpointSessionType session_type) {
+PBL_SYSCALL(VoiceSessionId, sys_voice_start_dictation,
+            (VAL, VoiceEndpointSessionType, session_type)) {
   if (session_type >= VoiceEndpointSessionTypeCount) {
     return AUDIO_ENDPOINT_SESSION_INVALID_ID;
   }
   return voice_start_dictation(session_type);
 }
 
-DEFINE_SYSCALL(void, sys_voice_stop_dictation, VoiceSessionId session_id) {
+PBL_SYSCALL(void, sys_voice_stop_dictation, (VAL, VoiceSessionId, session_id)) {
   voice_stop_dictation(session_id);
 }
 
-DEFINE_SYSCALL(void, sys_voice_cancel_dictation, VoiceSessionId session_id) {
+PBL_SYSCALL(void, sys_voice_cancel_dictation, (VAL, VoiceSessionId, session_id)) {
   voice_cancel_dictation(session_id);
 }
 

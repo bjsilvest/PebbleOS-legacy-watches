@@ -98,7 +98,7 @@
 // layer's origin is (12,0)). Emery flows each row from its measured height,
 // which cannot be chord-checked at compile time; on a circle every ink band has
 // to be proven against BOTH edges of its own row, so round pins them instead.
-// Every band below was checked against display_getafix.c's real 260-row mask.
+// Every band below was checked against display_gabbro.c's real 260-row mask.
 #define WEATHER_APP_LAYOUT_ROUND_TEXT_RAIL 16 // + off->x (2) -> content 18 -> screen 30
 // 28_BOLD ink 46..63. This is as high as the day name can go: 'WEDNESDAY' is
 // 113px, and between the glass on its left and the today disc's white halo on
@@ -528,6 +528,27 @@ static const char *prv_compass8(int deg) {
   return kDirs[((deg + 22) / 45) & 7];
 }
 
+static void prv_wind_in_user_units(int mph, const void *owner, int *speed, const char **unit) {
+  switch (shell_prefs_get_units_wind()) {
+    case UnitsWind_Mph:
+      *speed = mph;
+      *unit = i18n_get(i18n_noop("mph"), owner);
+      break;
+    case UnitsWind_MetersPerSecond:
+      *speed = ((mph * 447) + 500) / 1000;
+      *unit = i18n_get(i18n_noop("m/s"), owner);
+      break;
+    case UnitsWind_Knots:
+      *speed = ((mph * 869) + 500) / 1000;
+      *unit = i18n_get(i18n_noop("kt"), owner);
+      break;
+    default:
+      *speed = ((mph * 1609) + 500) / 1000;
+      *unit = i18n_get(i18n_noop("km/h"), owner);
+      break;
+  }
+}
+
 // The forecast description: "High UV. Winds SW at 12mph. Precipitation 20%." —
 // warning first, then wind (direction when the record carries it), then precip.
 // Sentences drop out cleanly when their reading is off the wire.
@@ -542,9 +563,9 @@ static void prv_build_forecast_desc(const WeatherLocationForecast *f, const void
   // A wind-flavored warning already said "winds" -- the wind sentence then
   // drops its prefix ("Light winds. SW at 12mph.", not "...Winds SW at...").
   if (f->today_wind_mph >= 0 && (size_t)n < buf_size) {
-    const bool mph = shell_prefs_get_units_wind() == UnitsWind_Mph;
-    const int speed = mph ? f->today_wind_mph : ((f->today_wind_mph * 1609) + 500) / 1000;
-    const char *unit = i18n_get(mph ? i18n_noop("mph") : i18n_noop("km/h"), owner);
+    int speed;
+    const char *unit;
+    prv_wind_in_user_units(f->today_wind_mph, owner, &speed, &unit);
     if (f->today_wind_dir_deg >= 0) {
       const char *fmt = wind_alert ? i18n_noop("%s at %d%s.") : i18n_noop("Winds %s at %d%s.");
       n += snprintf(buf + n, buf_size - n, " ");

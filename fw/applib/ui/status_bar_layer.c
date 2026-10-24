@@ -3,6 +3,7 @@
 
 #include "status_bar_layer.h"
 
+#include <pbl/kernel/assert.h>
 #include <pbl/services/clock.h>
 #include <pbl/util/math.h>
 #include <pbl/util/string.h>
@@ -18,7 +19,6 @@
 #include <kernel/ui/kernel_ui.h>
 #include <process_state/app_state/app_state.h>
 #include <syscall/syscall.h>
-#include <system/passert.h>
 
 typedef struct StatusBarTextFormat {
   GTextOverflowMode overflow_mode;
@@ -330,7 +330,7 @@ static void prv_tick_timer_handler_cb(PebbleEvent *e, void *cb_data) {
   if (!prv_mode_is_clock(status_bar_layer->config.mode)) {
     return;
   }
-  struct tm currtime;
+  struct pbl_tm currtime;
   const time_t tick_time = e->clock_tick.tick_time;
   sys_localtime_r(&tick_time, &currtime);
   const int min_of_day = (currtime.tm_hour * 60) + currtime.tm_min;

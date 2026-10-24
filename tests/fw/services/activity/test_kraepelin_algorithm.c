@@ -2,8 +2,11 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
+#include <pbl/kernel/assert.h>
+#include <pbl/kernel/fatal.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/activity/activity_algorithm.h>
 #include <pbl/services/activity/kraepelin/activity_algorithm_kraepelin.h>
@@ -16,14 +19,9 @@
 
 #include <applib/accel_service.h>
 #include <clar.h>
-#include <system/passert.h>
+#include <kernel/pbl_malloc.h>
 
 // Stubs
-#include <stubs_hexdump.h>
-#include <stubs_logging.h>
-#include <stubs_passert.h>
-#include <stubs_pbl_malloc.h>
-#include <stubs_sleep.h>
 
 // Fakes
 #include <fake_rtc.h>
@@ -1733,7 +1731,7 @@ void test_kraepelin_algorithm__activity_tests(void) {
           desc = "run";
           break;
         case KAlgActivityTypeCount:
-          WTF;
+          pbl_panic();
           break;
       }
 

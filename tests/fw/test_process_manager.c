@@ -2,6 +2,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 #include <errno.h>
+#include <stdint.h>
 
 #include <pbl/services/blob_db/app_db.h>
 #include <pbl/util/size.h>
@@ -10,44 +11,30 @@
 #include <process_management/app_install_manager.h>
 #include <process_management/pebble_process_info.h>
 #include <process_management/process_manager.h>
+#include <syscall/syscall.h>
 
 // Fakes
 #include <fake_pebble_tasks.h>
-
-// Stubs
-#include <stubs_accel_service.h>
-#include <stubs_analytics.h>
-#include <stubs_animation_service.h>
 #include <stubs_app_cache.h>
 #include <stubs_app_fetch_endpoint.h>
 #include <stubs_app_manager.h>
-#include <stubs_app_state.h>
-#include <stubs_dls.h>
-#include <stubs_evented_timer.h>
-#include <stubs_expandable_dialog.h>
-#include <stubs_heap.h>
-#include <stubs_i18n.h>
-#include <stubs_irq.h>
-#include <stubs_logging.h>
-#include <stubs_modal_manager.h>
-#include <stubs_new_timer.h>
-#include <stubs_passert.h>
-#include <stubs_pbl_malloc.h>
-#include <stubs_pebble_process_md.h>
-#include <stubs_persist.h>
-#include <stubs_resource_mapped.h>
-#include <stubs_resources.h>
-#include <stubs_syscalls.h>
-#include <stubs_thread.h>
-#include <stubs_tick.h>
-#include <stubs_watchface.h>
-#include <stubs_worker_manager.h>
-#include <stubs_worker_state.h>
 
-char __APP_RAM__[1024 * 128];
-char *__APP_RAM_end__ = &__APP_RAM__[1024 * 128];
-char __WORKER_RAM__[1024 * 12];
-char *__WORKER_RAM_end__ = &__APP_RAM__[1024 * 12];
+// Stubs
+
+// Linker symbols: the *_end__ labels must sit right after their region.
+#define SYM_STR_NX(x) #x
+#define SYM_STR(x)    SYM_STR_NX(x)
+#define SYM(x)        SYM_STR(__USER_LABEL_PREFIX__) #x
+
+__asm__(".data\n"
+        ".globl " SYM(__APP_RAM__) "\n" SYM(__APP_RAM__) ":\n.space 1024 * 128\n"
+        ".globl " SYM(__APP_RAM_end__) "\n" SYM(__APP_RAM_end__) ":\n"
+        ".globl " SYM(__WORKER_RAM__) "\n" SYM(__WORKER_RAM__) ":\n.space 1024 * 12\n"
+        ".globl " SYM(__WORKER_RAM_end__) "\n" SYM(__WORKER_RAM_end__) ":\n.space 1\n"
+        ".text\n");
+
+extern char __APP_RAM__[];
+extern char __APP_RAM_end__[];
 
 typedef struct {
   AppInstallEntry entry;
@@ -323,4 +310,43 @@ void test_process_manager__get_pebble_event_waits_again_after_an_interrupted_wai
   sys_get_pebble_event(&event);
 
   cl_assert_equal_i(event.type, PEBBLE_PROCESS_DEINIT_EVENT);
+}
+
+void test_process_manager__range_in_region(void) {
+  const PebbleTask t = PebbleTask_App;
+  char *lower = &__APP_RAM__[64];
+  char *end = __APP_RAM_end__;
+
+  cl_assert(process_manager_is_range_in_region(t, lower, 16, lower));
+  cl_assert(process_manager_is_range_in_region(t, end - 16, 16, lower));
+  cl_assert(process_manager_is_range_in_region(t, lower, end - lower, lower));
+  cl_assert(process_manager_is_range_in_region(t, end, 0, lower));
+
+  cl_assert(!process_manager_is_range_in_region(t, lower - 1, 16, lower));
+  cl_assert(!process_manager_is_range_in_region(t, end - 16, 17, lower));
+  cl_assert(!process_manager_is_range_in_region(t, end, 1, lower));
+  cl_assert(!process_manager_is_range_in_region(t, nullptr, 0, lower));
+}
+
+void test_process_manager__range_in_region_rejects_wrapping_sizes(void) {
+  const PebbleTask t = PebbleTask_App;
+  char *lower = &__APP_RAM__[64];
+  char *buf = &__APP_RAM__[256];
+
+  // buf + num_bytes wraps around to an address inside the region.
+  cl_assert(!process_manager_is_range_in_region(t, buf, SIZE_MAX - 15, lower));
+  cl_assert(!process_manager_is_range_in_region(t, buf, SIZE_MAX, lower));
+}
+
+void test_process_manager__region_bytes_from(void) {
+  const PebbleTask t = PebbleTask_App;
+  char *lower = &__APP_RAM__[64];
+  char *end = __APP_RAM_end__;
+
+  cl_assert_equal_i(process_manager_region_bytes_from(t, lower, lower), end - lower);
+  cl_assert_equal_i(process_manager_region_bytes_from(t, end - 1, lower), 1);
+  cl_assert_equal_i(process_manager_region_bytes_from(t, end, lower), 0);
+  cl_assert_equal_i(process_manager_region_bytes_from(t, end + 1, lower), 0);
+  cl_assert_equal_i(process_manager_region_bytes_from(t, lower - 1, lower), 0);
+  cl_assert_equal_i(process_manager_region_bytes_from(t, nullptr, lower), 0);
 }

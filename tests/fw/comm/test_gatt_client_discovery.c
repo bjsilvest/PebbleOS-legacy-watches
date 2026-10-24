@@ -5,7 +5,6 @@
 
 #include <clar.h>
 #include <comm/ble/gap_le_connection.h>
-#include <comm/ble/gap_le_task.h>
 #include <comm/ble/gatt_client_discovery.h>
 #include <comm/ble/gatt_service_changed.h>
 #include <kernel/events.h>
@@ -22,14 +21,6 @@
 
 // Stubs
 ///////////////////////////////////////////////////////////
-
-#include <stubs_bt_lock.h>
-#include <stubs_gatt_client_subscriptions.h>
-#include <stubs_logging.h>
-#include <stubs_mutex.h>
-#include <stubs_passert.h>
-#include <stubs_rand_ptr.h>
-#include <stubs_regular_timer.h>
 
 void core_dump_reset(bool is_forced) {
 }

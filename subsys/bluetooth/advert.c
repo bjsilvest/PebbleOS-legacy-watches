@@ -14,6 +14,7 @@
 #include <pbl/bluetooth/gatt.h>
 #include <pbl/bluetooth/pairing_confirm.h>
 #include <pbl/drivers/rng.h>
+#include <pbl/kernel/assert.h>
 #include <pbl/logging/logging.h>
 #include <pbl/util/math.h>
 
@@ -27,7 +28,6 @@
 #endif
 #include <kernel/pbl_malloc.h>
 #include <os/os_mbuf.h>
-#include <system/passert.h>
 
 PBL_LOG_MODULE_DECLARE(bt, CONFIG_BT_LOG_LEVEL);
 
