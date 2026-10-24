@@ -23,4 +23,7 @@ config SRAM_SIZE
 config NUM_IRQS
     default 97
 
+config NUM_IRQ_PRIO_BITS
+    default 4
+
 endif # SOC_STM32F4

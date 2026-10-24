@@ -10,6 +10,7 @@
 #include <pbl/drivers/hrm.h>
 #include <pbl/drivers/hrm/as7000.h>
 #include <pbl/drivers/watchdog.h>
+#include <pbl/kernel/delay.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/hrm/hrm_manager.h>
 #include <pbl/services/system_task.h>
@@ -18,7 +19,6 @@
 
 #include <applib/app_logging.h>
 #include <board/board.h>
-#include <kernel/util/sleep.h>
 #include <mfg/mfg_info.h>
 #ifdef CONFIG_HRM_AS7000_FW_UPDATE
 #include <pbl/services/filesystem/pfs.h>
@@ -347,7 +347,7 @@ static void prv_power_off(HRMDevice *dev) {
   const uint32_t elapsed_ms =
       (uint32_t)((rtc_get_ticks() - state->power_on_ticks) * 1000 / RTC_TICKS_HZ);
   if (elapsed_ms < BOOT_DELAY_MS) {
-    psleep(BOOT_DELAY_MS - elapsed_ms);
+    pbl_sleep_ms(BOOT_DELAY_MS - elapsed_ms);
   }
 
   pbl_gpio_set(&dev->enable, false);
@@ -386,7 +386,7 @@ static bool prv_wait_int(HRMDevice *dev, bool level, int timeout_ms) {
       return true;
     }
     system_task_watchdog_feed();
-    psleep(1);
+    pbl_sleep_ms(1);
   }
   return false;
 }
@@ -500,7 +500,7 @@ static void prv_power_on(HRMDevice *dev) {
     const uint32_t off_ms =
         (uint32_t)((rtc_get_ticks() - state->power_off_ticks) * 1000 / RTC_TICKS_HZ);
     if (off_ms < SHUT_DOWN_DELAY_MS) {
-      psleep(SHUT_DOWN_DELAY_MS - off_ms);
+      pbl_sleep_ms(SHUT_DOWN_DELAY_MS - off_ms);
     }
   }
 
@@ -533,7 +533,7 @@ static void prv_sleep_fed(uint32_t ms) {
   while (ms > 0) {
     const uint32_t step = MIN(ms, 50U);
     watchdog_feed();
-    psleep(step);
+    pbl_sleep_ms(step);
     ms -= step;
   }
 }
@@ -615,7 +615,7 @@ static bool prv_loader_ready(HRMDevice *dev) {
         return false;
       }
     }
-    psleep(1);
+    pbl_sleep_ms(1);
   }
   return false;
 }
@@ -632,7 +632,7 @@ static bool prv_enter_loader(HRMDevice *dev) {
     if (prv_read(dev, ADDR_APP_IDS, &apps, 1) && (apps & AS7000AppId_Loader)) {
       return true;
     }
-    psleep(1);
+    pbl_sleep_ms(1);
   }
   return false;
 }
@@ -785,7 +785,7 @@ void hrm_init(HRMDevice *dev) {
 
   pbl_gpio_stm32_analog(&dev->int_gpio);
   pbl_gpio_configure(&dev->enable, PBL_GPIO_OUTPUT_ACTIVE);
-  psleep(BOOT_DELAY_MS);
+  pbl_sleep_ms(BOOT_DELAY_MS);
   const bool found = prv_read(dev, ADDR_INFO_START, &info, sizeof(info));
   if (found && info.application_id == AS7000AppId_Loader) {
     // Give the loader its timeout to return to a valid application. The enable line must stay

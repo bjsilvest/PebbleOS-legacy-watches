@@ -20,7 +20,6 @@
 #include <board/board.h>
 #include <flash_region/flash_region.h>
 #include <pbl/kernel/delay.h>
-#include <kernel/util/sleep.h>
 #include <stm32f4xx.h>
 #include <pbl/kernel/assert.h>
 #include <pbl/kernel/fatal.h>
@@ -275,7 +274,7 @@ void qspi_flash_init(QSPIFlash *dev, QSPIFlashPart *part, bool coredump_mode) {
   if (coredump_mode) {
     pbl_busy_wait_us(part->reset_latency_ms * 1000);
   } else {
-    psleep(part->reset_latency_ms);
+    pbl_sleep_ms(part->reset_latency_ms);
   }
 
   prv_indirect_write_no_addr_1line(part->instructions.enter_quad_mode);
