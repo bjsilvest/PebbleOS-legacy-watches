@@ -50,6 +50,20 @@ static void prv_i2s_configure(MicDevice *this) {
   i2s.I2S_Mode = I2S_Mode_MasterRx;
   i2s.I2S_MCLKOutput = I2S_MCLKOutput_Disable;
   I2S_Init(this->spi, &i2s);
+
+  // The vendored I2S_Init() combines the HAL's packet length (16 bits, doubled
+  // for the LSB standard) with the StdPeriph divisor of 32 * packetlength, so
+  // here it computes a prescaler of 0 and falls back to 2: a ~9.6 MHz PDM clock
+  // instead of ~1 MHz, and a filter ISR that never lets go of the CPU. Set the
+  // prescaler for 32 bit clocks per 32 kHz frame from the PLLI2S output.
+  const uint32_t pll_in = ((RCC->PLLCFGR & RCC_PLLCFGR_PLLSRC) ? HSE_VALUE : HSI_VALUE) /
+                          (RCC->PLLCFGR & RCC_PLLCFGR_PLLM);
+  const uint32_t plln = (RCC->PLLI2SCFGR & RCC_PLLI2SCFGR_PLLI2SN) >> 6;
+  const uint32_t pllr = (RCC->PLLI2SCFGR & RCC_PLLI2SCFGR_PLLI2SR) >> 28;
+  const uint32_t bit_clock = 32 * I2S_AudioFreq_32k;
+  const uint32_t div = ((pll_in * plln) / pllr + bit_clock / 2) / bit_clock;
+  PBL_ASSERTN(div >= 4 && div <= 0x1ff);
+  this->spi->I2SPR = (uint16_t)((div / 2) | ((div & 1) << 8));
 }
 
 void mic_init(MicDevice *this) {
