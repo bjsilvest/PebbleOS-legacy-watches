@@ -26,8 +26,6 @@
 #else
         *nimble.dir*(.bss .bss.* COMMON)
 #endif
-        /* The sys shell's audit_delay result buffer. */
-        *sys_shell.c.obj(.bss .bss.*)
 #ifdef CONFIG_BOARD_SPALDING
         /* Kernel-only state that pushed spalding's SRAM over in v4.42. */
         *do_not_disturb.c.obj(.bss .bss.*)
