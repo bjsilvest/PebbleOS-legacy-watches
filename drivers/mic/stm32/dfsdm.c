@@ -17,7 +17,6 @@
 #include <pbl/soc/stm32/sleep.h>
 #include <pbl/util/math.h>
 
-#include <kernel/events.h>
 
 PBL_LOG_MODULE_DEFINE(driver_mic, CONFIG_DRIVER_MIC_LOG_LEVEL);
 
@@ -112,7 +111,6 @@ static void prv_dfsdm_disable(MicDevice *this) {
 void mic_init(MicDevice *this) {
   PBL_ASSERTN(!this->state->initialized);
 
-  this->state->main_pending = false;
   this->state->bg_pending = false;
   this->state->running = false;
   this->state->subscriber = (struct MicSubscriber){0};
@@ -233,12 +231,6 @@ static void prv_dispatch_samples(void *context_ptr) {
   pbl_mutex_unlock(&this->state->mic_mutex);
 }
 
-static void prv_dispatch_samples_main(void *context_ptr) {
-  MicDevice *this = context_ptr;
-  this->state->main_pending = false;
-  prv_dispatch_samples(context_ptr);
-}
-
 static void prv_dispatch_samples_bg(void *context_ptr) {
   MicDevice *this = context_ptr;
   this->state->bg_pending = false;
@@ -295,18 +287,8 @@ static void prv_dma_handler(void *context, bool is_complete) {
     }
   }
 
-  if (!this->state->main_pending) {
-    this->state->main_pending = true;
-    PebbleEvent e = {
-      .type = PEBBLE_CALLBACK_EVENT,
-      .callback = {
-        .callback = prv_dispatch_samples_main,
-        .data = (void *)this,
-      },
-    };
-    event_put_isr(&e);
-  }
-
+  // Encode on KernelBG, as the nRF5 and SF32LB52 mic drivers do, so that the
+  // Speex encoder does not take CPU time from the UI on KernelMain.
   if (!this->state->bg_pending) {
     this->state->bg_pending = true;
     system_task_add_callback_from_isr(prv_dispatch_samples_bg, (void *)this);
