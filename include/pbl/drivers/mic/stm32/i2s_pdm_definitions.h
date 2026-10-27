@@ -28,7 +28,6 @@ typedef struct MicState {
   TPDMFilter_InitStruct pdm_filter;
   bool initialized;
   bool running;
-  bool main_pending;
   bool bg_pending;
   uint32_t overflow_cnt;
   //! Milliseconds of output discarded while the filter settles.

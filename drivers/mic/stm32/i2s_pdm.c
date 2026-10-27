@@ -17,7 +17,6 @@
 #include <pbl/util/math.h>
 #include <pbl/util/size.h>
 
-#include <kernel/events.h>
 #include <pbl/kernel/assert.h>
 #include <pbl/kernel/fatal.h>
 
@@ -69,7 +68,6 @@ static void prv_i2s_configure(MicDevice *this) {
 void mic_init(MicDevice *this) {
   PBL_ASSERTN(!this->state->initialized);
 
-  this->state->main_pending = false;
   this->state->bg_pending = false;
   this->state->running = false;
   this->state->subscriber = (struct MicSubscriber){0};
@@ -212,12 +210,6 @@ static void prv_dispatch_samples(void *context_ptr) {
   pbl_mutex_unlock(&this->state->mic_mutex);
 }
 
-static void prv_dispatch_samples_main(void *context_ptr) {
-  MicDevice *this = context_ptr;
-  this->state->main_pending = false;
-  prv_dispatch_samples(context_ptr);
-}
-
 static void prv_dispatch_samples_bg(void *context_ptr) {
   MicDevice *this = context_ptr;
   this->state->bg_pending = false;
@@ -252,20 +244,8 @@ static void prv_dma_handler(void *context, bool is_complete) {
     this->state->overflow_cnt++;
   }
 
-  // Post to both KernelMain and KernelBG: whichever runs first empties the
-  // buffer, so a busy KernelMain does not make it overrun.
-  if (!this->state->main_pending) {
-    this->state->main_pending = true;
-    PebbleEvent e = {
-      .type = PEBBLE_CALLBACK_EVENT,
-      .callback = {
-        .callback = prv_dispatch_samples_main,
-        .data = (void *)this,
-      },
-    };
-    event_put_isr(&e);
-  }
-
+  // Encode on KernelBG, as the nRF5 and SF32LB52 mic drivers do: on
+  // KernelMain the Speex encoder takes a fifth of the CPU from the UI.
   if (!this->state->bg_pending) {
     this->state->bg_pending = true;
     system_task_add_callback_from_isr(prv_dispatch_samples_bg, (void *)this);
