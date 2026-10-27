@@ -21,11 +21,13 @@
 #include <pbl/services/put_bytes/put_bytes_storage.h>
 #include <pbl/services/system_task.h>
 #include <pbl/util/byteorder.h>
+#include <pbl/util/heap.h>
 #include <pbl/util/math.h>
 #include <pbl/util/testing.h>
 
 #include <comm/bluetooth_analytics.h>
 #include <kernel/events.h>
+#include <kernel/kernel_heap.h>
 #include <kernel/pbl_malloc.h>
 #include <kernel/pebble_tasks.h>
 #include <kernel/system_message.h>
@@ -309,6 +311,12 @@ static bool prv_init_put_job_queue_if_necessary(void) {
     put_jobs->job[i].buffer = buffer;
   }
   put_jobs->num_allocated_pb_jobs = i;
+  if (i < MAX_BATCHED_PB_PUT_OPS) {
+    unsigned int used, free_bytes, max_free;
+    heap_calc_totals(kernel_heap_get(), &used, &free_bytes, &max_free);
+    PBL_LOG_WRN("PutBytes got %d of %d buffers: heap %u free, largest %u", i,
+                MAX_BATCHED_PB_PUT_OPS, free_bytes, max_free);
+  }
   return true;
 }
 
