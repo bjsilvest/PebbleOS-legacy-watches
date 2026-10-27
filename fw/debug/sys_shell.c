@@ -17,6 +17,7 @@
 #include <pbl/util/size.h>
 
 #include <kernel/event_loop.h>
+#include <kernel/pbl_malloc.h>
 #include <kernel/util/factory_reset.h>
 #include <process_management/worker_manager.h>
 #include <system/bootbits.h>
@@ -170,32 +171,39 @@ static int prv_cmd_audit_delay(const struct pbl_shell *sh, size_t argc, char **a
   uint32_t elapsed_ms = pbl_ticks_to_ms((pbl_tick_t)(pbl_uptime_ticks() - t0));
   pbl_shell_print(sh, "busy wait 1000000 us: %" PRIu32 " ms", elapsed_ms);
 
-  // Short busy waits against the cycle counter, without interruptions.
-  static uint32_t s_took_ns[500];
+  // Short busy waits against the cycle counter, without interruptions. The results go on the
+  // heap so they don't take static RAM.
+  const size_t num_waits = 500;
+  uint32_t *took_ns = kernel_malloc(num_waits * sizeof(*took_ns));
+  if (!took_ns) {
+    pbl_shell_error(sh, "out of memory");
+    return -ENOMEM;
+  }
   pbl_irq_lock();
   pbl_busy_wait_us(1); // warm the cache
-  for (uint32_t i = 0; i < ARRAY_LENGTH(s_took_ns); i++) {
+  for (uint32_t i = 0; i < num_waits; i++) {
     uint32_t start = pbl_cycle_get_32();
     pbl_busy_wait_us(2 * i + 1);
-    s_took_ns[i] =
+    took_ns[i] =
         (uint32_t)(((uint64_t)(pbl_cycle_get_32() - start) * 1000000000U) / pbl_cycles_per_sec());
   }
   pbl_irq_unlock();
 
   uint32_t short_waits = 0;
   uint32_t max_over_ns = 0;
-  for (uint32_t i = 0; i < ARRAY_LENGTH(s_took_ns); i++) {
+  for (uint32_t i = 0; i < num_waits; i++) {
     uint32_t ns = (2 * i + 1) * 1000U;
-    if (s_took_ns[i] < ns) {
+    if (took_ns[i] < ns) {
       pbl_shell_print(sh, "busy wait %" PRIu32 " us: took %" PRIu32 " ns", ns / 1000U,
-                      s_took_ns[i]);
+                      took_ns[i]);
       short_waits++;
-    } else if (s_took_ns[i] - ns > max_over_ns) {
-      max_over_ns = s_took_ns[i] - ns;
+    } else if (took_ns[i] - ns > max_over_ns) {
+      max_over_ns = took_ns[i] - ns;
     }
   }
   pbl_shell_print(sh, "busy wait 1..999 us: %" PRIu32 " short, at most %" PRIu32 " ns over",
                   short_waits, max_over_ns);
+  kernel_free(took_ns);
   return 0;
 }
 #endif
