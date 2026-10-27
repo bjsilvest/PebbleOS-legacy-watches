@@ -43,9 +43,9 @@
       "file": "normal/base/images/Pebble_80x80_Alarm_clock_static.svg"
     },
     {
-      "type": "pdc",
+      "type": "raw",
       "name": "BATTERY_ICON_CHARGING_LARGE",
-      "file": "normal/base/images/Pebble_80x80_Battery_currently_charging.svg"
+      "file": "normal/snowy/images/animated_pdcs/Pebble_80x80_Battery_currently_charging.pdc"
     },
     {
       "type": "pdc",
