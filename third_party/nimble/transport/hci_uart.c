@@ -15,6 +15,7 @@
 #include <pbl/kernel/mutex.h>
 #include <pbl/kernel/sem.h>
 #include <pbl/kernel/thread.h>
+#include <pbl/kernel/time.h>
 #include <pbl/logging/logging.h>
 #include <pbl/task_wdt/task_wdt.h>
 #include <pbl/util/math.h>
@@ -1281,8 +1282,20 @@ static void prv_write_irq(const uint8_t *data, size_t len) {
 //! hang the writer until the watchdog resets the watch.
 #define TX_STALL_TIMEOUT_MS 2000U
 
+//! A byte leaves in ~11 us at 921600 baud, so the transmit register is busy
+//! for most of every write. Spin about three byte times before sleeping: a
+//! 1 ms sleep per byte held BLE sends, which run on KernelMain, to ~1 KB/s and
+//! stalled the UI. Keep it short: the HCI RX thread has KernelMain's priority
+//! and cannot drain the controller while KernelMain spins.
+#define TX_SPIN_US 30U
+
 //! @return false if the controller did not take the byte in time.
 static bool prv_write_byte_bounded(uint8_t byte) {
+  const uint32_t spin_start = pbl_cycle_get_32();
+  const uint32_t spin_cycles = TX_SPIN_US * (pbl_cycles_per_sec() / 1000000U);
+  while (!uart_is_tx_ready(BT_HCI_UART_TX) && (pbl_cycle_get_32() - spin_start) < spin_cycles) {
+  }
+  // Still busy: the controller holds CTS off, e.g. while it wakes up.
   for (uint32_t waited_ms = 0U; !uart_is_tx_ready(BT_HCI_UART_TX); waited_ms++) {
     if (waited_ms >= TX_STALL_TIMEOUT_MS) {
       return false;
