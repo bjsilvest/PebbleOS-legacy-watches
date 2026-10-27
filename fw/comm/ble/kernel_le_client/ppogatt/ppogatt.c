@@ -160,6 +160,9 @@ static RegularTimerInfo s_ack_timer;
 
 static uint8_t s_disconnect_counter;
 
+//! Data packets received out of sequence, each costing a retransmission by the phone
+static uint32_t s_rx_out_of_seq;
+
 //! Caps rediscovery on stale meta handles to once per BLE connection.
 static bool s_rediscovery_requested_this_connection;
 
@@ -761,8 +764,10 @@ static void prv_handle_data(PPoGATTClient *client, const PPoGATTPacket *packet,
     comm_session_receive_router_write(client->session, packet->payload, payload_length);
     //    PBL_LOG_DBG("Got PP data (sn=%u, %u bytes)", packet->sn, payload_length);
   } else {
-    PBL_LOG_DBG("packet->sn != next_expected_data_sn (%u != %u)", packet->sn,
-                client->in.next_expected_data_sn);
+    if ((s_rx_out_of_seq++ % 16U) == 0U) {
+      PBL_LOG_WRN("Data out of sequence (%u != %u), %" PRIu32 " so far", packet->sn,
+                  client->in.next_expected_data_sn, s_rx_out_of_seq);
+    }
     // Rely on the server retransmitting on Ack time-out
   }
 }
