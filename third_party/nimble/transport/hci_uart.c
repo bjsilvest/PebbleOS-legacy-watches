@@ -912,6 +912,8 @@ static void prv_write_irq(const uint8_t *data, size_t len) {
       }
       if (waited_ms >= TX_FLOW_TIMEOUT_MS) {
         s_tx_flow_forced++;
+        PBL_LOG_WRN("RTS held %lu ms: forcing %u of %u bytes, first %02x", (unsigned long)waited_ms,
+                    (unsigned)s_tx_left, (unsigned)len, data[0]);
         prv_tx_poll_rest();
         return;
       }
