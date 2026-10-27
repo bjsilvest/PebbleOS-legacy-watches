@@ -142,6 +142,8 @@ typedef struct {
 
   //! the time in ticks at which the put bytes init request completed
   RtcTicks start_ticks;
+  //! Chunks acked only after their flash write, as the job queue was full
+  uint32_t late_acks;
   struct pbl_bt_slave_conn_event_stats conn_event_stats;
 
   //! Holds PB commands. Will enqueue multiple PutRequests when pre-acking is enabled
@@ -746,6 +748,7 @@ static void prv_do_init(void) {
   success = prv_setup_storage_for_init_request(request, index);
 
   s_pb_state.start_ticks = rtc_get_ticks();
+  s_pb_state.late_acks = 0U;
 
   if (!success) {
     PBL_LOG_WRN("Failed to init storage");
@@ -816,7 +819,10 @@ static void prv_do_commit(void) {
 
   if (elapsed_time_ms > 0) {
     int bytes_per_sec = (int)((s_pb_state.total_size * 1000) / elapsed_time_ms);
-    PBL_LOG_DBG("PutBytes pushed %d bytes/sec", bytes_per_sec);
+    PBL_LOG_INFO("PutBytes type %u: %" PRIu32 " B in %" PRIu32 " ms, %d B/s, %" PRIu32
+                 " late acks, %d buffers",
+                 (unsigned)s_pb_state.type, s_pb_state.total_size, elapsed_time_ms, bytes_per_sec,
+                 s_pb_state.late_acks, s_pb_state.pb_pending_jobs.num_allocated_pb_jobs);
   }
 
   bluetooth_analytics_handle_put_bytes_stats(commit_succeeded, s_pb_state.type,
@@ -971,6 +977,7 @@ static void prv_process_put_requests_system_task_cb(void *unused) {
   prv_unlock_pb_job_state();
 
   if (do_ack) { // If we did not pre-ack, we need to ack the packet now!
+    s_pb_state.late_acks++;
     prv_send_response(ResponseAck, token);
   }
 }
