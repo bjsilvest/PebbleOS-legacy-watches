@@ -36,7 +36,12 @@
 #include <nimble/transport_impl.h>
 #include <os/endian.h>
 
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+// Controller reboots and forced sends belong in the flash log; NimBLE's own logging is too noisy.
+PBL_LOG_MODULE_DECLARE(bt, CONFIG_BT_LOG_LEVEL);
+#else
 PBL_LOG_MODULE_DECLARE(nimble, CONFIG_NIMBLE_LOG_LEVEL);
+#endif
 
 // Boards with split RX/TX UARTs define BT_HCI_UART_TX; BT_HCI_UART receives.
 #ifndef BT_HCI_UART_TX
