@@ -681,14 +681,24 @@ static void prv_try_sleep(void) {
 // Reboots after the controller stopped answering, at most this many per boot
 #define MAX_CONTROLLER_REBOOTS 5U
 
+// The host times out a command after 2 s. One sent while the controller
+// rebooted was dropped, so its timeout says nothing about the new controller.
+#define CONTROLLER_REBOOT_GRACE_MS 3000U
+
 static volatile bool s_reboot_requested;
 static uint32_t s_reboots;
+static RtcTicks s_rebooted_at;
 
 // Runs on the HCI thread. Writers see the state change and drop their bytes
 // until the controller runs again; the host then resyncs with an HCI Reset.
 static void prv_controller_reboot(void) {
   s_reboot_requested = false;
   if (s_controller_state != ControllerStateReady || s_reboots >= MAX_CONTROLLER_REBOOTS) {
+    return;
+  }
+  if (s_reboots > 0U &&
+      (rtc_get_ticks() - s_rebooted_at) < (CONTROLLER_REBOOT_GRACE_MS * RTC_TICKS_HZ) / 1000U) {
+    PBL_LOG_WRN("Controller just rebooted: let the host resync");
     return;
   }
   s_reboots++;
@@ -726,6 +736,7 @@ static void prv_controller_reboot(void) {
   if (booted) {
     prv_uart_start();
     s_last_activity = rtc_get_ticks();
+    s_rebooted_at = s_last_activity;
     s_power_save = s_power_save && s_flow_control;
   } else {
     // Off for good: nothing holds the STOP block any more.
