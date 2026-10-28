@@ -33,15 +33,15 @@ since the previous one.
 
 ### Notes per watch
 
-- **Pebble and Pebble Steel** run a cut-down build, so their versions end
-  in `-lite`: the full release does not fit the original Pebble's flash.
-  The timeline is a plain list, and Health, Weather, voice replies and the
+- **Pebble and Pebble Steel** run a cut-down `-lite` build: as the full release does not fit the original Pebble's flash.
+  The timeline is a plain list, and Health, Weather, and the
   Sports app are not included. Only the Kickstarter Pebble (ev2_4) has been
   tested; the later Pebble (v1_5) and Pebble Steel (v2_0) builds have not.
 - **Pebble Time Steel** has not been tested. It uses the Pebble Time's
   light-sensor calibration.
 - **Pairings from stock firmware are not carried over.** Pair your phone
   again after installing.
+- **If you want to return to the -rbl firmware, it is recommended you do a factory reset first, as you may not be able to delete paired Bluetooth devices made from the newer firmware.**
 
 ## Branches
 
