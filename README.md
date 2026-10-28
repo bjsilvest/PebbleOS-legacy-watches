@@ -64,3 +64,8 @@ by Google. Third-party components keep their own licenses, listed in
 `third_party/sbom.yml`. The TI Bluetooth init scripts are licensed by Texas
 Instruments for use only with TI devices; their license is attached to
 each release.
+
+Every port except the Pebble and Pebble Steel builds includes the
+[Speex](https://github.com/xiph/speex) speech codec for voice replies.
+Speex is under a BSD 3-clause license; its copyright notice and license
+are attached to each release that includes it as `LICENSE-Speex.txt`.
