@@ -48,6 +48,9 @@ static void prv_handle_event(PebbleEvent *e, void *context) {
 }
 
 MicStreamStartResult mic_stream_to_phone_start(MicStreamHandlers handlers, void *context) {
+#ifndef CONFIG_SERVICE_MIC_STREAM
+  return MicStreamStartErrUnavailable;
+#endif
   MicStreamState *state = prv_get_state();
   if (!state) {
     return MicStreamStartErrNotForeground;

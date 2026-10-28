@@ -86,8 +86,12 @@ typedef struct {
 
   ConnectionServiceState connection_service_state;
 
+#ifdef CONFIG_SERVICE_MIC_STREAM
   MicStreamState mic_stream_state;
+#endif
+#ifdef CONFIG_SERVICE_MIC_CAPTURE
   MicCaptureState mic_capture_state;
+#endif
 
 #ifdef CONFIG_SERVICE_ACTIVITY
   HealthServiceState health_service_state;
@@ -322,8 +326,12 @@ PBL_NOINLINE void app_state_init(void) {
 
   connection_service_state_init(app_state_get_connection_service_state());
 
+#ifdef CONFIG_SERVICE_MIC_STREAM
   mic_stream_state_init(app_state_get_mic_stream_state());
+#endif
+#ifdef CONFIG_SERVICE_MIC_CAPTURE
   mic_capture_state_init(app_state_get_mic_capture_state());
+#endif
 
   tick_timer_service_state_init(app_state_get_tick_timer_service_state());
 
@@ -463,11 +471,19 @@ ConnectionServiceState *app_state_get_connection_service_state(void) {
 }
 
 MicCaptureState *app_state_get_mic_capture_state(void) {
+#ifdef CONFIG_SERVICE_MIC_CAPTURE
   return &s_app_state_ptr->mic_capture_state;
+#else
+  return nullptr;
+#endif
 }
 
 MicStreamState *app_state_get_mic_stream_state(void) {
+#ifdef CONFIG_SERVICE_MIC_STREAM
   return &s_app_state_ptr->mic_stream_state;
+#else
+  return nullptr;
+#endif
 }
 
 #ifdef CONFIG_SERVICE_ACTIVITY

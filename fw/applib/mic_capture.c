@@ -40,6 +40,9 @@ static void prv_event(PebbleEvent *event, void *context) {
 }
 
 MicCaptureStartResult mic_capture_start(MicCaptureHandlers handlers, void *context) {
+#ifndef CONFIG_SERVICE_MIC_CAPTURE
+  return MicCaptureStartErrUnavailable;
+#endif
   MicCaptureState *state = prv_state();
   if (!state)
     return MicCaptureStartErrNotForeground;
