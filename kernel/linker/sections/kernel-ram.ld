@@ -26,6 +26,8 @@
 #else
         *nimble.dir*(.bss .bss.* COMMON)
 #endif
+        /* The app mic stream's state and encoded frame. */
+        *services__mic_stream.dir*(.bss .bss.*)
 #ifdef CONFIG_PULSE_EVERYWHERE
         /* Only without PULSE's buffers is there room for it in SRAM. */
         *task_timer.c.obj(.bss .bss.*)
