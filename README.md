@@ -27,8 +27,10 @@ with the builds for the other watches.
 | Pebble Time       | `snowy@dvt` | Tested       |
 | Pebble Time Steel | `snowy@s3`  | **Untested** |
 
-Download the `.pbz` for your watch and sideload it from the phone app. The
-release notes list what was tested and what changed.
+Download the `.pbz` for your watch and sideload it from the Core app.
+Coming from stock firmware, you also need to pair again over Bluetooth
+LE: follow the [installing steps](https://github.com/bjsilvest/PebbleOS-legacy-watches#installing) on the front page. The release
+notes list what was tested and what changed.
 
 ## Notes
 
