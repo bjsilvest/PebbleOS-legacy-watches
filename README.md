@@ -28,9 +28,11 @@ with the builds for the other watches.
 | Pebble, later edition (v1_5)        | `tintin@v1_5`  | **Untested** |
 | Pebble Steel (v2_0)                 | `tintin@v2_0`  | **Untested** |
 
-Download the `.pbz` whose name matches your watch's hardware revision and
-sideload it from the phone app. The release notes list what was tested and
-what changed.
+Download the `.pbz` for your hardware revision and sideload it from the
+Core app.
+Coming from stock firmware, you also need to pair again over Bluetooth
+LE: follow the [installing steps](https://github.com/bjsilvest/PebbleOS-legacy-watches#installing) on the front page. The release
+notes list what was tested and what changed.
 
 ## What is different on this watch
 
