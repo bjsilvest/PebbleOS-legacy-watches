@@ -64,7 +64,8 @@ update.
    **⋮** menu, then **Debug → Firmware Update Debug → Sideload FW**, and
    pick the `.pbz`. The watch shows the update's progress and restarts
    when it is done.
-4. Delete the old pairing on both sides: on the watch in
+4. Once the update has finished and the watch has restarted on the new
+   firmware, delete the old pairing on both sides: on the watch in
    **Settings → Bluetooth**, and on the phone in the Core app and in the
    phone's Bluetooth settings.
 5. **Android:** in the Core app, go to **Settings → Connectivity** and
