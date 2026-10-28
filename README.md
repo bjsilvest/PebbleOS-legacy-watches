@@ -44,6 +44,38 @@ watch, which hardware revisions have been tested and what changed.
   again after installing.
 - **If you want to return to the -rbl firmware, it is recommended you do a factory reset first, as you may not be able to delete paired Bluetooth devices made from the newer firmware.**
 
+## Installing
+
+Install the firmware from the Core app on your phone. You need the Core
+app's debug options for this.
+
+These builds use Bluetooth LE only. On Android, the Core app expects the
+original Pebble watches over Bluetooth Classic and hides them from its
+Bluetooth LE scan, so you have to turn that on to pair again after the
+update.
+
+### Coming from stock firmware
+
+1. In the Core app, go to **Settings → Debug** and turn on **Show debug
+   options**.
+2. Download the `.pbz` for your watch from the latest release onto your
+   phone.
+3. With the watch connected, open the **Watches** tab, tap the watch's
+   **⋮** menu, then **Debug → Firmware Update Debug → Sideload FW**, and
+   pick the `.pbz`. The watch shows the update's progress and restarts
+   when it is done.
+4. Delete the old pairing on both sides: on the watch in
+   **Settings → Bluetooth**, and on the phone in the Core app and in the
+   phone's Bluetooth settings.
+5. **Android:** in the Core app, go to **Settings → Connectivity** and
+   turn on **Show legacy watches in BLE scan**. iPhones don't need this.
+6. Pair the watch again from the Core app.
+
+### Updating from an earlier build of these ports
+
+The watch is already paired over Bluetooth LE, so only step 3 is needed:
+sideload the new `.pbz`.
+
 ## Branches
 
 - `<watch>-v4.42.0`: the current port, based on PebbleOS v4.42.0.
