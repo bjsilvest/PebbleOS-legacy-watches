@@ -20,16 +20,17 @@ stack.
 
 ## Watches
 
-| Watch | Codename | Latest release | Branch |
+| Watch | Codename | Latest build | Branch |
 |---|---|---|---|
-| Pebble, Pebble Steel | tintin | [v4.42.0-tintin.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.42.0-tintin.2) | [`tintin-v4.42.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/tintin-v4.42.0) |
-| Pebble Time, Pebble Time Steel | snowy | [v4.42.0-snowy.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.42.0-snowy.1) | [`snowy-v4.42.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/snowy-v4.42.0) |
-| Pebble Time Round | spalding | [v4.42.0-spalding.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.42.0-spalding.1) | [`spalding-v4.42.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/spalding-v4.42.0) |
+| Pebble, Pebble Steel | tintin | [v4.42.0-tintin.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.42.0-legacy) | [`tintin-v4.42.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/tintin-v4.42.0) |
+| Pebble Time, Pebble Time Steel | snowy | [v4.42.0-snowy.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.42.0-legacy) | [`snowy-v4.42.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/snowy-v4.42.0) |
+| Pebble Time Round | spalding | [v4.42.0-spalding.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.42.0-legacy) | [`spalding-v4.42.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/spalding-v4.42.0) |
 | Pebble 2 | silk | In progress, no release yet | [`silk-port`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/silk-port) |
 
-Download the `.pbz` file that matches your watch from its release. Each
-release lists which hardware revisions have been tested and what changed
-since the previous one.
+All watches share one release per PebbleOS version. Download the
+`.pbz` that matches your watch from the latest release,
+[Legacy watches 4.42.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.42.0-legacy). Its notes list, for each
+watch, which hardware revisions have been tested and what changed.
 
 ### Notes per watch
 
@@ -47,7 +48,8 @@ since the previous one.
 
 - `<watch>-v4.42.0`: the current port, based on PebbleOS v4.42.0.
 - `snowy-port`, `spalding-port`, `tintin-lite-fork`: the earlier ports,
-  based on PebbleOS v4.41.2 (releases `v4.41.2-*`).
+  based on PebbleOS v4.41.2 (release
+  [Legacy watches 4.41.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.41.2-legacy)).
 - `main`: Core's `main` branch from when this repository was made.
 
 ## Building
