@@ -19,7 +19,8 @@ v4.42.0 to the **Pebble Time Round**. It uses Bluetooth Low Energy
 
 ## Download
 
-Latest release: [v4.42.0-spalding.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.42.0-spalding.1)
+Latest build: v4.42.0-spalding.1, in the release [Legacy watches 4.42.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.42.0-legacy)
+with the builds for the other watches.
 
 | Watch             | Board      | Status |
 |-------------------|------------|--------|
