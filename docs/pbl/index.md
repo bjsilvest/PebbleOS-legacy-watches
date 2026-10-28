@@ -27,13 +27,13 @@ command's own options.
 
 | Build | Device | Emulator |
 | --- | --- | --- |
-| {doc}`configure` | {doc}`flash` | {doc}`qemu` |
-| {doc}`build` | {doc}`console` | {doc}`screenshot` |
-| {doc}`bundle` | {doc}`debug` | {doc}`touch` |
-| {doc}`menuconfig` | {doc}`image_resources` | {doc}`swipe` |
-| {doc}`clean` | {doc}`image_recovery` | {doc}`feed` |
-| {doc}`test` | {doc}`reset` | |
-| {doc}`itest` | {doc}`run` | |
+| {doc}`configure` | {doc}`run` | {doc}`screenshot` |
+| {doc}`build` | {doc}`flash` | {doc}`touch` |
+| {doc}`bundle` | {doc}`console` | {doc}`swipe` |
+| {doc}`menuconfig` | {doc}`debug` | {doc}`feed` |
+| {doc}`clean` | {doc}`image_resources` | |
+| {doc}`test` | {doc}`image_recovery` | |
+| {doc}`itest` | {doc}`reset` | |
 | | {doc}`erase` | |
 | | {doc}`bork` | |
 | | {doc}`openocd` | |
@@ -75,14 +75,19 @@ pbl -b build-asterix flash
 
 ## Runners
 
-Device commands reach a watch through a binary runner. A board lists the ones it supports in its manifest, and the
-first one is the default; `-r/--runner` picks another.
+Device commands reach their target through a binary runner: a watch, or a
+program on the host running the firmware, such as the emulator. A board
+lists the runners it supports in its manifest, and the first one that can
+handle the build is the default; `-r/--runner` picks another.
 
 | Runner | Boards | Operations |
 | --- | --- | --- |
-| `openocd` | asterix | flash (with resources), run, reset, erase (with ranges), debug, debug server |
-| `nrfutil` | asterix | flash (with resources), run, reset, erase (with ranges) |
+| `openocd` | asterix | flash (with resources), reset, erase (with ranges), debug, debug server |
+| `nrfutil` | asterix | flash (with resources), reset, erase (with ranges) |
 | `sftool` | obelix, getafix | flash (with resources), erase (with ranges) |
+| `qemu` | qemu_* | run |
+| `native` | native_* | run |
+| `wasm` | native_*/wasm | run |
 
 For the OpenOCD runner, the probe and target configuration lives in the
 board's `support/openocd.cfg`, and how to write the resources and erase
@@ -109,13 +114,13 @@ itest.md
 :hidden:
 :caption: Device
 
+run.md
 flash.md
 console.md
 debug.md
 image_resources.md
 image_recovery.md
 reset.md
-run.md
 erase.md
 bork.md
 openocd.md
@@ -125,7 +130,6 @@ openocd.md
 :hidden:
 :caption: Emulator
 
-qemu.md
 screenshot.md
 touch.md
 swipe.md

@@ -43,6 +43,15 @@ pbl_clar_test(test_put_bytes
   OVERRIDES dummy_board
 )
 
+pbl_clar_test(test_get_bytes
+  SOURCES
+    fw/services/get_bytes/get_bytes.c
+    tests/fakes/fake_session.c
+    tests/fakes/fake_events.c
+    tests/fakes/fake_rtc.c
+  DEFINES CONFIG_SOC_POSIX
+)
+
 pbl_clar_test(test_language_pack_storage
   SOURCES
     fw/services/put_bytes/put_bytes_storage_file.c
@@ -265,6 +274,20 @@ pbl_clar_test(test_app_cache
   OVERRIDES dummy_board
 )
 
+pbl_clar_test(test_mic_manager
+  SOURCES
+    fw/services/mic_manager/mic_manager.c
+  OVERRIDES dummy_board
+)
+
+pbl_clar_test(test_mic_stream
+  SOURCES
+    fw/services/mic_stream/mic_stream.c
+    fw/services/mic_manager/mic_manager.c
+    tests/fakes/fake_events.c
+  OVERRIDES dummy_board
+)
+
 pbl_clar_test(test_app_install_manager
   MODULES settings rand gtypes
   SOURCES
@@ -464,4 +487,15 @@ pbl_clar_test(test_system_task
     CONFIG_TASK_WDT_TIMEOUT_MS=5000
     CONFIG_SERVICE_SYSTEM_TASK_LOG_LEVEL=0
     PBL_NO_LINKER_SCRIPT
+)
+
+pbl_clar_test(test_mic_capture
+  SOURCES
+    fw/services/mic_capture/mic_capture.c
+    fw/services/mic_manager/mic_manager.c
+    fw/services/blob_db/app_db.c
+    tests/fakes/fake_events.c
+    tests/fakes/fake_settings_file.c
+  DEFINES CONFIG_SERVICE_MIC_CAPTURE
+  OVERRIDES dummy_board
 )
