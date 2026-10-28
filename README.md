@@ -48,12 +48,11 @@ since the previous one.
 - `<watch>-v4.42.0`: the current port, based on PebbleOS v4.42.0.
 - `snowy-port`, `spalding-port`, `tintin-lite-fork`: the earlier ports,
   based on PebbleOS v4.41.2 (releases `v4.41.2-*`).
-- `main`: Core's `main` branch from when this repository was made, plus
-  this page.
+- `main`: Core's `main` branch from when this repository was made.
 
 ## Building
 
-Follow Core's [getting started guide](https://pebbleos.readthedocs.io/en/latest/getting_started/index.html)
+Follow Core's [getting started guide](https://developer.repebble.com/pebbleos/docs/getting_started/)
 on the branch for your watch.
 
 ## Licenses
