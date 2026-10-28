@@ -157,8 +157,7 @@ bool mic_manager_reserve(MicClient client) {
   return rv;
 }
 
-void mic_manager_release(MicClient client) {
-  pbl_mutex_lock(&s_lock, PBL_FOREVER);
+static void prv_release_locked(MicClient client) {
   if ((client != MicClientNone) && (s_state.reserved == client)) {
     s_state.reserved = MicClientNone;
   }
@@ -168,6 +167,20 @@ void mic_manager_release(MicClient client) {
     s_state.on_preempted = nullptr;
     s_state.preempt_context = nullptr;
     PBL_LOG_DBG("Mic released by client %u", client);
+  }
+}
+
+void mic_manager_release(MicClient client) {
+  pbl_mutex_lock(&s_lock, PBL_FOREVER);
+  prv_release_locked(client);
+  prv_unlock();
+}
+
+void mic_manager_release_and_cleanup(MicClient client, void (*cleanup)(void)) {
+  pbl_mutex_lock(&s_lock, PBL_FOREVER);
+  prv_release_locked(client);
+  if (!s_state.dictation_active) {
+    cleanup();
   }
   prv_unlock();
 }
