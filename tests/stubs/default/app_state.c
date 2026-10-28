@@ -133,10 +133,14 @@ PBL_WEAK UnobstructedAreaState *app_state_get_unobstructed_area_state(void) {
   return &s_stub_unobstructed_area_state;
 }
 
-PBL_WEAK AppGlance s_app_glance;
+PBL_WEAK AppGlance *s_app_glance;
 
 PBL_WEAK AppGlance *app_state_get_glance(void) {
-  return &s_app_glance;
+  return s_app_glance;
+}
+
+PBL_WEAK void app_state_set_glance(AppGlance *glance) {
+  s_app_glance = glance;
 }
 
 static bool s_text_perimeter_debugging_enabled;

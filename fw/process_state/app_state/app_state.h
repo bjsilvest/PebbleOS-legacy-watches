@@ -170,6 +170,7 @@ AppFocusState *app_state_get_app_focus_state(void);
 UnobstructedAreaState *app_state_get_unobstructed_area_state(void);
 
 AppGlance *app_state_get_glance(void);
+void app_state_set_glance(AppGlance *glance);
 
 struct Layer;
 typedef struct Layer Layer;
