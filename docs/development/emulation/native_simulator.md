@@ -50,13 +50,16 @@ without a dictionary.
 
 Install a host C compiler and [SDL2](https://www.libsdl.org), both part of
 the dependencies in the {doc}`../../getting_started/index`. Then configure,
-build and start the program, here for Emery:
+build and run it, here for Emery:
 
 ```shell
 pbl configure --board native_emery
 pbl build
-build/pebbleos
+pbl run
 ```
+
+{doc}`../../pbl/run` starts `build/pebbleos`, which can also be run by
+hand.
 
 A reset of the watch restarts the process.
 
@@ -82,10 +85,12 @@ quits.
 
 ### Options
 
-`build/pebbleos` takes these options:
+`build/pebbleos` takes these options, given to {doc}`../../pbl/run` after
+`--`:
 
 - `-f FILE`: file backing the external flash, `pebbleos-flash.bin` in the
-  current directory by default. It keeps the watch's state across runs.
+  current directory by default, and in the build directory with
+  {doc}`../../pbl/run`. It keeps the watch's state across runs.
 - `-r FILE`: system resources installed at boot, the ones from the build by
   default.
 - `-s N`: window scale factor.
@@ -111,8 +116,8 @@ install and run as on a watch. Install them from the command line, or over
 the QEMU serial protocol as a phone would:
 
 ```shell
-build/pebbleos -i app.pbw
-build/pebbleos -p 12344
+pbl run -- -i app.pbw
+pbl run -- -p 12344
 pebble install --qemu localhost:12344 app.pbw
 ```
 
@@ -174,16 +179,28 @@ WebAssembly, with [Emscripten](https://emscripten.org):
 ```shell
 pbl configure --board=native_emery/wasm
 pbl build
-python3 -m http.server --directory build
+pbl run
 ```
 
-Then open <http://localhost:8000/pebbleos.html>. The watch has the emulator's
+{doc}`../../pbl/run` serves the build directory and opens
+<http://localhost:8000/pebbleos.html> in a browser. The watch has the emulator's
 frame: click its buttons, or use the arrow keys (left is back, right is
 select); on touch platforms the mouse is a finger on the screen. The
 firmware log is a click away. The flash lives in memory, so the watch starts
 afresh on every load, and there is no shell. The {doc}`/playground` embeds
 these builds in the documentation, one per board in `pbl_playground_boards`
 in `docs/conf.py`.
+
+Another page can embed a build in a frame and be its phone:
+
+- `?screen` shows the screen alone, filling the frame, with no frame artwork,
+  buttons or controls, and takes no input.
+- `?serial` gives the parent page the QEMU serial protocol, as `-p` does on
+  the command line. The frame posts `{pblReady: true}`, then the watch's bytes
+  as `{pblSerial: Uint8Array}`; the parent posts its bytes back the same way,
+  and a `.pbw` to install as `{pblInstall: Uint8Array}`. The watch starts
+  with no phone: the parent connects as one with a
+  `QemuProtocol_BluetoothConnection` message.
 
 ## How it works
 
