@@ -7,9 +7,12 @@ from .core import (
     RunnerError,
     UnsupportedOperation,
 )
+from .native import NativeRunner
 from .nrfutil import NrfUtilRunner
 from .openocd import OpenOcdRunner
+from .qemu import QemuRunner
 from .sftool import SfToolRunner
+from .wasm import WasmRunner
 
 __all__ = [
     "RunnerCaps",
@@ -29,6 +32,9 @@ RUNNERS = {
         OpenOcdRunner,
         SfToolRunner,
         NrfUtilRunner,
+        QemuRunner,
+        NativeRunner,
+        WasmRunner,
     )
 }
 
