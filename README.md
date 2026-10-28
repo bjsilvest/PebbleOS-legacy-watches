@@ -19,7 +19,8 @@ Bluetooth Low Energy (NimBLE) in place of the original Bluetooth stack.
 
 ## Download
 
-Latest release: [v4.42.0-snowy.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.42.0-snowy.1)
+Latest build: v4.42.0-snowy.1, in the release [Legacy watches 4.42.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.42.0-legacy)
+with the builds for the other watches.
 
 | Watch             | Board       | Status       |
 |-------------------|-------------|--------------|
