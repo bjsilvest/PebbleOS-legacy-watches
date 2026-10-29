@@ -13,8 +13,10 @@
 #define BT_VENDOR_NAME "Pebble Technology"
 
 static const BoardConfig BOARD_CONFIG = {
-  .ambient_light_dark_threshold = 150,
-  .ambient_k_delta_threshold = 50,
+  // In lux: the stock raw threshold (150) through the provisional table in
+  // board_silk.c, so the backlight still switches where it did.
+  .ambient_light_dark_threshold = 347,
+  .ambient_k_delta_threshold = 100,
   .backlight_on_percent = 25,
 };
 

@@ -14,6 +14,7 @@
 #include <pbl/drivers/uart/stm32.h>
 #include <pbl/drivers/vibe/pwm.h>
 #include <pbl/kernel/irq.h>
+#include <pbl/util/size.h>
 
 #include <board/board.h>
 #include <flash_region/flash_region.h>
@@ -157,10 +158,27 @@ PBL_VIBE_PWM_DEFINE(s_vibe,
                     .vsys_scale = 3300);
 const struct pbl_vibe *const VIBE = &s_vibe.vibe;
 
-// Ambient light: photodiode on ADC1 channel 13, no lux calibration
+// Ambient light: phototransistor on ADC1 channel 13
 ///////////////////////////////////////////////////////////////////////////////
 
-PBL_ALS_STM32_ADC_DEFINE(s_als, nullptr, .enable = PBL_GPIO(STM32_GPIOC, 0, 0),
+// PROVISIONAL, until calibrated against a lux meter: Pebble 2 readings 3 s
+// after the backlight went off (dark ~20, dim ~25, indoor ~80, window ~415)
+// against the middle of each condition's usual lux range. The sunlight point
+// is a guess.
+static const struct pbl_als_lux_point s_als_lux_table[] = {
+  {20, 0},       // pitch dark
+  {25, 10},      // dim room
+  {80, 175},     // normal indoor light
+  {415, 1000},   // next to a window
+  {2000, 10000}, // direct sunlight (not measured)
+};
+
+static const struct pbl_als_scale s_als_scale = {
+  .table = s_als_lux_table,
+  .table_len = ARRAY_LENGTH(s_als_lux_table),
+};
+
+PBL_ALS_STM32_ADC_DEFINE(s_als, &s_als_scale, .enable = PBL_GPIO(STM32_GPIOC, 0, 0),
                          .channel = ADC_Channel_13, .pin = PBL_GPIO(STM32_GPIOC, 3, 0),
                          .always_on = true);
 const struct pbl_als *const ALS = &s_als.als;
