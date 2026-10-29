@@ -31,17 +31,20 @@ def get_git_revision(suffix=""):
 
     try:
         tag = _git("describe")
+        # Each port's branch has its own release tags, e.g. snowy/v4.43.0-legacy.1:
+        # the port goes in front, and is left out of the version.
+        tag = re.sub(r"^[\w-]+/", "", tag)
         if _is_dirty():
             tag += "-dirty"
     except subprocess.CalledProcessError:
         tag = "v9.9.9-dev"
         print(f"Git tag not found, using {tag}", file=sys.stderr)
     # Right after the version numbers, e.g. v4.42.0-lite-tintin.1, unless the
-    # tag already carries it there.
+    # tag already carries it, e.g. v4.43.0-legacy-lite.1.
     if suffix:
         numbers = re.match(r"v[\d.]*\d", tag)
         end = numbers.end() if numbers else len(tag)
-        if not tag.startswith(suffix, end):
+        if suffix not in tag[end:]:
             tag = tag[:end] + suffix + tag[end:]
 
     # The tag must follow the documented form. See
