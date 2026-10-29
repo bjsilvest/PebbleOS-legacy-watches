@@ -161,16 +161,17 @@ const struct pbl_vibe *const VIBE = &s_vibe.vibe;
 // Ambient light: phototransistor on ADC1 channel 13
 ///////////////////////////////////////////////////////////////////////////////
 
-// PROVISIONAL, until calibrated against a lux meter: Pebble 2 readings 3 s
-// after the backlight went off (dark ~20, dim ~25, indoor ~80, window ~415)
-// against the middle of each condition's usual lux range. The sunlight point
-// is a guess.
+// Light sensor readings (3 s after the backlight went off) on a Pebble 2 in
+// seven lighting conditions, against the middle of each condition's usual lux
+// range. The ADC saturates in direct sunlight.
 static const struct pbl_als_lux_point s_als_lux_table[] = {
-  {20, 0},       // pitch dark
-  {25, 10},      // dim room
-  {80, 175},     // normal indoor light
-  {415, 1000},   // next to a window
-  {2000, 10000}, // direct sunlight (not measured)
+  {19, 0},       // pitch dark
+  {36, 2},       // dark room, light from a doorway
+  {76, 10},      // dim room, one small lamp
+  {178, 175},    // normal indoor light
+  {620, 550},    // bright room, desk lamp
+  {1186, 3000},  // outdoors in shade
+  {4086, 10000}, // direct sunlight
 };
 
 static const struct pbl_als_scale s_als_scale = {

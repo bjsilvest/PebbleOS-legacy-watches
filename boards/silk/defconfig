@@ -55,8 +55,8 @@ CONFIG_ACCEL_BMA255=y
 CONFIG_AMBIENT_LIGHT=y
 CONFIG_AMBIENT_LIGHT_STM32_ADC=y
 CONFIG_AMBIENT_LIGHT_THRESHOLD_LOCAL=y
-# Backlight brightness follows the light sensor (Settings > Display). The lux
-# table in board_silk.c is provisional until calibrated.
+# Backlight brightness follows the light sensor (Settings > Display), with the
+# sensor's calibration table in board_silk.c.
 CONFIG_AMBIENT_LIGHT_LUX_TABLE=y
 CONFIG_DYNAMIC_BACKLIGHT=y
 
