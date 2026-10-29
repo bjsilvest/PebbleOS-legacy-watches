@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 //! @file
@@ -39,6 +40,9 @@ bool gatt_service_changed_client_handle_indication(struct GAPLEConnection *conne
 // Server -- Pebble serving up the "Service Changed" characteristic to the remote
 
 void gatt_service_changed_server_handle_fw_update(void);
+
+//! @return true if this boot follows a firmware update, so remotes may hold a stale cache.
+bool gatt_service_changed_server_fw_updated(void);
 
 ////////////////////////////
 // For Testing:
