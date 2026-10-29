@@ -54,6 +54,16 @@ struct pbl_als;
  *
  * Covers the sensor and the optical path in front of it, so it belongs to the board.
  */
+#ifdef CONFIG_AMBIENT_LIGHT_LUX_TABLE
+/** @brief Lux calibration point. */
+struct pbl_als_lux_point {
+  /** Raw level. */
+  uint16_t level;
+  /** Lux at that level. */
+  uint16_t lux;
+};
+#endif
+
 struct pbl_als_scale {
   /** Dark offset, in raw counts. */
   uint32_t offset;
@@ -61,6 +71,15 @@ struct pbl_als_scale {
   uint32_t num;
   /** Denominator. */
   uint32_t den;
+#ifdef CONFIG_AMBIENT_LIGHT_LUX_TABLE
+  /**
+   * Optional points by rising level, interpolated between, used instead of the linear scale;
+   * levels outside them take the end points.
+   */
+  const struct pbl_als_lux_point *table;
+  /** Number of points in @c table. */
+  uint8_t table_len;
+#endif
 };
 
 /** @brief Ambient light sensor driver operations, called with the device lock held. */
