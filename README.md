@@ -5,7 +5,7 @@
 # PebbleOS for the Pebble Time Round (spalding)
 
 An unofficial port of [Core Devices' PebbleOS](https://github.com/coredevices/PebbleOS)
-v4.42.0 to the **Pebble Time Round**. It uses Bluetooth Low Energy
+v4.43.0 to the **Pebble Time Round**. It uses Bluetooth Low Energy
 (NimBLE) in place of the original Bluetooth stack.
 
 > **Not official.** This project is not made, endorsed or supported by Core
@@ -19,7 +19,7 @@ v4.42.0 to the **Pebble Time Round**. It uses Bluetooth Low Energy
 
 ## Download
 
-Latest build: v4.42.0-spalding.1, in the release [Legacy watches 4.42.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.42.0-legacy)
+Latest build: v4.43.0-legacy.1, in the release [Legacy watches 4.43.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy)
 with the builds for the other watches.
 
 | Watch             | Board      | Status |
@@ -54,8 +54,8 @@ pbl bundle
 
 This branch is one of several ports in this repository. The
 [front page](https://github.com/bjsilvest/PebbleOS-legacy-watches) lists
-them all, with their latest releases. The earlier port, based on PebbleOS
-v4.41.2, is on the `spalding-port` branch.
+them all, with their latest releases. The earlier ports are on the
+`spalding-v4.42.0` (PebbleOS v4.42.0) and `spalding-port` (v4.41.2) branches.
 
 ## Licenses
 
