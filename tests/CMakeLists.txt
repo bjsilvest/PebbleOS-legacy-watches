@@ -51,6 +51,8 @@ add_compile_options(${PBL_TEST_C_FLAGS})
 set(PBL_TEST_DEFINES
   "CLAR_FIXTURE_PATH=\"${PBL_BASE}/tests/fixtures/\""
   CONFIG_LOG=1
+  # Kconfig default of the optional fault handler logs
+  CONFIG_LOG_FROM_FAULT_HANDLER=1
   # The flash layout every test sees; it belongs to no platform.
   CONFIG_FLASH_GD25Q256E=1
   CONFIG_PBLBOOT=1
