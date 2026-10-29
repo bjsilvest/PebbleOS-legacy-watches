@@ -44,7 +44,7 @@ watch, which hardware revisions have been tested and what changed.
   light-sensor calibration.
 - **Pairings from stock firmware are not carried over.** Pair your phone
   again after installing.
-- **If you want to return to the -rbl firmware, it is recommended you do a factory reset first, as you may not be able to delete paired Bluetooth devices made from the newer firmware.**
+- **If you want to return to the -rbl firmware, it is recommended you do a factory reset first** You may not be able to delete paired Bluetooth devices made from the newer firmware.
 
 ## Installing
 
