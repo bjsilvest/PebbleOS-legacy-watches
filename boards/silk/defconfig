@@ -67,3 +67,11 @@ CONFIG_HRM_AS7000_FW_UPDATE=y
 # Settings: motion sensitivity and left-handed (rotated) wear
 CONFIG_ACCEL_SENSITIVITY=y
 CONFIG_ORIENTATION_MANAGER=y
+
+# GAP Peripheral Preferred Connection Parameters, as the stock firmware has:
+# Service Changed then sits at the stock handle, which phones that cached the
+# stock layout honor. Values match our low-power connection parameters.
+CONFIG_NIMBLE_BLE_SVC_GAP_PPCP_MIN_CONN_INTERVAL=24
+CONFIG_NIMBLE_BLE_SVC_GAP_PPCP_MAX_CONN_INTERVAL=36
+CONFIG_NIMBLE_BLE_SVC_GAP_PPCP_SLAVE_LATENCY=30
+CONFIG_NIMBLE_BLE_SVC_GAP_PPCP_SUPERVISION_TMO=600
