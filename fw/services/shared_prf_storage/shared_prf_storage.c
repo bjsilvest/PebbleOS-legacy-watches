@@ -290,6 +290,8 @@ static bool prv_fetch_field(uint8_t *field_out, size_t offset, size_t field_size
 // Our bonding database, which survives everything but a factory reset
 #define BONDING_DB_FILE "gap_bonding_db"
 
+static bool s_imported_stock;
+
 static bool prv_key_is_nil(const struct pbl_bt_sm_key *key) {
   const struct pbl_bt_sm_key nil_key = {};
   return memcmp(key, &nil_key, sizeof(nil_key)) == 0;
@@ -399,9 +401,14 @@ static void prv_import_stock(void) {
   PBL_LOG_INFO("Importing the stock shared PRF storage");
   prv_erase_region_and_save(stock);
   prv_set_stock_seen_crc(stock_crc);
+  s_imported_stock = true;
 
 done:
   kernel_free(stock);
+}
+
+bool shared_prf_storage_imported_stock(void) {
+  return s_imported_stock;
 }
 #endif
 

@@ -19,6 +19,14 @@
 #include <pbl/util/math.h>
 
 #include <host/ble_gap.h>
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#include <host/ble_gatt.h>
+#include <host/ble_uuid.h>
+#include <nimble/nimble_port.h>
+#include <pbl/services/new_timer/new_timer.h>
+#include <pbl/services/shared_prf_storage/shared_prf_storage.h>
+#include <services/gatt/ble_svc_gatt.h>
+#endif
 #include <kernel/pbl_malloc.h>
 #include <os/os_mbuf.h>
 
@@ -207,6 +215,76 @@ static void prv_handle_disconnection_event(struct ble_gap_event *event) {
   pbl_bt_handle_le_disconnection_complete_event(&disconnection_event);
 }
 
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+// A phone that paired with the stock firmware keeps its attribute cache, even
+// when it pairs again: Android drops it only on unbonding or on Service Changed.
+// Phone apps keep the attributes they found at connect for the whole link,
+// so drop the link a little after Service Changed: the reconnect uses ours.
+#define SVC_CHANGED_RECONNECT_MS 1000
+
+static struct ble_npl_callout s_svc_changed_reconnect;
+static uint16_t s_svc_changed_conn = BLE_HS_CONN_HANDLE_NONE;
+// The phone told this boot, so the rediscovery after the reconnect does not start another.
+static bool s_svc_changed_sent;
+static ble_addr_t s_svc_changed_peer;
+
+static void prv_svc_changed_reconnect_cb(struct ble_npl_event *ev) {
+  (void)ble_gap_terminate(s_svc_changed_conn, BLE_ERR_REM_USER_CONN_TERM);
+  s_svc_changed_conn = BLE_HS_CONN_HANDLE_NONE;
+}
+
+static bool prv_svc_changed_val_handle(uint16_t *val_handle) {
+  const ble_uuid16_t svc_uuid = BLE_UUID16_INIT(PBL_BT_GATT_SERVICE_UUID);
+  const ble_uuid16_t chr_uuid = BLE_UUID16_INIT(BLE_SVC_GATT_CHR_SERVICE_CHANGED_UUID16);
+  return ble_gatts_find_chr(&svc_uuid.u, &chr_uuid.u, nullptr, val_handle) == 0;
+}
+
+//! Tells the phone every handle changed, whether or not our bonding has its subscription,
+//! then reconnects. Once per phone and boot.
+static void prv_indicate_svc_changed(uint16_t conn_handle, uint16_t val_handle,
+                                     const ble_addr_t *peer) {
+  if (s_svc_changed_sent && ble_addr_cmp(peer, &s_svc_changed_peer) == 0) {
+    return;
+  }
+
+  const uint16_t range[2] = {htole16(0x0001), htole16(0xFFFF)};
+  struct os_mbuf *om = ble_hs_mbuf_from_flat(range, sizeof(range));
+  if (!om) {
+    return;
+  }
+  int rc = ble_gatts_indicate_custom(conn_handle, val_handle, om);
+  if (rc != 0) {
+    PBL_LOG_ERR("Service Changed: indicate failed: 0x%04x", (uint16_t)rc);
+    return;
+  }
+  PBL_LOG_INFO("Service Changed: indicated, reconnecting");
+  s_svc_changed_sent = true;
+  s_svc_changed_peer = *peer;
+
+  if (s_svc_changed_reconnect.handle == TIMER_INVALID_ID) {
+    ble_npl_callout_init(&s_svc_changed_reconnect, nimble_port_get_dflt_eventq(),
+                         prv_svc_changed_reconnect_cb, nullptr);
+  }
+  s_svc_changed_conn = conn_handle;
+  ble_npl_callout_reset(&s_svc_changed_reconnect,
+                        ble_npl_time_ms_to_ticks32(SVC_CHANGED_RECONNECT_MS));
+}
+
+#ifdef CONFIG_SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK
+// An imported bonding has no subscriptions and the phone does not enable Service
+// Changed again, so indicate on an encrypted link after an import.
+static void prv_svc_changed_after_import(uint16_t conn_handle,
+                                         const struct ble_gap_conn_desc *desc) {
+  uint16_t val_handle;
+  if (!desc->sec_state.encrypted || !desc->sec_state.bonded ||
+      !shared_prf_storage_imported_stock() || !prv_svc_changed_val_handle(&val_handle)) {
+    return;
+  }
+  prv_indicate_svc_changed(conn_handle, val_handle, &desc->peer_id_addr);
+}
+#endif
+#endif
+
 static void prv_handle_enc_change_event(struct ble_gap_event *event) {
   struct ble_gap_conn_desc desc;
   if (ble_gap_conn_find(event->enc_change.conn_handle, &desc) != 0) {
@@ -224,6 +302,10 @@ static void prv_handle_enc_change_event(struct ble_gap_event *event) {
   };
   nimble_addr_to_pebble_addr(&desc.peer_id_addr, &enc_change_event.dev_address);
   pbl_bt_handle_le_encryption_change_event(&enc_change_event);
+
+#if defined(CONFIG_BT_CONTROLLER_DA1468X) && defined(CONFIG_SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK)
+  prv_svc_changed_after_import(event->enc_change.conn_handle, &desc);
+#endif
 }
 
 static void prv_handle_conn_params_updated_event(struct ble_gap_event *event) {
@@ -357,6 +439,20 @@ static void prv_handle_subscription_event(struct ble_gap_event *event) {
               event->subscribe.conn_handle, event->subscribe.attr_handle,
               event->subscribe.prev_notify, event->subscribe.cur_notify,
               event->subscribe.prev_indicate, event->subscribe.cur_indicate);
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  // A phone enables Service Changed right after pairing; it may still hold the
+  // stock attribute cache. Only on an encrypted link: iOS subscribes before
+  // pairing, and the reconnect would cut its pairing short.
+  struct ble_gap_conn_desc desc;
+  uint16_t val_handle;
+  if (event->subscribe.reason == BLE_GAP_SUBSCRIBE_REASON_WRITE &&
+      event->subscribe.cur_indicate && !event->subscribe.prev_indicate &&
+      ble_gap_conn_find(event->subscribe.conn_handle, &desc) == 0 &&
+      desc.sec_state.encrypted && prv_svc_changed_val_handle(&val_handle) &&
+      event->subscribe.attr_handle == val_handle) {
+    prv_indicate_svc_changed(event->subscribe.conn_handle, val_handle, &desc.peer_id_addr);
+  }
+#endif
 }
 
 static void prv_handle_notification_rx_event(struct ble_gap_event *event) {
