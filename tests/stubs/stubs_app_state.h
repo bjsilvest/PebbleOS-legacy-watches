@@ -53,13 +53,6 @@ void app_state_set_user_data(void *data);
 
 void *app_state_get_user_data(void);
 
-void app_state_set_js_runtime_context(uint8_t *unaligned_buffer,
-                                      JsRuntimeContext *js_runtime_context);
-
-uint8_t *app_state_get_js_runtime_context_buffer(void);
-
-JsRuntimeContext *app_state_get_js_runtime_context(void);
-
 void app_state_set_js_memory_api_context(JsMemoryAPIContext *context);
 
 JsMemoryAPIContext *app_state_get_js_memory_api_context(void);
@@ -71,6 +64,8 @@ UnobstructedAreaState *app_state_get_unobstructed_area_state(void);
 extern AppGlance s_app_glance;
 
 AppGlance *app_state_get_glance(void);
+
+void app_state_set_glance(AppGlance *glance);
 
 bool app_state_get_text_perimeter_debugging_enabled(void);
 

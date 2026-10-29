@@ -102,22 +102,6 @@ PBL_WEAK void *app_state_get_user_data(void) {
   return s_user_data;
 }
 
-static JsRuntimeContext *s_js_runtime_context = nullptr;
-static uint8_t *s_runtime_context_buffer = nullptr;
-PBL_WEAK void app_state_set_js_runtime_context(uint8_t *unaligned_buffer,
-                                               JsRuntimeContext *js_runtime_context) {
-  s_js_runtime_context = js_runtime_context;
-  s_runtime_context_buffer = unaligned_buffer;
-}
-
-PBL_WEAK uint8_t *app_state_get_js_runtime_context_buffer(void) {
-  return s_runtime_context_buffer;
-}
-
-PBL_WEAK JsRuntimeContext *app_state_get_js_runtime_context(void) {
-  return s_js_runtime_context;
-}
-
 static JsMemoryAPIContext *s_js_memory_api_context = nullptr;
 PBL_WEAK void app_state_set_js_memory_api_context(JsMemoryAPIContext *context) {
   s_js_memory_api_context = context;
@@ -134,9 +118,14 @@ PBL_WEAK UnobstructedAreaState *app_state_get_unobstructed_area_state(void) {
 }
 
 PBL_WEAK AppGlance s_app_glance;
+static AppGlance *s_app_glance_ptr = &s_app_glance;
 
 PBL_WEAK AppGlance *app_state_get_glance(void) {
-  return &s_app_glance;
+  return s_app_glance_ptr;
+}
+
+PBL_WEAK void app_state_set_glance(AppGlance *glance) {
+  s_app_glance_ptr = glance;
 }
 
 static bool s_text_perimeter_debugging_enabled;
