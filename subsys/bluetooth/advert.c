@@ -20,6 +20,7 @@
 
 #include <host/ble_gap.h>
 #ifdef CONFIG_BT_CONTROLLER_CC2564
+#include <comm/ble/gatt_service_changed.h>
 #include <host/ble_gatt.h>
 #include <host/ble_uuid.h>
 #include <nimble/nimble_port.h>
@@ -219,6 +220,67 @@ static void prv_handle_disconnection_event(struct ble_gap_event *event) {
   pbl_bt_handle_le_disconnection_complete_event(&disconnection_event);
 }
 
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+// Phone apps keep the attributes they found at connect for the whole link,
+// so drop the link a little after Service Changed: the reconnect uses ours.
+#define SVC_CHANGED_RECONNECT_MS 1000
+
+static struct ble_npl_callout s_svc_changed_reconnect;
+static uint16_t s_svc_changed_conn = BLE_HS_CONN_HANDLE_NONE;
+
+static void prv_svc_changed_reconnect_cb(struct ble_npl_event *ev) {
+  (void)ble_gap_terminate(s_svc_changed_conn, BLE_ERR_REM_USER_CONN_TERM);
+  s_svc_changed_conn = BLE_HS_CONN_HANDLE_NONE;
+}
+
+// After a firmware update the phone may hold the cache of another attribute
+// layout, and it does not enable Service Changed again on a bonded link, so
+// indicate on the first encrypted link. Once per phone and boot, so the
+// rediscovery after the reconnect does not start another round.
+static bool s_svc_changed_update_sent;
+static ble_addr_t s_svc_changed_update_peer;
+
+static void prv_svc_changed_after_update(uint16_t conn_handle,
+                                         const struct ble_gap_conn_desc *desc) {
+  if (!gatt_service_changed_server_fw_updated() || !desc->sec_state.encrypted ||
+      !desc->sec_state.bonded ||
+      (s_svc_changed_update_sent && ble_addr_cmp(&desc->peer_id_addr,
+                                                 &s_svc_changed_update_peer) == 0)) {
+    return;
+  }
+
+  const ble_uuid16_t svc_uuid = BLE_UUID16_INIT(PBL_BT_GATT_SERVICE_UUID);
+  const ble_uuid16_t chr_uuid = BLE_UUID16_INIT(BLE_SVC_GATT_CHR_SERVICE_CHANGED_UUID16);
+  uint16_t val_handle;
+  if (ble_gatts_find_chr(&svc_uuid.u, &chr_uuid.u, nullptr, &val_handle) != 0) {
+    return;
+  }
+
+  // Indicate without a stored subscription: every handle changed.
+  const uint16_t range[2] = {htole16(0x0001), htole16(0xFFFF)};
+  struct os_mbuf *om = ble_hs_mbuf_from_flat(range, sizeof(range));
+  if (!om) {
+    return;
+  }
+  int rc = ble_gatts_indicate_custom(conn_handle, val_handle, om);
+  if (rc != 0) {
+    PBL_LOG_ERR("Service Changed: indicate failed: 0x%04x", (uint16_t)rc);
+    return;
+  }
+  PBL_LOG_INFO("Service Changed: indicated after update, reconnecting");
+  s_svc_changed_update_sent = true;
+  s_svc_changed_update_peer = desc->peer_id_addr;
+
+  if (s_svc_changed_reconnect.handle == TIMER_INVALID_ID) {
+    ble_npl_callout_init(&s_svc_changed_reconnect, nimble_port_get_dflt_eventq(),
+                         prv_svc_changed_reconnect_cb, nullptr);
+  }
+  s_svc_changed_conn = conn_handle;
+  ble_npl_callout_reset(&s_svc_changed_reconnect,
+                        ble_npl_time_ms_to_ticks32(SVC_CHANGED_RECONNECT_MS));
+}
+#endif
+
 static void prv_handle_enc_change_event(struct ble_gap_event *event) {
   struct ble_gap_conn_desc desc;
   if (ble_gap_conn_find(event->enc_change.conn_handle, &desc) != 0) {
@@ -236,6 +298,10 @@ static void prv_handle_enc_change_event(struct ble_gap_event *event) {
   };
   nimble_addr_to_pebble_addr(&desc.peer_id_addr, &enc_change_event.dev_address);
   pbl_bt_handle_le_encryption_change_event(&enc_change_event);
+
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+  prv_svc_changed_after_update(event->enc_change.conn_handle, &desc);
+#endif
 }
 
 static void prv_handle_conn_params_updated_event(struct ble_gap_event *event) {
@@ -364,19 +430,6 @@ static void prv_handle_mtu_change_event(struct ble_gap_event *event) {
 
 extern int pebble_pairing_service_get_connectivity_send_notification(uint16_t conn_handle,
                                                                      uint16_t attr_handle);
-#ifdef CONFIG_BT_CONTROLLER_CC2564
-// Phone apps keep the attributes they found at connect for the whole link,
-// so drop the link a little after Service Changed: the reconnect uses ours.
-#define SVC_CHANGED_RECONNECT_MS 1000
-
-static struct ble_npl_callout s_svc_changed_reconnect;
-static uint16_t s_svc_changed_conn = BLE_HS_CONN_HANDLE_NONE;
-
-static void prv_svc_changed_reconnect_cb(struct ble_npl_event *ev) {
-  (void)ble_gap_terminate(s_svc_changed_conn, BLE_ERR_REM_USER_CONN_TERM);
-  s_svc_changed_conn = BLE_HS_CONN_HANDLE_NONE;
-}
-#endif
 
 static void prv_handle_subscription_event(struct ble_gap_event *event) {
   PBL_LOG_DBG("prv_handle_subscription_event: connhandle: %d attr:%d notify:%d/%d indicate:%d/%d",
