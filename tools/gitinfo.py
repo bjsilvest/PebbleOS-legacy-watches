@@ -31,6 +31,9 @@ def get_git_revision():
 
     try:
         tag = _git("describe")
+        # Each port's branch has its own release tags, e.g. snowy/v4.43.0-legacy.1:
+        # the port goes in front, and is left out of the version.
+        tag = re.sub(r"^[\w-]+/", "", tag)
         if _is_dirty():
             tag += "-dirty"
     except subprocess.CalledProcessError:
