@@ -9,8 +9,7 @@ to the original Pebble watches. Each port follows Core's tagged releases
 and uses Bluetooth Low Energy (NimBLE) in place of the original Bluetooth
 stack.
 
-Disclaimer: These ports were made with an assistance of LLM coding tools. Most of the initial porting
-work was done with Claude Opus 5.5.
+Disclaimer: These ports were made with an assistance of LLM coding tools. Initial research, coding, review, and documentation was done with Claude Opus 5.5.
 
 > **Not official.** This project is not made, endorsed or supported by Core
 > Devices, Google or Pebble Technology. "Pebble" is a trademark of its owner
