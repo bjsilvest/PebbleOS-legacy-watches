@@ -20,6 +20,7 @@
 
 #include <host/ble_gap.h>
 #ifdef CONFIG_BT_CONTROLLER_DA1468X
+#include <comm/ble/gatt_service_changed.h>
 #include <host/ble_gatt.h>
 #include <host/ble_uuid.h>
 #include <nimble/nimble_port.h>
@@ -270,19 +271,23 @@ static void prv_indicate_svc_changed(uint16_t conn_handle, uint16_t val_handle,
                         ble_npl_time_ms_to_ticks32(SVC_CHANGED_RECONNECT_MS));
 }
 
-#ifdef CONFIG_SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK
-// An imported bonding has no subscriptions and the phone does not enable Service
-// Changed again, so indicate on an encrypted link after an import.
-static void prv_svc_changed_after_import(uint16_t conn_handle,
+// After a firmware update, or after importing the stock pairing, the phone may
+// hold the attribute cache of another layout. It does not enable Service Changed
+// again (an imported bonding has no subscriptions either), so indicate on the
+// first encrypted link.
+static void prv_svc_changed_after_update(uint16_t conn_handle,
                                          const struct ble_gap_conn_desc *desc) {
+  bool layout_may_differ = gatt_service_changed_server_fw_updated();
+#ifdef CONFIG_SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK
+  layout_may_differ = layout_may_differ || shared_prf_storage_imported_stock();
+#endif
   uint16_t val_handle;
-  if (!desc->sec_state.encrypted || !desc->sec_state.bonded ||
-      !shared_prf_storage_imported_stock() || !prv_svc_changed_val_handle(&val_handle)) {
+  if (!layout_may_differ || !desc->sec_state.encrypted || !desc->sec_state.bonded ||
+      !prv_svc_changed_val_handle(&val_handle)) {
     return;
   }
   prv_indicate_svc_changed(conn_handle, val_handle, &desc->peer_id_addr);
 }
-#endif
 #endif
 
 static void prv_handle_enc_change_event(struct ble_gap_event *event) {
@@ -303,8 +308,8 @@ static void prv_handle_enc_change_event(struct ble_gap_event *event) {
   nimble_addr_to_pebble_addr(&desc.peer_id_addr, &enc_change_event.dev_address);
   pbl_bt_handle_le_encryption_change_event(&enc_change_event);
 
-#if defined(CONFIG_BT_CONTROLLER_DA1468X) && defined(CONFIG_SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK)
-  prv_svc_changed_after_import(event->enc_change.conn_handle, &desc);
+#ifdef CONFIG_BT_CONTROLLER_DA1468X
+  prv_svc_changed_after_update(event->enc_change.conn_handle, &desc);
 #endif
 }
 
