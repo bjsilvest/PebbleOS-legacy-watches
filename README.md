@@ -24,8 +24,8 @@ Disclaimer: These ports were made with an assistance of LLM coding tools. Initia
 | Watch | Codename | Latest build | Branch |
 |---|---|---|---|
 | Pebble, Pebble Steel | tintin | [v4.43.0-legacy-lite.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`tintin-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/tintin-v4.43.0) |
-| Pebble Time, Pebble Time Steel | snowy | [v4.43.0-legacy.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`snowy-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/snowy-v4.43.0) |
-| Pebble Time Round | spalding | [v4.43.0-legacy.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`spalding-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/spalding-v4.43.0) |
+| Pebble Time, Pebble Time Steel | snowy | [v4.43.0-legacy.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`snowy-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/snowy-v4.43.0) |
+| Pebble Time Round | spalding | [v4.43.0-legacy.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`spalding-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/spalding-v4.43.0) |
 | Pebble 2 | silk | In progress, no release yet | [`silk-port`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/silk-port) |
 
 All watches share one release per PebbleOS version. Download the
@@ -89,9 +89,10 @@ the `.pbz` as in step 3.
   watch and keep it open while the phone pairs, then enter the code the
   watch shows. Alternatively, forget the watch on both sides and pair
   again.
-- **Pebble Time, Pebble Time Steel and Pebble Time Round:** in the
-  4.43.0-legacy.1 builds, the same applies. From the next release, these
-  watches keep recovery's pairing and reconnect without pairing again.
+- **Pebble Time, Pebble Time Steel and Pebble Time Round:** from
+  4.43.0-legacy.2, the firmware takes over recovery's pairing, so the phone
+  reconnects without pairing again. With 4.43.0-legacy.1, pair again as
+  above.
 
 ## Branches
 
