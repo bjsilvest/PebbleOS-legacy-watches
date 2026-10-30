@@ -56,7 +56,7 @@ in 1% steps.
 
 ## Building
 
-Follow Core's [getting started guide](https://pebbleos.readthedocs.io/en/latest/getting_started/index.html)
+Follow Core's [getting started guide](https://developer.repebble.com/pebbleos/docs/getting_started/)
 to install the SDK, then build a bundle for your revision:
 
 ```shell
