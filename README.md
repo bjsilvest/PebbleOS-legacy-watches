@@ -46,7 +46,7 @@ watch, which hardware revisions have been tested and what changed.
   in the sensor, and this firmware never updates the sensor.
 - **Pairings from stock firmware are not carried over.** Pair your phone
   again after installing.
-- **If you want to return to the -rbl firmware, it is recommended you do a factory reset first** You may not be able to delete paired Bluetooth devices made from the newer firmware.
+- **If you want to return to the -rbl firmware, it is recommended you do a factory reset first.** You may not be able to delete paired Bluetooth devices made from the newer firmware.
 
 ## Installing
 
@@ -92,11 +92,7 @@ the `.pbz` as in step 3.
   watch and keep it open while the phone pairs, then enter the code the
   watch shows. Alternatively, forget the watch on both sides and pair
   again.
-- **Pebble Time, Pebble Time Steel and Pebble Time Round:** from
-  4.43.0-legacy.2, the firmware takes over recovery's pairing, so the phone
-  reconnects without pairing again. With 4.43.0-legacy.1, pair again as
-  above.
-- **Pebble 2:** the firmware takes over recovery's pairing, so the phone
+- **Pebble Time, Pebble Time Steel and Pebble Time Round, And Pebble 2:** the firmware takes over recovery's pairing, so the phone
   reconnects without pairing again.
 
 ## Branches
