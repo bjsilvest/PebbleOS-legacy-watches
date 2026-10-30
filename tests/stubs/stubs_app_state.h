@@ -68,9 +68,11 @@ extern UnobstructedAreaState s_stub_unobstructed_area_state;
 
 UnobstructedAreaState *app_state_get_unobstructed_area_state(void);
 
-extern AppGlance s_app_glance;
+extern AppGlance *s_app_glance;
 
 AppGlance *app_state_get_glance(void);
+
+void app_state_set_glance(AppGlance *glance);
 
 bool app_state_get_text_perimeter_debugging_enabled(void);
 

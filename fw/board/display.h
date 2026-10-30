@@ -26,6 +26,8 @@ typedef struct {
 #include <board/displays/display_asterix.h>
 #elifdef CONFIG_BOARD_SNOWY
 #include <board/displays/display_snowy.h>
+#elifdef CONFIG_BOARD_SPALDING
+#include <board/displays/display_spalding.h>
 #elif defined(CONFIG_BOARD_OBELIX_DVT) || defined(CONFIG_BOARD_OBELIX_PVT) || \
     defined(CONFIG_BOARD_OBELIX_BB2)
 #include <board/displays/display_obelix.h>

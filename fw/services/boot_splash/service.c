@@ -35,8 +35,8 @@
 #define BOOT_SPLASH_FB_BYTES DISPLAY_FRAMEBUFFER_BYTES
 #endif
 
-// Stock Pebble Time shows a white logo on black.
-#if defined(CONFIG_BOARD_SNOWY)
+// Stock Pebble Time and Time Round show a white logo on black.
+#if defined(CONFIG_BOARD_SNOWY) || defined(CONFIG_BOARD_SPALDING)
 #define SPLASH_COLOR_BG        SPLASH_COLOR_BLACK
 #define SPLASH_COLOR_LOGO      SPLASH_COLOR_WHITE
 #define SPLASH_COLOR_TRACK     SPLASH_COLOR_DGRAY

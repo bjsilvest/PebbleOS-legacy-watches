@@ -9,6 +9,7 @@
 #include <pbl/util/string.h>
 #include <pbl/util/uuid.h>
 
+#include <applib/applib_malloc.auto.h>
 #include <applib/template_string.h>
 #include <apps/system/launcher/default/app_glance_generic.h>
 #include <process_state/app_state/app_state.h>
@@ -98,7 +99,11 @@ AppGlanceResult app_glance_add_slice(AppGlanceReloadSession *session, AppGlanceS
 }
 
 void app_glance_reload(AppGlanceReloadCallback callback, void *context) {
-  AppGlance *glance = app_state_get_glance();
+  AppGlance *glance = applib_malloc(sizeof(AppGlance));
+  if (!glance) {
+    return;
+  }
+  app_state_set_glance(glance);
 
   Uuid current_app_uuid;
   sys_get_app_uuid(&current_app_uuid);
@@ -115,4 +120,7 @@ void app_glance_reload(AppGlanceReloadCallback callback, void *context) {
   }
 
   sys_app_glance_update(&current_app_uuid, glance);
+
+  app_state_set_glance(nullptr);
+  applib_free(glance);
 }

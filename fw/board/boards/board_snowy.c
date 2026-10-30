@@ -86,7 +86,11 @@ static const struct pbl_i2c_dev I2C_SLAVE_MAX14690 = PBL_I2C_DEV(&s_i2c1.bus, 0x
 
 // Compass: MAG3110, data ready active high on PF14
 PBL_MAG3110_DEFINE(s_mag3110, &s_i2c1.bus, 0x0e, .int_gpio = PBL_GPIO(STM32_GPIOF, 14, 0),
+#ifdef CONFIG_BOARD_SPALDING
+                   .axis_map = {0, 1, 2}, .axis_dir = {1, -1, 1});
+#else
                    .axis_map = {1, 0, 2}, .axis_dir = {-1, -1, 1});
+#endif
 const struct pbl_mag *const MAG = &s_mag3110.mag;
 
 // PMIC
@@ -132,6 +136,21 @@ const struct pbl_vibe *const VIBE = &s_vibe.vibe;
 // Ambient light: phototransistor on ADC1 channel 2, powered by PA3
 ///////////////////////////////////////////////////////////////////////////////
 
+#ifdef CONFIG_BOARD_SPALDING
+// Light sensor readings (3 s after the backlight went off) on a Pebble Time
+// Round in seven lighting conditions, against the middle of each condition's
+// usual lux range: the phototransistor jumps from the dark floor in the
+// faintest light, then rises slowly up to sunlight.
+static const struct pbl_als_lux_point s_als_lux_table[] = {
+  {236, 0},      // closet, near pitch dark
+  {2861, 2},     // dark room, light from a doorway
+  {2995, 10},    // dim room, one small lamp
+  {3589, 175},   // normal indoor light
+  {3636, 550},   // bright room, desk lamp
+  {3822, 3000},  // outdoors in shade
+  {4006, 10000}, // direct sunlight
+};
+#else
 // Light sensor readings (3 s after the backlight went off) on a Pebble Time
 // in eight lighting conditions, against the middle of each condition's usual
 // lux range: the phototransistor rises steeply up to room light, then
@@ -146,6 +165,7 @@ static const struct pbl_als_lux_point s_als_lux_table[] = {
   {2957, 3000},  // outdoors in shade
   {3030, 10000}, // direct sunlight
 };
+#endif
 
 static const struct pbl_als_scale s_als_scale = {
   .table = s_als_lux_table,

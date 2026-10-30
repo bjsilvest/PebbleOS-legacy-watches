@@ -17,7 +17,12 @@ elseif(CONFIG_DISPLAY_SHARP_LS013B7DH01_NRF5)
 elseif(CONFIG_DISPLAY_SHARP_LS013B7DH01_STM32)
   list(APPEND sources sharp_ls013b7dh01/sharp_ls013b7dh01_stm32.c)
 elseif(CONFIG_DISPLAY_ICE40LP_STM32)
-  set(bitstream ${CMAKE_CURRENT_SOURCE_DIR}/ice40lp/snowy_framebuffer.fpga)
+  if(CONFIG_BOARD_SPALDING)
+    # iCE40UL1K, 180x180 round
+    set(bitstream ${CMAKE_CURRENT_SOURCE_DIR}/ice40lp/spalding_framebuffer.fpga)
+  else()
+    set(bitstream ${CMAKE_CURRENT_SOURCE_DIR}/ice40lp/snowy_framebuffer.fpga)
+  endif()
   # Embedded deflated: mostly zeros, it shrinks to under a quarter.
   set(deflated ${CMAKE_CURRENT_BINARY_DIR}/ice40lp_bitstream.deflate)
   add_custom_command(OUTPUT ${deflated}

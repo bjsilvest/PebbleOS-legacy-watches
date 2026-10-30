@@ -17,7 +17,7 @@ CACHE_FILE = "CMakeCache.txt"
 DOTCONFIG_FILE = ".config"
 
 # CONFIG_PLATFORM_* -> the SDK platform name, mirroring cmake/modules/platform.cmake.
-_PLATFORMS = ("basalt", "emery", "flint", "gabbro")
+_PLATFORMS = ("basalt", "chalk", "emery", "flint", "gabbro")
 
 
 def _parse_dotconfig(path):

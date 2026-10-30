@@ -63,7 +63,11 @@ __APP_RAM__ = __WORKER_RAM_end__;
 __APP_RAM_size__ = PBL_APP_RAM_SIZE;
 __APP_RAM_end__ = __APP_RAM__ + __APP_RAM_size__;
 
+#if CONFIG_ISR_STACK_CCM
+REGION_ALIAS("REGION_ISR_STACK", CCM);
+#else
 REGION_ALIAS("REGION_ISR_STACK", RAM);
+#endif
 #if CONFIG_CCM_SIZE
 __CCM_start__ = ORIGIN(CCM);
 __CCM_size__ = LENGTH(CCM);

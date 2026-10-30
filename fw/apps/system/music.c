@@ -50,6 +50,7 @@
 // Unified round media layout: a full-screen backdrop, a progress arc along the bezel whose gap
 // hugs the action bar, a centred artist / title / times stack across the widest band of the
 // circle, and the state icon anchoring the bottom.
+#if PBL_DISPLAY_HEIGHT >= 260
 #define ART_ROUND_CLOCK_Y  10
 #define ART_ROUND_ARTIST_Y (DISP_ROWS / 2 - 76)
 #define ART_ROUND_TITLE_Y  (DISP_ROWS / 2 - 42)
@@ -57,8 +58,23 @@
 #define ART_ROUND_TIMES_Y  (DISP_ROWS / 2 + 58)
 // Symmetric side margin for the text stack: centred on the true display centre, and wide lines
 // still clear the action bar's crescent on the right.
-#define ART_ROUND_TEXT_MARGIN    48
-#define ART_ROUND_ICON_CENTER_Y  (DISP_ROWS - 26)
+#define ART_ROUND_TEXT_MARGIN     48
+#define ART_ROUND_TIMES_MARGIN    ART_ROUND_TEXT_MARGIN
+#define ART_ROUND_TIMES_FONT_KEY  FONT_KEY_GOTHIC_24_BOLD
+#define ART_ROUND_ICON_CENTER_Y   (DISP_ROWS - 26)
+#else
+// 180x180 (Time Round): two title lines, and smaller times on a wider band so they stay on one
+// line above the state icon.
+#define ART_ROUND_CLOCK_Y         4
+#define ART_ROUND_ARTIST_Y        26
+#define ART_ROUND_TITLE_Y         54
+#define ART_ROUND_TITLE_H         60
+#define ART_ROUND_TIMES_Y         116
+#define ART_ROUND_TEXT_MARGIN     40
+#define ART_ROUND_TIMES_MARGIN    30
+#define ART_ROUND_TIMES_FONT_KEY  FONT_KEY_GOTHIC_18_BOLD
+#define ART_ROUND_ICON_CENTER_Y   (DISP_ROWS - 22)
+#endif
 #define ART_ROUND_RING_THICKNESS 7
 // Progress arc endpoints, degrees clockwise from 12 o'clock: it runs from the bottom edge of the
 // action bar around the bottom, left and top of the circle to the action bar's top edge. The
@@ -1258,8 +1274,8 @@ static void prv_draw_round_progress(GContext *ctx, const GRect *bounds) {
     char times[2 * (sizeof(MUSIC_TIME_STR_MAX) - 1) + sizeof(" / ")];
     snprintf(times, sizeof(times), "%s / %s", data->position_buffer, data->length_buffer);
     const GRect box =
-        GRect(ART_ROUND_TEXT_MARGIN, ART_ROUND_TIMES_Y, DISP_COLS - 2 * ART_ROUND_TEXT_MARGIN, 30);
-    GFont font = fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD);
+        GRect(ART_ROUND_TIMES_MARGIN, ART_ROUND_TIMES_Y, DISP_COLS - 2 * ART_ROUND_TIMES_MARGIN, 30);
+    GFont font = fonts_get_system_font(ART_ROUND_TIMES_FONT_KEY);
     if (data->has_album_art) {
       prv_draw_outlined_text(ctx, times, font, box, GTextOverflowModeFill, GTextAlignmentCenter);
     } else {

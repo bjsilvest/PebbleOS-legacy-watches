@@ -52,6 +52,11 @@ void mfg_info_get_model(char *buffer);
 //!              length including the null-terminator. Longer strings will be truncated to fit.
 void mfg_info_set_model(const char *model);
 
+#ifdef CONFIG_BOARD_SPALDING
+//! Factory measured offset of the round display from its bezel, in pixels.
+GPoint mfg_info_get_disp_offsets(void);
+#endif
+
 //! Set or update any constant data that needs to be written at manufacturing
 //! time but which is not customized to the individual unit.
 void mfg_info_update_constant_data(void);
