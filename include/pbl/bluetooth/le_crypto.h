@@ -29,4 +29,10 @@ bool pbl_bt_le_d1(const uint8_t k[16], uint16_t d, uint16_t r, uint8_t out[16]);
 /** @brief dm(k, r), the EDIV mask function of legacy pairing key generation. */
 bool pbl_bt_le_dm(const uint8_t k[16], uint64_t r, uint16_t *out);
 
+/**
+ * @brief dm(k, r) as the stock (Bluetopia) firmware computes it: the top 16 bits of
+ * e(k, padding || r) instead of the bottom ones.
+ */
+bool pbl_bt_le_dm_stock(const uint8_t k[16], uint64_t r, uint16_t *out);
+
 /** @} */

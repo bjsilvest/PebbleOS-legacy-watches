@@ -386,11 +386,15 @@ static bool prv_key_is_nil_v2(const struct pbl_bt_sm_key *key) {
 
 //! Imports the stock firmware's root keys, name and BLE pairing when our
 //! identity root key differs from its own. Stock (Bluetopia) did not store
-//! the LTK it gave the phone, only the DIV and EDIV: regenerate it as
-//! d1(ER, DIV, 0) and store it with the stock EDIV and a Rand of 0. The H4
-//! transport checks a reconnecting phone's EDIV against dm(DHK, Rand) and
-//! then stands in Rand 0, so NimBLE finds the key; if the check fails, the
-//! phone pairs again. Never writes the stock region.
+//! the LTK it gave the phone, only the DIV and EDIV: regenerate it and store
+//! it with the stock EDIV and a Rand of 0. The H4 transport checks a
+//! reconnecting phone's EDIV and then stands in Rand 0, so NimBLE finds the
+//! key; if the check fails, the phone pairs again. Never writes the stock
+//! region.
+//!
+//! Stock swaps the legacy key roles: its ER is d1(IR, 3, 0) (the spec's
+//! DHK) and its DHK is the stored encryption root key; see
+//! pbl_bt_le_dm_stock() for its dm.
 static void prv_import_stock_v2(void) {
   StockV2Data *stock = kernel_zalloc_check(sizeof(*stock));
   flash_read_bytes((uint8_t *)stock, FLASH_REGION_STOCK_SHARED_PRF_STORAGE_BEGIN, sizeof(*stock));
@@ -432,8 +436,9 @@ static void prv_import_stock_v2(void) {
         },
     .is_remote_encryption_info_valid = ble->is_remote_encryption_info_valid,
   };
-  if (ble->is_local_encryption_info_valid &&
-      pbl_bt_le_d1(stock_er->data, ble->local_div, 0, info.local_encryption_info.ltk.data)) {
+  uint8_t er[16];
+  if (ble->is_local_encryption_info_valid && pbl_bt_le_d1(stock_ir->data, 3, 0, er) &&
+      pbl_bt_le_d1(er, ble->local_div, 0, info.local_encryption_info.ltk.data)) {
     info.local_encryption_info.ediv = ble->local_ediv;
     info.local_encryption_info.div = ble->local_div;
     info.local_encryption_info.rand = 0;

@@ -462,9 +462,9 @@ static volatile uint32_t s_legacy_ltk_mismatch;
 //! A bond imported from the stock firmware has its LTK regenerated but not
 //! the Rand the phone holds (stock never stored it), so it is stored with
 //! Rand 0. When the phone asks for that key, check its EDIV is the stock
-//! one, DIV ^ dm(DHK, Rand) with DHK = d1(IR, 3, 0), and stand in Rand 0 so
-//! NimBLE finds the key. Otherwise leave the request alone: NimBLE declines
-//! and the phone pairs again.
+//! one, DIV ^ dm(DHK, Rand) with stock's DHK (the encryption root key) and
+//! dm, and stand in Rand 0 so NimBLE finds the key. Otherwise leave the
+//! request alone: NimBLE declines and the phone pairs again.
 static void prv_ltk_req_imported_bond(struct ble_hci_ev *ev) {
   if (ev->opcode != BLE_HCI_EVCODE_LE_META || ev->length != LE_LTK_REQ_LEN ||
       ev->data[0] != BLE_HCI_LE_SUBEV_LT_KEY_REQ) {
@@ -480,17 +480,16 @@ static void prv_ltk_req_imported_bond(struct ble_hci_ev *ev) {
   }
 
   struct pbl_bt_sm_pairing_info info;
-  struct pbl_bt_sm_key ir;
+  struct pbl_bt_sm_key dhk;
   if (!shared_prf_storage_get_ble_pairing_data(&info, nullptr, nullptr, nullptr) ||
       !info.is_local_encryption_info_valid || info.local_encryption_info.rand != 0U ||
       info.local_encryption_info.ediv != ediv ||
-      !shared_prf_storage_get_root_key(PBL_BT_SM_ROOT_KEY_TYPE_IDENTITY, &ir)) {
+      !shared_prf_storage_get_root_key(PBL_BT_SM_ROOT_KEY_TYPE_ENCRYPTION, &dhk)) {
     return;
   }
 
-  uint8_t dhk[16];
   uint16_t y;
-  if (!pbl_bt_le_d1(ir.data, 3U, 0U, dhk) || !pbl_bt_le_dm(dhk, rand, &y)) {
+  if (!pbl_bt_le_dm_stock(dhk.data, rand, &y)) {
     return;
   }
   if ((uint16_t)(ediv ^ y) != info.local_encryption_info.div) {

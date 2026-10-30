@@ -50,16 +50,30 @@ bool pbl_bt_le_d1(const uint8_t k[16], uint16_t d, uint16_t r, uint8_t out[16]) 
   return pbl_bt_le_e(k, plain, out);
 }
 
-bool pbl_bt_le_dm(const uint8_t k[16], uint64_t r, uint16_t *out) {
-  // dm(k, r) = e(k, padding || r) mod 2^16
+static bool prv_dm_block(const uint8_t k[16], uint64_t r, uint8_t enc[16]) {
+  // e(k, padding || r)
   uint8_t plain[16] = {0};
-  uint8_t enc[16];
   for (int i = 0; i < 8; i++) {
     plain[i] = (r >> (8 * i)) & 0xffU;
   }
-  if (!pbl_bt_le_e(k, plain, enc)) {
+  return pbl_bt_le_e(k, plain, enc);
+}
+
+bool pbl_bt_le_dm(const uint8_t k[16], uint64_t r, uint16_t *out) {
+  // dm(k, r) = e(k, padding || r) mod 2^16
+  uint8_t enc[16];
+  if (!prv_dm_block(k, r, enc)) {
     return false;
   }
   *out = enc[0] | (enc[1] << 8);
+  return true;
+}
+
+bool pbl_bt_le_dm_stock(const uint8_t k[16], uint64_t r, uint16_t *out) {
+  uint8_t enc[16];
+  if (!prv_dm_block(k, r, enc)) {
+    return false;
+  }
+  *out = enc[14] | (enc[15] << 8);
   return true;
 }
