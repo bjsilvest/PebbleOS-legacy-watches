@@ -7,10 +7,13 @@
 #include <pbl/drivers/backlight/is31fl3196.h>
 #else
 #include <pbl/drivers/backlight/pwm.h>
+#include <pbl/drivers/pwm/stm32.h>
 #endif
+#include <pbl/drivers/display/sharp_ls013b7dh01_stm32.h>
 #include <pbl/drivers/i2c/stm32.h>
 #include <pbl/drivers/imu/lis3dh/lis3dh.h>
 #include <pbl/drivers/imu/mag3110/mag3110.h>
+#include <pbl/drivers/input/stm32_keys.h>
 #include <pbl/drivers/regulator/gpio.h>
 #include <pbl/drivers/temperature/stm32.h>
 #include <pbl/drivers/uart/stm32.h>
@@ -22,15 +25,22 @@
 // Buttons
 ///////////////////////////////////////////////////////////////////////////////
 
-const BoardConfigButton BOARD_CONFIG_BUTTON = {
-  .buttons = {
-    [BUTTON_ID_BACK] = {"Back", PBL_GPIO(STM32_GPIOC, 3, PBL_GPIO_ACTIVE_LOW), PBL_INPUT_KEY_BACK},
-    [BUTTON_ID_UP] = {"Up", PBL_GPIO(STM32_GPIOA, 2, PBL_GPIO_ACTIVE_LOW), PBL_INPUT_KEY_UP},
-    [BUTTON_ID_SELECT] =
-        {"Select", PBL_GPIO(STM32_GPIOC, 6, PBL_GPIO_ACTIVE_LOW), PBL_INPUT_KEY_SELECT},
-    [BUTTON_ID_DOWN] = {"Down", PBL_GPIO(STM32_GPIOA, 1, PBL_GPIO_ACTIVE_LOW), PBL_INPUT_KEY_DOWN},
-  },
-};
+PBL_STM32_KEYS_DEFINE(
+    BUTTONS, "buttons",
+    PBL_GPIO_KEYS_KEY("Back", PBL_GPIO(STM32_GPIOC, 3, PBL_GPIO_ACTIVE_LOW), PBL_INPUT_KEY_BACK,
+                      40),
+    PBL_GPIO_KEYS_KEY("Up", PBL_GPIO(STM32_GPIOA, 2, PBL_GPIO_ACTIVE_LOW), PBL_INPUT_KEY_UP, 40),
+    PBL_GPIO_KEYS_KEY("Select", PBL_GPIO(STM32_GPIOC, 6, PBL_GPIO_ACTIVE_LOW), PBL_INPUT_KEY_SELECT,
+                      40),
+    PBL_GPIO_KEYS_KEY("Down", PBL_GPIO(STM32_GPIOA, 1, PBL_GPIO_ACTIVE_LOW), PBL_INPUT_KEY_DOWN,
+                      40));
+
+// Display: Sharp LS013B7DH01 on SPI2, see BOARD_CONFIG_DISPLAY
+///////////////////////////////////////////////////////////////////////////////
+
+PBL_DISPLAY_SHARP_LS013B7DH01_STM32_DEFINE(s_display, "display", PBL_DISPLAY_WIDTH,
+                                           PBL_DISPLAY_HEIGHT);
+const struct pbl_display *const DISPLAY = &s_display.disp;
 
 // Debug UART
 ///////////////////////////////////////////////////////////////////////////////
@@ -50,8 +60,9 @@ static UARTDevice DBG_UART_DEVICE = {
   .af = GPIO_AF_USART3,
   .irqn = PBL_IRQN(USART3),
 };
-UARTDevice *const DBG_UART = &DBG_UART_DEVICE;
-PBL_IRQ_CONNECT(USART3, 13, uart_irq_handler, DBG_UART, 0);
+PBL_IRQ_CONNECT(USART3, 13, uart_irq_handler, &DBG_UART_DEVICE, 0);
+PBL_UART_STM32_DEFINE(s_dbg_uart, "usart3", 115200, &DBG_UART_DEVICE);
+const struct pbl_uart *const DBG_UART = &s_dbg_uart.uart;
 
 #ifdef CONFIG_BT_HCI_UART
 // Bluetooth HCI
@@ -98,16 +109,11 @@ PBL_IS31FL3196_DEFINE(s_is31fl3196, &s_i2c1.bus, 0x64, .sdb = PBL_GPIO(STM32_GPI
                       .status_led_compensation_mv = 30);
 const struct pbl_backlight *const BACKLIGHT = &s_is31fl3196.backlight;
 #else
-// Backlight: TIM3 CH2
-PBL_BACKLIGHT_PWM_DEFINE(s_backlight,
-                         .pwm =
-                             {
-                               .output = PBL_GPIO(STM32_GPIOB, 5, 0),
-                               .timer = TIM3,
-                               .rcc = RCC_APB1Periph_TIM3,
-                               .af = GPIO_AF_TIM3,
-                               .channel = 2,
-                             },
+// Backlight: TIM3 CH2 (output 1)
+PBL_PWM_STM32_DEFINE(s_tim3, "tim3", TIM3, RCC_APB1Periph_TIM3, false, GPIO_AF_TIM3,
+                     [1] = PBL_GPIO(STM32_GPIOB, 5, 0));
+
+PBL_BACKLIGHT_PWM_DEFINE(s_backlight, .pwm = PBL_PWM(&s_tim3.ctrl, 1, PBL_PWM_HZ(256), 0),
                          .max_duty_cycle_percent = 100);
 const struct pbl_backlight *const BACKLIGHT = &s_backlight.backlight;
 #endif

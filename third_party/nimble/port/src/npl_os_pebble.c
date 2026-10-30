@@ -20,6 +20,7 @@
 #include <pbl/kernel/assert.h>
 #include <pbl/kernel/fatal.h>
 #include <pbl/logging/logging.h>
+#include <pbl/task_wdt/task_wdt.h>
 
 struct ble_npl_event *npl_pebble_eventq_get(struct ble_npl_eventq *evq, ble_npl_time_t tmo) {
   struct ble_npl_event *ev = NULL;
@@ -132,7 +133,17 @@ ble_npl_error_t npl_pebble_sem_pend(struct ble_npl_sem *sem, ble_npl_time_t time
     assert(timeout == 0);
   }
 
-  return pbl_sem_take(&sem->handle, PBL_TICKS(timeout)) == 0 ? BLE_NPL_OK : BLE_NPL_TIMEOUT;
+  // A bounded wait (e.g. for an HCI command's reply) is not a stuck thread:
+  // several timing out back to back outlast the task watchdog.
+  const bool bounded = timeout != BLE_NPL_TIME_FOREVER && timeout != 0;
+  if (bounded) {
+    pbl_task_wdt_set_waiting(true);
+  }
+  const int rc = pbl_sem_take(&sem->handle, PBL_TICKS(timeout));
+  if (bounded) {
+    pbl_task_wdt_set_waiting(false);
+  }
+  return rc == 0 ? BLE_NPL_OK : BLE_NPL_TIMEOUT;
 }
 
 ble_npl_error_t npl_pebble_sem_release(struct ble_npl_sem *sem) {

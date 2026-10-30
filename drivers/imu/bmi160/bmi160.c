@@ -499,7 +499,14 @@ static void prv_handle_data(void) {
   // fifo drain callback could have already been scheduled so don't check the
   // interrupt status
   if (s_fifo_in_use) {
-    prv_drain_fifo();
+    // INT2 is level triggered but the EXTI only sees rising edges: drain until
+    // the watermark is clear, or no new edge comes and sampling stalls.
+    for (int i = 0; i < 4; i++) {
+      prv_drain_fifo();
+      if (pbl_gpio_get(&BOARD_CONFIG_ACCEL.accel_int_gpios[1]) <= 0) {
+        break;
+      }
+    }
     return;
   }
 
@@ -547,7 +554,22 @@ static void prv_accel_enable_undersampling(bool enable) {
   prv_read_modify_write(BMI160_REG_ACC_CONF, acc_us_bwp, acc_us_bwp_mask);
 }
 
-static void prv_update_accel_interrupts(bool enable) {
+// Operating modes that need the interrupt pins: data (FIFO watermark or data
+// ready on INT2), shake and double tap (INT1).
+static uint8_t s_interrupt_users;
+
+static void prv_update_accel_interrupts(bool use, AccelOperatingMode mode) {
+  const bool was_enabled = (s_interrupt_users != 0);
+  if (use) {
+    s_interrupt_users |= (1 << mode);
+  } else {
+    s_interrupt_users &= ~(1 << mode);
+  }
+  const bool enable = (s_interrupt_users != 0);
+  if (enable == was_enabled) {
+    return;
+  }
+
   for (unsigned int i = 0; i < ARRAY_LENGTH(BOARD_CONFIG_ACCEL.accel_int_gpios); i++) {
     uint8_t int_cfg = 0;
     uint8_t int_mask = 0xf << (i * 4);
@@ -769,6 +791,8 @@ static void prv_configure_accel_sampling(bool enable_int, bool use_fifo) {
   BMI160_DBG("INT_EN[1] = 0x%" PRIx8, bmi160_read_reg(BMI160_REG_INT_EN_1));
   int_enabled = enable_int;
   s_fifo_in_use = use_fifo;
+
+  prv_update_accel_interrupts(enable_int, AccelOperatingModeData);
 }
 
 static int prv_set_num_samples(const struct pbl_accel *accel, uint32_t num_samples) {
@@ -941,7 +965,7 @@ static int prv_set_shake_detection(const struct pbl_accel *accel, bool on) {
     return 0;
   }
 
-  prv_update_accel_interrupts(on);
+  prv_update_accel_interrupts(on, AccelOperatingModeShakeDetection);
   if (on) {
     prv_enable_shake_detection();
   } else {
@@ -960,7 +984,7 @@ static int prv_set_double_tap_detection(const struct pbl_accel *accel, bool on) 
     return 0;
   }
 
-  prv_update_accel_interrupts(on);
+  prv_update_accel_interrupts(on, AccelOperatingModeDoubleTapDetection);
   if (on) {
     prv_enable_double_tap_detection();
   } else {

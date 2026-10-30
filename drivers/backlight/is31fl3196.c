@@ -48,7 +48,7 @@ static uint8_t s_brightness;
 static uint32_t s_status_color;
 
 static bool prv_write_register(uint8_t reg, uint8_t value) {
-  return pbl_i2c_write_register_block(&s_dev->i2c, reg, 1, &value) == 0;
+  return pbl_i2c_reg_write_byte(&s_dev->i2c, reg, value) == 0;
 }
 
 // Writes OUT1-3 or OUT4-6 from 0xRRGGBB (OUTn+0 = red) and latches them.
@@ -59,13 +59,11 @@ static void prv_write_outputs(uint8_t first_reg, uint32_t rgb) {
 
   pbl_gpio_set(&s_dev->sdb, true);
 
-  pbl_i2c_use(&s_dev->i2c);
   bool ret = true;
   for (int i = 0; i < 3; i++) {
     ret &= prv_write_register(first_reg + i, (uint8_t)(rgb >> (16 - 8 * i)));
   }
   ret &= prv_write_register(IS31FL3196_REG_DATA_UPDATE, IS31FL3196_LATCH);
-  pbl_i2c_release(&s_dev->i2c);
   if (!ret) {
     PBL_LOG_ERR("IS31FL3196 write failed (i2c)");
   }
@@ -81,7 +79,6 @@ static int prv_init(const struct pbl_backlight *bl) {
   pbl_gpio_configure(&s_dev->sdb, PBL_GPIO_OUTPUT_INACTIVE);
   pbl_gpio_set(&s_dev->sdb, true);
 
-  pbl_i2c_use(&s_dev->i2c);
   // A missing controller must not be fatal: a dark backlight beats a boot
   // loop.
   if (!prv_write_register(IS31FL3196_REG_RESET, IS31FL3196_LATCH)) {
@@ -96,7 +93,6 @@ static int prv_init(const struct pbl_backlight *bl) {
       PBL_LOG_ERR("IS31FL3196 init write failed (i2c)");
     }
   }
-  pbl_i2c_release(&s_dev->i2c);
 
   pbl_gpio_set(&s_dev->sdb, false);
 

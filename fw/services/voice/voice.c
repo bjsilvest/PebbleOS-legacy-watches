@@ -128,7 +128,7 @@ static void prv_stop_recording(void) {
 
   prv_teardown_session();
 
-  // Speex cleanup will be handled by delayed cleanup to avoid race conditions
+  // The Speex encoder is freed once the session goes idle, in prv_reset()
 }
 
 static void prv_cancel_recording(void) {
@@ -149,6 +149,12 @@ static void prv_cancel_early_session(void) {
 static void prv_reset(void) {
   s_state = SessionState_Idle;
   s_session_id = AUDIO_ENDPOINT_SESSION_INVALID_ID;
+  // The encoder takes over 8 KB of kernel heap: give it back between sessions
+  // rather than keep it from the first dictation on. voice_start_dictation()
+  // sets it up again. Not while the mic still feeds its frame buffer.
+  if (!mic_is_running(MIC)) {
+    voice_speex_deinit();
+  }
   mic_manager_set_dictation_active(false);
 }
 

@@ -10,17 +10,6 @@
 #include <pbl/drivers/button_id.h>
 #include <pbl/input/input.h>
 
-typedef void GPIO_TypeDef;
-
-#define GPIO_Port_NULL nullptr
-#define GPIO_Pin_NULL  0U
-
-typedef enum {
-  GPIO_PuPd_NOPULL,
-  GPIO_PuPd_UP,
-  GPIO_PuPd_DOWN,
-} GPIOPuPd_TypeDef;
-
 typedef struct {
   uint8_t backlight_on_percent;
   uint32_t ambient_light_dark_threshold;
@@ -31,15 +20,6 @@ typedef struct {
 } BoardConfig;
 
 typedef struct {
-  const char *name;
-  uint16_t code;
-} ButtonConfig;
-
-typedef struct {
-  ButtonConfig buttons[NUM_BUTTONS];
-} BoardConfigButton;
-
-typedef struct {
   const uint8_t low_power_threshold;
   const uint16_t battery_capacity_hours;
 } BoardConfigPower;
@@ -48,18 +28,12 @@ typedef struct {
   uint8_t default_motion_sensitivity;
 } BoardConfigAccel;
 
-typedef const struct UARTDevice UARTDevice;
+struct pbl_uart;
 typedef const struct QSPIPort QSPIPort;
 typedef const struct QSPIFlash QSPIFlash;
 typedef const struct HRMDevice HRMDevice;
 typedef const struct MicDevice MicDevice;
 typedef const struct AudioDevice AudioDevice;
-
-typedef struct PosixDisplayDevice {
-  uint16_t width;
-  uint16_t height;
-} PosixDisplayDevice;
-typedef const PosixDisplayDevice DisplayDevice;
 
 void board_early_init(void);
 void board_init(void);

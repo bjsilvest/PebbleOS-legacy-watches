@@ -2,6 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
+import platform
+import shutil
+
+from pbl import emulator
 
 from .core import Runner, RunnerCaps, RunnerError
 
@@ -18,7 +22,7 @@ class NativeRunner(Runner):
 
     @classmethod
     def capabilities(cls):
-        return RunnerCaps(commands={"run"})
+        return RunnerCaps(commands={"run", "debug"})
 
     @classmethod
     def supports(cls, cfg):
@@ -39,7 +43,31 @@ class NativeRunner(Runner):
         if self.bt_hci and not hci_uart:
             raise RunnerError("--bt-hci needs a build with CONFIG_BT_HCI_UART=y")
 
-        argv = [program, "-f", build.join(FLASH_FILE)]
+        argv = [
+            program,
+            "-f", build.join(FLASH_FILE),
+            "-p", str(emulator.PEBBLE_TOOL_PORT),
+        ]  # fmt: skip
         if self.bt_hci:
             argv += ["-b", self.bt_hci]
-        return self.run_program(argv + list(self.cfg.extra_args))
+        if command == "debug":
+            # The terminal belongs to the debugger: Ctrl-C has to reach it.
+            argv = self._debugger() + argv + ["-c", str(emulator.CONSOLE_PORT)]
+        argv += list(self.cfg.extra_args)
+        return self.run_program(argv)
+
+    def _debugger(self):
+        """The host's debugger, set to start the program given after it."""
+        build = self.cfg.build
+        # The debug information names sources relative to the build
+        # directory, from paths relative to the top directory.
+        debuggers = [
+            ["gdb", "-ex", f"set substitute-path {build} {build.topdir}", "--args"],
+            ["lldb", "-o", f"settings set target.source-map {build} {build.topdir}", "--"],
+        ]
+        if platform.system() == "Darwin":
+            debuggers.reverse()
+        for debugger in debuggers:
+            if shutil.which(debugger[0]):
+                return debugger
+        raise RunnerError("no gdb or lldb found")

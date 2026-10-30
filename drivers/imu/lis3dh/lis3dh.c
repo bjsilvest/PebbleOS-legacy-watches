@@ -116,20 +116,14 @@ static uint8_t s_last_raw[SAMPLE_SIZE];
 static uint64_t s_last_us;
 
 static bool prv_write(uint8_t reg, uint8_t value) {
-  pbl_i2c_use(I2C_LIS3DH);
-  const bool ok = pbl_i2c_write_register(I2C_LIS3DH, reg, value) == 0;
-  pbl_i2c_release(I2C_LIS3DH);
-  return ok;
+  return pbl_i2c_reg_write_byte(I2C_LIS3DH, reg, value) == 0;
 }
 
 static bool prv_read(uint8_t reg, uint8_t *data, uint32_t len) {
   if (len > 1U) {
     reg |= AUTO_INCREMENT;
   }
-  pbl_i2c_use(I2C_LIS3DH);
-  const bool ok = pbl_i2c_read_register_block(I2C_LIS3DH, reg, len, data) == 0;
-  pbl_i2c_release(I2C_LIS3DH);
-  return ok;
+  return pbl_i2c_burst_read(I2C_LIS3DH, reg, data, len) == 0;
 }
 
 static uint64_t prv_now_us(void) {

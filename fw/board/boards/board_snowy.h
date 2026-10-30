@@ -14,36 +14,15 @@
 #define BT_VENDOR_NAME "Pebble Technology"
 
 static const BoardConfig BOARD_CONFIG = {
-#ifdef CONFIG_BOARD_SPALDING
   // As the lux-calibrated Core watches: the backlight stops coming on in
   // light brighter than a desk lamp.
   .ambient_light_dark_threshold = 800,
   .ambient_k_delta_threshold = 100,
+#ifdef CONFIG_BOARD_SPALDING
   .backlight_on_percent = 25,
 #else
-#ifdef CONFIG_BOARD_SNOWY_S3
-  .ambient_light_dark_threshold = 1118,
-#else
-  .ambient_light_dark_threshold = 1085,
-#endif
-  .ambient_k_delta_threshold = 35,
   .backlight_on_percent = 45,
 #endif
-};
-
-// Active low with pull-ups; Back has an external one.
-static const BoardConfigButton BOARD_CONFIG_BUTTON = {
-  .buttons = {
-    [BUTTON_ID_BACK] = {"Back", PBL_GPIO(STM32_GPIOG, 4, PBL_GPIO_ACTIVE_LOW), PBL_INPUT_KEY_BACK},
-    [BUTTON_ID_UP] =
-        {"Up", PBL_GPIO(STM32_GPIOG, 3, PBL_GPIO_ACTIVE_LOW | PBL_GPIO_PULL_UP), PBL_INPUT_KEY_UP},
-    [BUTTON_ID_SELECT] =
-        {"Select", PBL_GPIO(STM32_GPIOG, 1, PBL_GPIO_ACTIVE_LOW | PBL_GPIO_PULL_UP),
-         PBL_INPUT_KEY_SELECT},
-    [BUTTON_ID_DOWN] = {
-      "Down", PBL_GPIO(STM32_GPIOG, 2, PBL_GPIO_ACTIVE_LOW | PBL_GPIO_PULL_UP), PBL_INPUT_KEY_DOWN
-    },
-  },
 };
 
 static const BoardConfigPower BOARD_CONFIG_POWER = {
@@ -114,7 +93,7 @@ static const BoardConfigIce40Display BOARD_CONFIG_DISPLAY = {
 // MCO1 on PA8 outputs the LSE, the 32 kHz clock of the FPGA and the CC2564.
 static const struct pbl_gpio BOARD_MCO1 = PBL_GPIO(STM32_GPIOA, 8, 0);
 
-extern UARTDevice *const DBG_UART;
+extern const struct pbl_uart *const DBG_UART;
 
 #ifdef CONFIG_BT_HCI_UART
 // CC2564B HCI: USART1 with hardware flow control.

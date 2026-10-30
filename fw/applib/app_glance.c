@@ -9,6 +9,7 @@
 #include <pbl/util/string.h>
 #include <pbl/util/uuid.h>
 
+#include <applib/applib_malloc.auto.h>
 #include <applib/template_string.h>
 #ifdef CONFIG_SERVICE_APP_GLANCES
 #include <apps/system/launcher/default/app_glance_generic.h>

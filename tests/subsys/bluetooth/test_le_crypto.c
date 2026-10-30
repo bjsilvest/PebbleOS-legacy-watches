@@ -71,6 +71,10 @@ void test_le_crypto__d1_dm_are_e(void) {
   cl_assert(pbl_bt_le_dm(k, 0x0102030405060708ULL, &dm));
   cl_assert(pbl_bt_le_e(k, rplain, expected));
   cl_assert_equal_i(dm, expected[0] | (expected[1] << 8));
+
+  // Stock (Bluetopia) dm keeps the top 16 bits instead
+  cl_assert(pbl_bt_le_dm_stock(k, 0x0102030405060708ULL, &dm));
+  cl_assert_equal_i(dm, expected[14] | (expected[15] << 8));
 }
 
 void test_le_crypto__legacy_ediv_roundtrip(void) {

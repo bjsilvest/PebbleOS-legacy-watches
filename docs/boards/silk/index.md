@@ -126,13 +126,13 @@ STM32 drivers are rewritten against the current APIs, using the old drivers
 | Board (`fw/board/boards/board_silk.*`) | done for the above |
 | I2C3, AS3701B PMIC, battery ADC | done (stock charger settings) |
 | Vibe (DRV2603 PWM), backlight PWM, BMA255 accel | done (stock values; QEMU does not emulate the BMA255) |
-| Ambient light (ADC1 ch13, PC0 enable) | done |
+| Ambient light (ADC1 ch13, PC0 enable) | done, tested on hardware: stock dark threshold 150 checked on hardware: settled readings are about 20 in the dark, 25 in dim light, 80 indoors and 350 to 480 by a window. In dim light the sensor takes about 3 s to settle after the backlight (up to about 138 while settling), which stays under the threshold |
 | DFSDM mic (DMA2 stream 6) | done |
 | Internal temperature sensor | done |
 | Hardware platform ID (`PebbleSilk`), bundle `hwrev: silk` | done |
 | DMA for display, QSPI, UART RX | todo (polled for now) |
 | Bluetooth (DA14681, H4 over UART, NimBLE host) | done, untested on hardware; needs the Dialog SDK, see below |
-| Heart rate (AS7000 on I2C3, Pebble 2 HR only) | done, untested on hardware: probed at boot (the SE runs the same image), runs the ams application already in the sensor flash and never enters its loader or reflashes it (the update image was not released); BPM only, no SpO2/HRV; QEMU does not emulate it |
+| Heart rate (AS7000 on I2C3, Pebble 2 HR only) | done, BPM and LED pulsing tested on hardware: probed at boot (the SE runs the same image), runs the ams application in the sensor flash; BPM, HRV mode while an app asks (results not decoded), no SpO2; never writes the sensor flash, see [Heart rate sensor](#heart-rate-sensor); QEMU does not emulate it |
 | Motion sensitivity setting (`ACCEL_SENSITIVITY`; default "Medium" keeps the stock threshold) | on, untested on hardware |
 | Left-handed wear (`ORIENTATION_MANAGER`: display, buttons, BMA255 rotate 180°) | on; display checked in QEMU |
 
@@ -178,6 +178,61 @@ Pin map (from the stock board file):
 | Accel ints | PA6, PA3 |
 | ADC1 | ALS ch13 (PC3, enable PC0), battery ch5 (PA5), temperature |
 | Mic | DFSDM1 ch2, CK PC2, SD PB14 |
+
+## Heart rate sensor
+
+The AS7000 runs an ams application from its own flash. Settings > System >
+Information shows its version as "HRM sensor" (e.g. `1.13.16 HW 4 p2.0`).
+
+**Stock firmware never updated many sensors.** Every stock release from 4.2
+to 4.4.3-rbl carries application 1.14.4 and reflashes the sensor at boot on
+any version mismatch. Factory watches shipped with 1.13.16, which the stock
+v4.0-prf4 recovery firmware also carries. Asked to switch to its loader, a
+1.13.16 sensor stops answering I2C for 36 to 75 ms, but stock read the
+running applications once, 35 ms after asking. It gave up before sending
+any record, on every boot, so such watches stayed on 1.13.16 without harm.
+The loader returns to a valid application by itself about 12.7 s after it
+was entered, whether or not it is polled.
+
+**This firmware never writes the sensor.** A sensor update was built and
+tested in a private development tree, but it is not part of this port: the
+ams application image is not redistributable, and a failed update can leave
+the sensor where only hardware can recover it. What that work found:
+
+- Waiting up to 300 ms for the loader to answer is enough. With that, a
+  stock 1.14.4 image (from a stock firmware the owner obtained) flashed
+  cleanly on hardware, from 1.13.16 to 1.14.4. The image is a two-byte
+  application version followed by `{address, length - 1, data}` segments,
+  sent to the loader as Intel HEX records; the last segment is the valid
+  application marker, so an interrupted update leaves the sensor in its
+  loader and a retry can finish it.
+- The stock recovery firmware may flash 1.13.16 back.
+- A sensor whose application hangs before it answers I2C ignores the
+  enable line, so the driver cannot reset it into the loader. Releasing
+  the enable line keeps the loader in force-loader mode, but only at a cold
+  power-up of the sensor, which on the Pebble 2 means unplugging and
+  replugging its flex cable (the sensor has no software-switchable supply).
+  That is how a test sensor hung by experimental firmware was brought back.
+- 1.13.16 and 1.14.4 both report heart rate with this driver; nothing here
+  needs 1.14.4.
+
+**HRV is on, but apps cannot use it yet.** The sensor has an undocumented
+PRV (pulse rate variability) application that stock firmware never used.
+With `CONFIG_HRM_AS7000_HRV` (on in the silk defconfig) the driver runs it
+next to HRM while an app asks for HRV, as the Pebble Time 2 runs HRV only
+for such apps, and falls back to HRM alone if the sensor does not start
+with it. Tested on hardware: PRV starts and the LEDs look solid while it
+runs, as on the Time 2. Two things still keep HRV from apps:
+
+- The Pebble 2 (diorite) SDK is frozen, so `health_service_set_hrv_sample_period`
+  is a stub for Pebble 2 apps. Checked with app SDK 4.33.1 and pebble-tool
+  5.1.1 (the latest on 2026-10-30): the diorite header defines it as `(0)`,
+  so a test app built for diorite never calls the firmware, while the same
+  app built for emery does. Apps need an updated SDK to ask for HRV.
+- The PRV results are not decoded, so no HRV values reach apps even when
+  PRV runs. `CONFIG_HRM_AS7000_PRV_PROBE` (diagnostic, off) records the
+  registers around the PPG block in Settings > System > Information and
+  app logs, to work them out.
 
 ## Resources
 

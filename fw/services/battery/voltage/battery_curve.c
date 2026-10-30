@@ -51,6 +51,38 @@ static const VoltagePoint charge_curve[] = {
   {70, 4250}
 };
 
+#elif defined(CONFIG_BOARD_SPALDING)
+// When the voltage drops below these (mV), the watch will start heading for standby (after delay)
+#define BATTERY_CRITICAL_VOLTAGE_CHARGING    3700
+#define BATTERY_CRITICAL_VOLTAGE_DISCHARGING 3300
+// Battery Tables for Spalding (Pebble Time Round), from the stock firmware
+static VoltagePoint discharge_curve[] = {
+  {0, BATTERY_CRITICAL_VOLTAGE_DISCHARGING},
+  {2, 3470},
+  {5, 3600},
+  {10, 3680},
+  {20, 3720},
+  {30, 3760},
+  {40, 3790},
+  {50, 3830},
+  {60, 3875},
+  {70, 3950},
+  {80, 4050},
+  {90, 4130},
+  {100, 4250}
+};
+
+static const VoltagePoint charge_curve[] = {
+  {0, BATTERY_CRITICAL_VOLTAGE_CHARGING},
+  {10, 3950},
+  {20, 3990},
+  {30, 4030},
+  {40, 4090},
+  {50, 4180},
+  {60, 4230},
+  {70, 4250}
+};
+
 #elif defined(CONFIG_BOARD_TINTIN)
 // When the voltage drops below these (mV), the watch will start heading for standby (after delay)
 #define BATTERY_CRITICAL_VOLTAGE_CHARGING    3200

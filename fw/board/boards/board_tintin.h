@@ -39,8 +39,6 @@ static const BoardConfig BOARD_CONFIG = {
 // drives low; the lines have external pull-ups.
 static const struct pbl_gpio BOARD_BUTTON_COM = PBL_GPIO(STM32_GPIOA, 0, 0);
 
-extern const BoardConfigButton BOARD_CONFIG_BUTTON;
-
 static const BoardConfigPower BOARD_CONFIG_POWER = {
 #if defined(CONFIG_BOARD_TINTIN_BB2)
   .low_power_threshold = 5,
@@ -110,7 +108,7 @@ static const BoardConfigNorSpi BOARD_CONFIG_NOR_SPI = {
 // MCO1 on PA8 outputs the LSE, the CC2564's 32 kHz slow clock.
 static const struct pbl_gpio BOARD_MCO1 = PBL_GPIO(STM32_GPIOA, 8, 0);
 
-extern UARTDevice *const DBG_UART;
+extern const struct pbl_uart *const DBG_UART;
 
 // LIS3DH on I2C1 (PB8 SCL, PB7 SDA)
 extern const struct pbl_i2c_dev *const I2C_LIS3DH;

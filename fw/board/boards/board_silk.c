@@ -3,17 +3,21 @@
 
 #include <pbl/drivers/ambient/stm32_adc.h>
 #include <pbl/drivers/backlight/pwm.h>
+#include <pbl/drivers/display/sharp_ls013b7dh01_stm32.h>
 #include <pbl/drivers/dma/stm32.h>
 #include <pbl/drivers/flash/qspi_flash_definitions.h>
 #include <pbl/drivers/i2c/stm32.h>
 #include <pbl/drivers/imu/bma255/bma255.h>
+#include <pbl/drivers/input/stm32_keys.h>
 #include <pbl/drivers/mic/stm32/dfsdm_definitions.h>
 #include <pbl/drivers/pmic/as3701b.h>
+#include <pbl/drivers/pwm/stm32.h>
 #include <pbl/drivers/regulator/gpio.h>
 #include <pbl/drivers/temperature/stm32.h>
 #include <pbl/drivers/uart/stm32.h>
 #include <pbl/drivers/vibe/pwm.h>
 #include <pbl/kernel/irq.h>
+#include <pbl/util/size.h>
 
 #include <board/board.h>
 #include <flash_region/flash_region.h>
@@ -32,8 +36,9 @@ static UARTDevice DBG_UART_DEVICE = {
   .af = GPIO_AF_USART1,
   .irqn = PBL_IRQN(USART1),
 };
-UARTDevice *const DBG_UART = &DBG_UART_DEVICE;
-PBL_IRQ_CONNECT(USART1, 13, uart_irq_handler, DBG_UART, 0);
+PBL_IRQ_CONNECT(USART1, 13, uart_irq_handler, &DBG_UART_DEVICE, 0);
+PBL_UART_STM32_DEFINE(s_dbg_uart, "usart1", 115200, &DBG_UART_DEVICE);
+const struct pbl_uart *const DBG_UART = &s_dbg_uart.uart;
 
 #ifdef CONFIG_BT_HCI_UART
 // Bluetooth HCI
@@ -79,6 +84,24 @@ static UARTDevice BT_HCI_TX_UART_DEVICE = {
 UARTDevice *const BT_HCI_TX_UART = &BT_HCI_TX_UART_DEVICE;
 PBL_IRQ_CONNECT(USART2, 12, uart_irq_handler, BT_HCI_TX_UART, 0);
 #endif
+
+// Buttons: active high; Back has an external pull-down, the others use the internal one
+///////////////////////////////////////////////////////////////////////////////
+
+PBL_STM32_KEYS_DEFINE(
+    BUTTONS, "buttons",
+    PBL_GPIO_KEYS_KEY("Back", PBL_GPIO(STM32_GPIOC, 13, 0), PBL_INPUT_KEY_BACK, 40),
+    PBL_GPIO_KEYS_KEY("Up", PBL_GPIO(STM32_GPIOD, 2, PBL_GPIO_PULL_DOWN), PBL_INPUT_KEY_UP, 40),
+    PBL_GPIO_KEYS_KEY("Select", PBL_GPIO(STM32_GPIOH, 0, PBL_GPIO_PULL_DOWN), PBL_INPUT_KEY_SELECT,
+                      40),
+    PBL_GPIO_KEYS_KEY("Down", PBL_GPIO(STM32_GPIOH, 1, PBL_GPIO_PULL_DOWN), PBL_INPUT_KEY_DOWN, 40));
+
+// Display: Sharp LS013B7DH01 on SPI2, see BOARD_CONFIG_DISPLAY
+///////////////////////////////////////////////////////////////////////////////
+
+PBL_DISPLAY_SHARP_LS013B7DH01_STM32_DEFINE(s_display, "display", PBL_DISPLAY_WIDTH,
+                                           PBL_DISPLAY_HEIGHT);
+const struct pbl_display *const DISPLAY = &s_display.disp;
 
 // QSPI flash
 ///////////////////////////////////////////////////////////////////////////////
@@ -130,37 +153,46 @@ PBL_GPIO_REGULATOR_DEFINE(BOARD_LED_BOOST, "led_boost", STM32_GPIOB, 13, 0, fals
 // Backlight: TIM3 CH1, powered by the LED boost
 ///////////////////////////////////////////////////////////////////////////////
 
+PBL_PWM_STM32_DEFINE(s_tim3, "tim3", TIM3, RCC_APB1Periph_TIM3, false, GPIO_AF_TIM3,
+                     PBL_GPIO(STM32_GPIOC, 6, 0));
+
 PBL_BACKLIGHT_PWM_DEFINE(s_backlight, .supply = &BOARD_LED_BOOST.reg,
-                         .pwm =
-                             {
-                               .output = PBL_GPIO(STM32_GPIOC, 6, 0),
-                               .timer = TIM3,
-                               .rcc = RCC_APB1Periph_TIM3,
-                               .af = GPIO_AF_TIM3,
-                               .channel = 1,
-                             },
+                         .pwm = PBL_PWM(&s_tim3.ctrl, 0, PBL_PWM_HZ(256), 0),
                          .max_duty_cycle_percent = 67);
 const struct pbl_backlight *const BACKLIGHT = &s_backlight.backlight;
 
 // Vibe: DRV2603 driven by TIM14 CH1
 ///////////////////////////////////////////////////////////////////////////////
 
-PBL_VIBE_PWM_DEFINE(s_vibe, false,
-                    .pwm =
-                        {
-                          .output = PBL_GPIO(STM32_GPIOA, 7, 0),
-                          .timer = TIM14,
-                          .rcc = RCC_APB1Periph_TIM14,
-                          .af = GPIO_AF_TIM14,
-                          .channel = 1,
-                        },
+PBL_PWM_STM32_DEFINE(s_tim14, "tim14", TIM14, RCC_APB1Periph_TIM14, false, GPIO_AF_TIM14,
+                     PBL_GPIO(STM32_GPIOA, 7, 0));
+
+PBL_VIBE_PWM_DEFINE(s_vibe, false, .pwm = PBL_PWM(&s_tim14.ctrl, 0, PBL_PWM_HZ(22000), 0),
                     .vsys_scale = 3300);
 const struct pbl_vibe *const VIBE = &s_vibe.vibe;
 
-// Ambient light: photodiode on ADC1 channel 13, no lux calibration
+// Ambient light: phototransistor on ADC1 channel 13
 ///////////////////////////////////////////////////////////////////////////////
 
-PBL_ALS_STM32_ADC_DEFINE(s_als, nullptr, .enable = PBL_GPIO(STM32_GPIOC, 0, 0),
+// Light sensor readings (3 s after the backlight went off) on a Pebble 2 in
+// seven lighting conditions, against the middle of each condition's usual lux
+// range. The ADC saturates in direct sunlight.
+static const struct pbl_als_lux_point s_als_lux_table[] = {
+  {19, 0},       // pitch dark
+  {36, 2},       // dark room, light from a doorway
+  {76, 10},      // dim room, one small lamp
+  {178, 175},    // normal indoor light
+  {620, 550},    // bright room, desk lamp
+  {1186, 3000},  // outdoors in shade
+  {4086, 10000}, // direct sunlight
+};
+
+static const struct pbl_als_scale s_als_scale = {
+  .table = s_als_lux_table,
+  .table_len = ARRAY_LENGTH(s_als_lux_table),
+};
+
+PBL_ALS_STM32_ADC_DEFINE(s_als, &s_als_scale, .enable = PBL_GPIO(STM32_GPIOC, 0, 0),
                          .channel = ADC_Channel_13, .pin = PBL_GPIO(STM32_GPIOC, 3, 0),
                          .always_on = true);
 const struct pbl_als *const ALS = &s_als.als;

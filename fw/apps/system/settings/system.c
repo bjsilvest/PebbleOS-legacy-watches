@@ -67,8 +67,13 @@
 #include <system/reboot_reason.h>
 #include <system/version.h>
 
-#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+#ifdef CONFIG_HRM_AS7000
 #include <pbl/drivers/hrm/as7000.h>
+#endif
+#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+#include <pbl/services/hrm/hrm_manager.h>
+
+#include <applib/app.h>
 #endif
 
 enum {
@@ -91,6 +96,9 @@ enum {
   SystemInformationItemBtRxBoot,
   SystemInformationItemBtRxReset,
 #endif
+#endif
+#ifdef CONFIG_HRM_AS7000
+  SystemInformationItemHrm,
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   SystemInformationItemHrmPrv,
@@ -184,8 +192,11 @@ typedef struct SystemInformationData {
   char bt_rx_string[48];
   char app_fetch_string[21];
 #endif
+#ifdef CONFIG_HRM_AS7000
+  char hrm_string[32];
+#endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
-  char hrm_prv_string[40];
+  char hrm_prv_string[64];
   char hrm_changed_string[12];
   // Per handshake: 0x12 and the first read of the 0x2c block as the title, the second read below
   char hrm_history_title[AS7000_PROBE_HISTORY][16];
@@ -289,6 +300,9 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemBtRxReset] = i18n_noop("BT Rx reset"),
 #endif
 #endif
+#ifdef CONFIG_HRM_AS7000
+  [SystemInformationItemHrm] = i18n_noop("HRM sensor"),
+#endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   [SystemInformationItemHrmPrv] = i18n_noop("HRM PRV"),
   [SystemInformationItemHrmChanged] = i18n_noop("HRM changed"),
@@ -347,6 +361,53 @@ static uint16_t prv_information_get_num_rows_callback(MenuLayer *menu_layer, uin
   return SystemInformationItem_Count;
 }
 
+#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+//! The HRV request the Settings app holds, if any
+static bool prv_hrv_requested(void) {
+  return sys_hrm_manager_get_app_subscription(app_get_app_id()) != HRM_INVALID_SESSION_REF;
+}
+
+static void prv_format_hrm_prv(SystemInformationData *info, AS7000Probe *probe) {
+  if (!as7000_get_probe(HRM, probe)) {
+    strncpy(info->hrm_prv_string, "no sensor", sizeof(info->hrm_prv_string) - 1);
+    return;
+  }
+  sniprintf(info->hrm_prv_string, sizeof(info->hrm_prv_string),
+            "%s%ubpm q%u s%02x p%u %u-%u r%02x a%02x%s b%u n%lu m%02x v%u",
+            prv_hrv_requested() ? "HRV " : "", probe->bpm, probe->sqi, probe->status,
+            probe->ppg_samples, probe->ppg_min, probe->ppg_max, probe->requested, probe->running,
+            probe->prv_failed ? " F" : "", probe->boots, (unsigned long)probe->handshakes,
+            probe->max_2c, probe->advances);
+}
+
+//! Ask for HRV like an app would, or stop asking. The Health service API is frozen for
+//! Pebble 2 apps, so this is the only way to request it on silk. Kept until Select again or
+//! the Settings app exits.
+static void prv_toggle_hrv(SystemInformationData *info) {
+  const AppInstallId app_id = app_get_app_id();
+  const HRMSessionRef session = sys_hrm_manager_get_app_subscription(app_id);
+  if (session != HRM_INVALID_SESSION_REF) {
+    sys_hrm_manager_unsubscribe(session);
+  } else {
+    sys_hrm_manager_app_subscribe(app_id, 1 /*update_interval_s*/, 0 /*expire_s*/,
+                                  HRMFeature_BPM | HRMFeature_HRV);
+  }
+  AS7000Probe probe = {};
+  prv_format_hrm_prv(info, &probe);
+}
+#endif
+
+static void prv_information_select_callback(MenuLayer *menu_layer, MenuIndex *cell_index,
+                                            void *context) {
+#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+  if (cell_index->row == SystemInformationItemHrmPrv) {
+    SettingsSystemData *data = (SettingsSystemData *)context;
+    prv_toggle_hrv(&data->information_data);
+    menu_layer_reload_data(menu_layer);
+  }
+#endif
+}
+
 static void prv_information_window_load(Window *window) {
   SettingsSystemData *data = (SettingsSystemData *)window_get_user_data(window);
 
@@ -366,6 +427,7 @@ static void prv_information_window_load(Window *window) {
                              .get_num_rows = prv_information_get_num_rows_callback,
                              .get_cell_height = prv_information_get_cell_height_callback,
                              .draw_row = prv_information_draw_row_callback,
+                             .select_click = prv_information_select_callback,
                            });
   GColor highlight_bg = shell_prefs_get_theme_highlight_color();
   menu_layer_set_highlight_colors(menu_layer, highlight_bg, gcolor_legible_over(highlight_bg));
@@ -451,16 +513,25 @@ static void prv_information_window_push(SettingsSystemData *data) {
   info->subtitle_text[SystemInformationItemBtRxReset] = da1468x_rx_after_reset();
 #endif
 #endif
+#ifdef CONFIG_HRM_AS7000
+  // Sensor application version, for comparing units
+  AS7000InfoRecord hrm_info;
+  if (as7000_get_version_info(HRM, &hrm_info)) {
+    sniprintf(info->hrm_string, sizeof(info->hrm_string), "%u.%u.%u HW %u p%u.%u",
+              hrm_info.sw_version_major >> 6, hrm_info.sw_version_major & 0x3f,
+              hrm_info.sw_version_minor, hrm_info.hw_revision, hrm_info.protocol_version_major,
+              hrm_info.protocol_version_minor);
+  } else if (hrm_info.protocol_version_major != 0 || hrm_info.application_id != 0) {
+    sniprintf(info->hrm_string, sizeof(info->hrm_string), "no app (p%u app %02x)",
+              hrm_info.protocol_version_major, hrm_info.application_id);
+  } else {
+    strncpy(info->hrm_string, "none", sizeof(info->hrm_string) - 1);
+  }
+  info->subtitle_text[SystemInformationItemHrm] = info->hrm_string;
+#endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   AS7000Probe probe = {};
-  if (!as7000_get_probe(HRM, &probe)) {
-    strncpy(info->hrm_prv_string, "no sensor", sizeof(info->hrm_prv_string) - 1);
-  } else {
-    sniprintf(info->hrm_prv_string, sizeof(info->hrm_prv_string),
-              "r%02x a%02x%s b%u n%lu %ubpm m%02x v%u", probe.requested, probe.running,
-              probe.prv_failed ? " F" : "", probe.boots, (unsigned long)probe.handshakes,
-              probe.bpm, probe.max_2c, probe.advances);
-  }
+  prv_format_hrm_prv(info, &probe);
   // Newest first
   for (int row = 0; row < AS7000_PROBE_HISTORY; row++) {
     const AS7000ProbeSample *sample =

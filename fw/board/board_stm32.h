@@ -41,18 +41,6 @@ typedef struct {
   const uint8_t backlight_on_percent; // percent of max possible brightness
 } BoardConfig;
 
-// Button Configuration
-/////////////////////////////////////////////////////////////////////////////
-typedef struct {
-  const char *const name; ///< Name for debugging purposes.
-  const struct pbl_gpio gpio;
-  uint16_t code;
-} ButtonConfig;
-
-typedef struct {
-  const ButtonConfig buttons[NUM_BUTTONS];
-} BoardConfigButton;
-
 // Power Configuration
 /////////////////////////////////////////////////////////////////////////////
 typedef struct {
@@ -97,26 +85,6 @@ typedef struct {
   uint8_t default_motion_sensitivity;
 } BoardConfigAccel;
 
-
-//! A timer channel driving a PWM output pin.
-typedef struct {
-  struct pbl_gpio output;
-  TIM_TypeDef *timer;
-  uint32_t rcc;    ///< RCC_APB1Periph_TIMx, or RCC_APB2Periph_TIMx if apb2
-  bool apb2;       ///< The timer is on APB2 (TIM1, TIM8-11)
-  uint8_t af;      ///< GPIO_AF_TIMx
-  uint8_t channel; ///< 1-4
-} PwmConfig;
-
-typedef struct {
-  const PwmConfig pwm;
-  //! Optional enable output, active while the motor runs.
-  const struct pbl_gpio ctl;
-  //! The PWM drives an H-bridge: 50% is stopped, below runs it in reverse.
-  bool hbridge;
-  //! Supply voltage (mV) at which the duty cycle is not scaled; 0 to not scale.
-  uint16_t vsys_scale;
-} BoardConfigActuator;
 
 typedef struct {
   SPI_TypeDef *spi;

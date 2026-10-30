@@ -14,6 +14,7 @@
 
 #include <applib/applib_malloc.auto.h>
 #include <applib/applib_resource_private.h>
+#include <applib/graphics/framebuffer.h>
 #include <applib/graphics/graphics.h>
 #include <process_state/app_state/app_state.h>
 #include <syscall/syscall.h>
@@ -100,6 +101,16 @@ PBL_ALWAYS_INLINE
 #endif
 GBitmapDataRowInfo prv_gbitmap_get_data_row_info(const GBitmap *bitmap, uint16_t y) {
   if (bitmap->info.format == GBitmapFormat8BitCircular) {
+#if PBL_ROUND
+    if (!bitmap->data_row_infos) {
+      const uint16_t inset = display_round_mask_inset(y);
+      return (GBitmapDataRowInfo){
+        .data = (uint8_t *)bitmap->addr + y * DISP_COLS,
+        .min_x = inset,
+        .max_x = DISP_COLS - 1 - inset,
+      };
+    }
+#endif
     const GBitmapDataRowInfoInternal *info = &bitmap->data_row_infos[y];
     return (GBitmapDataRowInfo){
       .data = (uint8_t *)bitmap->addr + info->offset,
@@ -245,9 +256,10 @@ static GBitmap *prv_gbitmap_create_blank(GSize size, GBitmapFormat format) {
       return nullptr;
     }
 
-#if PBL_ROUND
+#if PBL_ROUND && DISPLAY_FRAMEBUFFER_BYTES < DISP_COLS * DISP_ROWS
+    // A display with a packed framebuffer (Time Round) has the layout of legacy round apps.
     if (BITMAP_FORMAT_IS_CIRCULAR_FULL_SCREEN(size, format)) {
-      bitmap->data_row_infos = g_gbitmap_data_row_infos;
+      bitmap->data_row_infos = g_gbitmap_legacy_3x_data_row_infos;
     }
 #endif
   }

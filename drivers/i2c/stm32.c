@@ -20,14 +20,12 @@
 
 //! Event expected on entry to each state.
 static const uint32_t s_guard_events[] = {
-  [PBL_I2C_STM32_WRITE_ADDRESS_TX] = I2C_EVENT_MASTER_MODE_SELECT,
-  [PBL_I2C_STM32_WRITE_REG_ADDRESS] = I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED,
-  [PBL_I2C_STM32_REPEAT_START] = I2C_EVENT_MASTER_BYTE_TRANSMITTED,
-  [PBL_I2C_STM32_WRITE_ADDRESS_RX] = I2C_EVENT_MASTER_MODE_SELECT,
-  [PBL_I2C_STM32_WAIT_FOR_DATA] = I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED,
-  [PBL_I2C_STM32_READ_DATA] = I2C_EVENT_MASTER_BYTE_RECEIVED,
+  [PBL_I2C_STM32_START] = I2C_EVENT_MASTER_MODE_SELECT,
+  [PBL_I2C_STM32_ADDRESS_TX] = I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED,
+  [PBL_I2C_STM32_ADDRESS_RX] = I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED,
   [PBL_I2C_STM32_WRITE_DATA] = I2C_EVENT_MASTER_BYTE_TRANSMITTING,
   [PBL_I2C_STM32_END_WRITE] = I2C_EVENT_MASTER_BYTE_TRANSMITTED,
+  [PBL_I2C_STM32_READ_DATA] = I2C_EVENT_MASTER_BYTE_RECEIVED,
 };
 
 static const struct pbl_i2c_stm32 *prv_i2c(const struct pbl_i2c_bus *bus) {
@@ -123,23 +121,51 @@ static void prv_disable(const struct pbl_i2c_bus *bus) {
   prv_pins_input(i2c);
 }
 
-static bool prv_is_busy(const struct pbl_i2c_bus *bus) {
-  return (prv_i2c(bus)->i2c->SR2 & I2C_SR2_BUSY) != 0;
+static bool prv_is_busy(const struct pbl_i2c_stm32 *i2c) {
+  return (i2c->i2c->SR2 & I2C_SR2_BUSY) != 0;
 }
 
-static void prv_start_transfer(const struct pbl_i2c_bus *bus) {
-  const struct pbl_i2c_stm32 *i2c = prv_i2c(bus);
-
-  i2c->state->xfer_state = PBL_I2C_STM32_WRITE_ADDRESS_TX;
+static void prv_begin(const struct pbl_i2c_stm32 *i2c) {
+  i2c->state->xfer_state = PBL_I2C_STM32_START;
   i2c->state->idx = 0;
-  prv_stop_block(i2c);
-
   i2c->i2c->CR1 |= I2C_CR1_ACK;
   i2c->i2c->CR1 |= I2C_CR1_START;
-  i2c->i2c->CR2 |= I2C_CR2_ITEVTEN | I2C_CR2_ITERREN;
 }
 
-static void prv_abort_transfer(const struct pbl_i2c_bus *bus) {
+static int prv_start(const struct pbl_i2c_bus *bus, uint16_t addr, struct pbl_i2c_msg *msgs,
+                     uint8_t num_msgs) {
+  const struct pbl_i2c_stm32 *i2c = prv_i2c(bus);
+  struct pbl_i2c_stm32_state *state = i2c->state;
+
+  for (uint8_t i = 0; i < num_msgs; i++) {
+    if (msgs[i].len == 0U) {
+      return -ENOTSUP;
+    }
+  }
+
+  // A glitch can latch BUSY with the bus idle; only a reset clears it.
+  if (prv_is_busy(i2c)) {
+    i2c->i2c->CR1 |= I2C_CR1_SWRST;
+    i2c->i2c->CR1 &= ~I2C_CR1_SWRST;
+    prv_enable(bus);
+    if (prv_is_busy(i2c)) {
+      return -EBUSY;
+    }
+  }
+
+  state->msgs = msgs;
+  state->num_msgs = num_msgs;
+  state->msg = 0;
+  state->addr = addr;
+  prv_stop_block(i2c);
+
+  prv_begin(i2c);
+  i2c->i2c->CR2 |= I2C_CR2_ITEVTEN | I2C_CR2_ITERREN;
+
+  return 0;
+}
+
+static void prv_abort(const struct pbl_i2c_bus *bus) {
   const struct pbl_i2c_stm32 *i2c = prv_i2c(bus);
 
   prv_disable_all_interrupts(i2c->i2c);
@@ -148,19 +174,30 @@ static void prv_abort_transfer(const struct pbl_i2c_bus *bus) {
   prv_stop_release(i2c);
 }
 
-static void prv_end_transfer_irq(const struct pbl_i2c_stm32 *i2c, bool success) {
+static void prv_end_transfer_irq(const struct pbl_i2c_stm32 *i2c, int status) {
   prv_disable_all_interrupts(i2c->i2c);
   i2c->i2c->CR1 |= I2C_CR1_STOP;
   i2c->state->xfer_state = PBL_I2C_STM32_COMPLETE;
   prv_stop_release(i2c);
-  pbl_i2c_bus_event(&i2c->bus, success ? PBL_I2C_EVENT_COMPLETE : PBL_I2C_EVENT_ERROR);
+  pbl_i2c_bus_complete(&i2c->bus, status);
+}
+
+//! The current message is done: continue a write, restart for the next message or stop.
+static void prv_next_msg(const struct pbl_i2c_stm32 *i2c) {
+  struct pbl_i2c_stm32_state *state = i2c->state;
+
+  state->msg++;
+  state->idx = 0;
+  if (state->msg == state->num_msgs) {
+    prv_end_transfer_irq(i2c, 0);
+  } else {
+    prv_begin(i2c);
+  }
 }
 
 void pbl_i2c_stm32_ev_irq_handler(const struct pbl_i2c_stm32 *i2c) {
   I2C_TypeDef *regs = i2c->i2c;
   struct pbl_i2c_stm32_state *state = i2c->state;
-  const struct pbl_i2c_transfer *transfer = &i2c->bus.state->transfer;
-  const uint8_t addr = transfer->addr << 1;
 
   if (state->xfer_state == PBL_I2C_STM32_COMPLETE) {
     // Spurious interrupt
@@ -174,73 +211,64 @@ void pbl_i2c_stm32_ev_irq_handler(const struct pbl_i2c_stm32 *i2c) {
     return;
   }
 
+  struct pbl_i2c_msg *msg = &state->msgs[state->msg];
+  const uint8_t addr = state->addr << 1;
+
   switch (state->xfer_state) {
-    case PBL_I2C_STM32_WRITE_ADDRESS_TX:
-      if (transfer->with_reg) {
-        regs->DR = addr & ~I2C_READ_WRITE_BIT;
-        state->xfer_state = PBL_I2C_STM32_WRITE_REG_ADDRESS;
-      } else if (transfer->dir == PBL_I2C_READ) {
+    case PBL_I2C_STM32_START:
+      if ((msg->flags & PBL_I2C_MSG_READ) != 0U) {
         regs->DR = addr | I2C_READ_WRITE_BIT;
-        if (transfer->size == 1) {
+        if (msg->len == 1) {
           // NACK the only byte to stop the device sending.
           regs->CR1 &= ~I2C_CR1_ACK;
         }
-        state->xfer_state = PBL_I2C_STM32_WAIT_FOR_DATA;
+        state->xfer_state = PBL_I2C_STM32_ADDRESS_RX;
       } else {
         regs->DR = addr & ~I2C_READ_WRITE_BIT;
-        state->xfer_state = PBL_I2C_STM32_WRITE_DATA;
+        state->xfer_state = PBL_I2C_STM32_ADDRESS_TX;
       }
       break;
 
-    case PBL_I2C_STM32_WRITE_REG_ADDRESS:
-      regs->DR = transfer->reg;
-      if (transfer->dir == PBL_I2C_READ) {
-        state->xfer_state = PBL_I2C_STM32_REPEAT_START;
-      } else {
-        regs->CR2 |= I2C_CR2_ITBUFEN;
-        state->xfer_state = PBL_I2C_STM32_WRITE_DATA;
+    case PBL_I2C_STM32_ADDRESS_TX:
+      regs->CR2 |= I2C_CR2_ITBUFEN;
+      state->xfer_state = PBL_I2C_STM32_WRITE_DATA;
+      regs->DR = msg->buf[state->idx++];
+      break;
+
+    case PBL_I2C_STM32_WRITE_DATA:
+      if (state->idx == msg->len) {
+        if (state->msg + 1 < state->num_msgs &&
+            (state->msgs[state->msg + 1].flags & PBL_I2C_MSG_NOSTART) != 0U) {
+          state->msg++;
+          state->idx = 0;
+          msg++;
+        } else {
+          regs->CR2 &= ~I2C_CR2_ITBUFEN;
+          state->xfer_state = PBL_I2C_STM32_END_WRITE;
+          break;
+        }
       }
+      regs->DR = msg->buf[state->idx++];
       break;
 
-    case PBL_I2C_STM32_REPEAT_START:
-      regs->CR1 |= I2C_CR1_START;
-      state->xfer_state = PBL_I2C_STM32_WRITE_ADDRESS_RX;
+    case PBL_I2C_STM32_END_WRITE:
+      prv_next_msg(i2c);
       break;
 
-    case PBL_I2C_STM32_WRITE_ADDRESS_RX:
-      regs->DR = addr | I2C_READ_WRITE_BIT;
-      if (transfer->size == 1) {
-        regs->CR1 &= ~I2C_CR1_ACK;
-      }
-      state->xfer_state = PBL_I2C_STM32_WAIT_FOR_DATA;
-      break;
-
-    case PBL_I2C_STM32_WAIT_FOR_DATA:
+    case PBL_I2C_STM32_ADDRESS_RX:
       regs->CR2 |= I2C_CR2_ITBUFEN;
       state->xfer_state = PBL_I2C_STM32_READ_DATA;
       break;
 
     case PBL_I2C_STM32_READ_DATA:
-      transfer->data[state->idx++] = regs->DR;
-      if (state->idx + 1 == transfer->size) {
+      msg->buf[state->idx++] = regs->DR;
+      if (state->idx + 1 == msg->len) {
         // NACK the last byte.
         regs->CR1 &= ~I2C_CR1_ACK;
-      } else if (state->idx == transfer->size) {
+      } else if (state->idx == msg->len) {
         regs->CR2 &= ~I2C_CR2_ITBUFEN;
-        prv_end_transfer_irq(i2c, true);
+        prv_next_msg(i2c);
       }
-      break;
-
-    case PBL_I2C_STM32_WRITE_DATA:
-      regs->DR = transfer->data[state->idx++];
-      if (state->idx == transfer->size) {
-        regs->CR2 &= ~I2C_CR2_ITBUFEN;
-        state->xfer_state = PBL_I2C_STM32_END_WRITE;
-      }
-      break;
-
-    case PBL_I2C_STM32_END_WRITE:
-      prv_end_transfer_irq(i2c, true);
       break;
 
     default:
@@ -251,22 +279,27 @@ void pbl_i2c_stm32_ev_irq_handler(const struct pbl_i2c_stm32 *i2c) {
 
 void pbl_i2c_stm32_er_irq_handler(const struct pbl_i2c_stm32 *i2c) {
   I2C_TypeDef *regs = i2c->i2c;
+  const enum pbl_i2c_stm32_xfer_state xfer_state = i2c->state->xfer_state;
 
-  if (i2c->state->xfer_state == PBL_I2C_STM32_COMPLETE) {
+  if (xfer_state == PBL_I2C_STM32_COMPLETE) {
     regs->CR2 &= ~I2C_CR2_ITERREN;
     return;
   }
 
-  // Overrun, bus error or NACK: end the transfer; the bus layer recovers.
+  // A NACK of the address: no device there.
+  const bool no_device =
+      (regs->SR1 & I2C_SR1_AF) != 0U &&
+      (xfer_state == PBL_I2C_STM32_ADDRESS_TX || xfer_state == PBL_I2C_STM32_ADDRESS_RX);
+
+  // Overrun, bus error or NACK: end the transfer.
   regs->SR1 &= ~(I2C_SR1_OVR | I2C_SR1_BERR | I2C_SR1_AF | I2C_SR1_ARLO);
-  prv_end_transfer_irq(i2c, false);
+  prv_end_transfer_irq(i2c, no_device ? -ENXIO : -EIO);
 }
 
 const struct pbl_i2c_bus_ops pbl_i2c_stm32_ops = {
   .init = prv_init,
   .enable = prv_enable,
   .disable = prv_disable,
-  .is_busy = prv_is_busy,
-  .start_transfer = prv_start_transfer,
-  .abort_transfer = prv_abort_transfer,
+  .start = prv_start,
+  .abort = prv_abort,
 };

@@ -5,6 +5,8 @@
 //! device with an RX DMA stream, received into a circular buffer and handed
 //! to the RX handler on line idle and at each half of the buffer.
 
+#include <errno.h>
+
 #include <pbl/drivers/gpio/stm32.h>
 #include <pbl/drivers/uart.h>
 #include <pbl/drivers/uart/stm32.h>
@@ -12,6 +14,7 @@
 
 #include <pbl/kernel/assert.h>
 #include <pbl/kernel/fatal.h>
+#include <pbl/util/misc.h>
 
 // Fixed point precision for the baud rate divider, as the ST library uses.
 #define DIV_PRECISION (100)
@@ -336,3 +339,70 @@ void uart_clear_rx_dma_buffer(UARTDevice *dev) {
                              dev->state->rx_dma_length;
   pbl_irq_unlock();
 }
+
+// Class port
+///////////////////////////////////////////////////////////////////////////////
+
+static UARTDevice *prv_dev(const struct pbl_uart *uart) {
+  return container_of(uart, const struct pbl_uart_stm32, uart)->dev;
+}
+
+static void prv_class_rx(UARTDevice *dev, uint8_t data, const UARTRXErrorFlags *err_flags) {
+  if (!pbl_uart_receive(dev->state->uart, data)) {
+    uart_set_rx_interrupt_enabled(dev, false);
+  }
+}
+
+static int prv_class_init(const struct pbl_uart *uart) {
+  UARTDevice *dev = prv_dev(uart);
+
+  dev->state->uart = uart;
+  uart_init(dev);
+  uart_set_rx_interrupt_handler(dev, prv_class_rx);
+
+  return 0;
+}
+
+static int prv_class_early_init(const struct pbl_uart *uart) {
+  uart_init_tx_only(prv_dev(uart));
+
+  return 0;
+}
+
+static int prv_class_configure(const struct pbl_uart *uart, const struct pbl_uart_config *cfg) {
+  if (cfg->parity != PBL_UART_PARITY_NONE || cfg->flow_ctrl != PBL_UART_FLOW_CTRL_NONE) {
+    return -ENOTSUP;
+  }
+
+  uart_set_baud_rate(prv_dev(uart), cfg->baudrate);
+
+  return 0;
+}
+
+static void prv_class_poll_out(const struct pbl_uart *uart, uint8_t c) {
+  uart_write_byte(prv_dev(uart), c);
+}
+
+static void prv_class_flush(const struct pbl_uart *uart) {
+  uart_wait_for_tx_complete(prv_dev(uart));
+}
+
+static int prv_class_rx_enable(const struct pbl_uart *uart) {
+  uart_set_rx_interrupt_enabled(prv_dev(uart), true);
+
+  return 0;
+}
+
+static void prv_class_rx_disable(const struct pbl_uart *uart) {
+  uart_set_rx_interrupt_enabled(prv_dev(uart), false);
+}
+
+const struct pbl_uart_ops pbl_uart_stm32_ops = {
+  .init = prv_class_init,
+  .early_init = prv_class_early_init,
+  .configure = prv_class_configure,
+  .poll_out = prv_class_poll_out,
+  .flush = prv_class_flush,
+  .rx_enable = prv_class_rx_enable,
+  .rx_disable = prv_class_rx_disable,
+};

@@ -21,11 +21,13 @@
 #include <pbl/services/put_bytes/put_bytes_storage.h>
 #include <pbl/services/system_task.h>
 #include <pbl/util/byteorder.h>
+#include <pbl/util/heap.h>
 #include <pbl/util/math.h>
 #include <pbl/util/testing.h>
 
 #include <comm/bluetooth_analytics.h>
 #include <kernel/events.h>
+#include <kernel/kernel_heap.h>
 #include <kernel/pbl_malloc.h>
 #include <kernel/pebble_tasks.h>
 #include <kernel/system_message.h>
@@ -140,6 +142,8 @@ typedef struct {
 
   //! the time in ticks at which the put bytes init request completed
   RtcTicks start_ticks;
+  //! Chunks acked only after their flash write, as the job queue was full
+  uint32_t late_acks;
   struct pbl_bt_slave_conn_event_stats conn_event_stats;
 
   //! Holds PB commands. Will enqueue multiple PutRequests when pre-acking is enabled
@@ -309,6 +313,12 @@ static bool prv_init_put_job_queue_if_necessary(void) {
     put_jobs->job[i].buffer = buffer;
   }
   put_jobs->num_allocated_pb_jobs = i;
+  if (i < MAX_BATCHED_PB_PUT_OPS) {
+    unsigned int used, free_bytes, max_free;
+    heap_calc_totals(kernel_heap_get(), &used, &free_bytes, &max_free);
+    PBL_LOG_WRN("PutBytes got %d of %d buffers: heap %u free, largest %u", i,
+                MAX_BATCHED_PB_PUT_OPS, free_bytes, max_free);
+  }
   return true;
 }
 
@@ -741,6 +751,7 @@ static void prv_do_init(void) {
   success = prv_setup_storage_for_init_request(request, index);
 
   s_pb_state.start_ticks = rtc_get_ticks();
+  s_pb_state.late_acks = 0U;
 
   if (!success) {
     PBL_LOG_WRN("Failed to init storage");
@@ -811,7 +822,10 @@ static void prv_do_commit(void) {
 
   if (elapsed_time_ms > 0) {
     int bytes_per_sec = (int)((s_pb_state.total_size * 1000) / elapsed_time_ms);
-    PBL_LOG_DBG("PutBytes pushed %d bytes/sec", bytes_per_sec);
+    PBL_LOG_INFO("PutBytes type %u: %" PRIu32 " B in %" PRIu32 " ms, %d B/s, %" PRIu32
+                 " late acks, %d buffers",
+                 (unsigned)s_pb_state.type, s_pb_state.total_size, elapsed_time_ms, bytes_per_sec,
+                 s_pb_state.late_acks, s_pb_state.pb_pending_jobs.num_allocated_pb_jobs);
   }
 
   bluetooth_analytics_handle_put_bytes_stats(commit_succeeded, s_pb_state.type,
@@ -966,6 +980,7 @@ static void prv_process_put_requests_system_task_cb(void *unused) {
   prv_unlock_pb_job_state();
 
   if (do_ack) { // If we did not pre-ack, we need to ack the packet now!
+    s_pb_state.late_acks++;
     prv_send_response(ResponseAck, token);
   }
 }

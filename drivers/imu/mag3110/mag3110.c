@@ -41,23 +41,11 @@ PBL_LOG_MODULE_DEFINE(driver_mag, CONFIG_DRIVER_IMU_LOG_LEVEL);
 static const struct pbl_mag3110 *s_dev;
 
 static int prv_read(uint8_t reg, uint8_t len, uint8_t *data) {
-  int ret;
-
-  pbl_i2c_use(&s_dev->i2c);
-  ret = pbl_i2c_read_register_block(&s_dev->i2c, reg, len, data);
-  pbl_i2c_release(&s_dev->i2c);
-
-  return ret;
+  return pbl_i2c_burst_read(&s_dev->i2c, reg, data, len);
 }
 
 static int prv_write(uint8_t reg, uint8_t data) {
-  int ret;
-
-  pbl_i2c_use(&s_dev->i2c);
-  ret = pbl_i2c_write_register_block(&s_dev->i2c, reg, 1, &data);
-  pbl_i2c_release(&s_dev->i2c);
-
-  return ret;
+  return pbl_i2c_reg_write_byte(&s_dev->i2c, reg, data);
 }
 
 static void prv_supply(bool on) {

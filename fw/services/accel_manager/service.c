@@ -15,6 +15,7 @@
 #include <pbl/services/analytics/analytics.h>
 #include <pbl/services/event_service.h>
 #include <pbl/services/imu/units.h>
+#include <pbl/services/new_timer/new_timer.h>
 #include <pbl/services/system_task.h>
 #include <pbl/services/vibe_pattern.h>
 #include <pbl/util/math.h>
@@ -746,6 +747,30 @@ static bool prv_shared_buffer_empty(void) {
   return empty;
 }
 
+//! Lists every subscriber and what the tasks that serve them are running. Logged on the first
+//! overflow and every 32nd after, since a stalled subscriber overflows on every batch.
+static void prv_log_subscribers(void) {
+  static uint32_t s_overflows;
+
+  if ((s_overflows++ % 32U) != 0U) {
+    return;
+  }
+
+  PBL_LOG_WRN("Accel subscriber fell behind (%" PRIu32 "): system task in %p, timers in %p",
+              s_overflows, system_task_get_current_callback(),
+              new_timer_debug_get_current_callback());
+  pbl_accel_lock(ACCEL);
+  for (AccelManagerState *state = (AccelManagerState *)s_data_subscribers; state;
+       state = (AccelManagerState *)state->list_node.next) {
+    const int left =
+        pbl_shared_cbuf_get_read_space_remaining(&s_buffer, &state->buffer_client.buffer_client);
+    PBL_LOG_WRN("  task %d cb %p unread %d posted %d have %u/%u", (int)state->task,
+                (void *)state->data_cb_handler, left, state->event_posted, state->num_samples,
+                state->samples_per_update);
+  }
+  pbl_accel_unlock(ACCEL);
+}
+
 static int16_t prv_scale_raw_axis(const uint8_t *sample, const AccelRawBatch *batch, uint8_t axis) {
   const uint8_t *p = sample + batch->axis[axis].offset;
   int16_t raw = (int16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8U));
@@ -788,7 +813,7 @@ static void prv_samples_cb(const struct pbl_accel *accel, const AccelRawBatch *b
   bool rv = pbl_shared_cbuf_write_reserve(&s_buffer, total, false /*advance_slackers*/, &seg1,
                                           &seg1_length, &seg2);
   if (!rv) {
-    PBL_LOG_WRN("Accel subscriber fell behind, truncating data");
+    prv_log_subscribers();
     rv = pbl_shared_cbuf_write_reserve(&s_buffer, total, true /*advance_slackers*/, &seg1,
                                        &seg1_length, &seg2);
   }

@@ -18,6 +18,9 @@
 #include <kernel/pebble_tasks.h>
 #include <kernel/system_message.h>
 #include <system/reboot_reason.h>
+#ifdef CONFIG_BT_OWN_SERVICE_CHANGED
+#include <comm/ble/gatt_service_changed.h>
+#endif
 #include <system/reset.h>
 
 static const uint16_t ENDPOINT_ID = SYS_MSG_ENDPOINT_ID;
@@ -32,6 +35,9 @@ void system_message_send(SystemMessageType type) {
 
 static void prv_reset_kernel_bg_cb(void *unused) {
   PBL_LOG_ALWAYS("Rebooting to install firmware...");
+#ifdef CONFIG_BT_OWN_SERVICE_CHANGED
+  gatt_service_changed_note_update_layout();
+#endif
   RebootReason reason = {RebootReasonCode_SoftwareUpdate, 0};
   reboot_reason_set(&reason);
   system_reset();

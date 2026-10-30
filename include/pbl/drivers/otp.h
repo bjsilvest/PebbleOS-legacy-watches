@@ -19,8 +19,8 @@
  * @{
  */
 
-#if defined(CONFIG_BOARD_SNOWY) || defined(CONFIG_BOARD_TINTIN)
-/** @brief OTP slot indexes, in the stock snowy (and tintin) layout. The stock factory flow
+#if defined(CONFIG_BOARD_SNOWY) || defined(CONFIG_BOARD_SPALDING) || defined(CONFIG_BOARD_TINTIN)
+/** @brief OTP slot indexes, in the stock snowy and spalding layout (tintin too). The stock factory flow
  *  could write the serials several times; the most recent locked slot wins. */
 enum {
   OTP_SERIAL1 = 0,

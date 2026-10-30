@@ -86,12 +86,12 @@ The same keys can be sent from the monitor with `sendkey`, e.g.
 
 ### Touch
 
-On boards with touch, tap and swipe from a shell with {doc}`../../pbl/touch`
-and {doc}`../../pbl/swipe`:
+On boards with touch, tap and swipe from a shell with
+{doc}`../../pbl/emulator`:
 
 ```shell
-pbl touch 130 130
-pbl swipe 130 220 130 40
+pbl emulator touch 130 130
+pbl emulator swipe 130 220 130 40
 ```
 
 ### Console and screenshots
@@ -99,18 +99,18 @@ pbl swipe 130 220 130 40
 Other shells attach to the running emulator:
 
 ```shell
-pbl console       # the firmware's debug console
-pbl screenshot    # writes build/screenshot.png
+pbl console               # the firmware's debug console
+pbl emulator screenshot   # writes build/screenshot.png
 ```
 
 ### Phone data
 
-There is no phone attached, but {doc}`../../pbl/feed` writes what the phone
-app would, such as weather, music, notifications and calendar events, over
+There is no phone attached, but {doc}`pbl emulator feed <../../pbl/emulator>`
+writes what the phone app would, such as weather, music, notifications and calendar events, over
 the Pebble protocol port:
 
 ```shell
-pbl feed weather
+pbl emulator feed weather
 ```
 
 ### Apps
@@ -124,20 +124,38 @@ pebble install /path/to/app.pbw --qemu
 
 Launch with `--keep-flash-image` to keep installed apps across launches.
 
+### Microphone
+
+The emulator's microphone captures audio sent from the host, and silence
+otherwise. With dictation or an app capturing, play a tone, noise, a WAV file
+or your computer's microphone into it:
+
+```shell
+pbl emulator mic --file speech.wav
+```
+
+See {doc}`../../pbl/emulator` for the options. With the `pebble` tool
+connected instead, use `pebble emu-mic --qemu localhost:12344`.
+
+Apps need the phone to grant them the microphone, which only the SDK
+emulator (`pebble install --emulator`) does; see
+{doc}`../../reference/local-microphone`.
+
 ### Debugging
 
 The emulator always runs a GDB server. {doc}`../../pbl/debug` attaches to it
 through a proxy that walks the kernel's thread list, so `info threads` and
-per-thread backtraces work; see {doc}`../debugging`.
+per-thread backtraces work; {doc}`../debugging/gdb_tutorial` walks through a
+session.
 
 ## Ports and sockets
 
 | Endpoint | Use |
 | --- | --- |
 | The launching terminal | Interactive QEMU monitor |
-| `build/qemu-mon.sock` | Socket monitor, used by `pbl screenshot` and scripts |
+| `build/qemu-mon.sock` | Socket monitor, used by `pbl emulator screenshot` and scripts |
 | `localhost:12345` | Serial console, used by `pbl console` |
-| `localhost:12344` | Pebble protocol, used by the `pebble` tool and `pbl feed` |
+| `localhost:12344` | Pebble protocol, used by the `pebble` tool and `pbl emulator feed` |
 | `localhost:1234` | GDB server |
 | `uart1.log` | The first UART's output, in the repository root |
 

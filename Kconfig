@@ -94,6 +94,15 @@ config DEBUG_INFO_MACROS
       firmware's macros. It costs around 7% of the compile time and
       makes the objects, and with them the link, noticeably larger.
 
+config DEBUGGER_AWARE
+    bool "Adapt to an attached debugger"
+    default y if !RELEASE
+    depends on ARCH_HAS_DEBUGGER_DETECT
+    help
+      While a debugger is attached, stop the hardware watchdog and only
+      log the stalls the task watchdog detects, so that the firmware can
+      stay stopped for as long as needed.
+
 config ASAN
     bool "AddressSanitizer"
     depends on ARCH_POSIX
@@ -135,9 +144,8 @@ config TSAN
 config LINKER_MAP
     bool "Linker map file"
     help
-      Write build/pebbleos.map, the cross-referenced link map that
-      tools/analyze_fw_static_memory_usage.py reads. It is tens of
-      megabytes and costs around a fifth of the link.
+      Write build/pebbleos.map, the cross-referenced link map. It is tens
+      of megabytes and costs around a fifth of the link.
 
 endmenu
 
@@ -221,6 +229,8 @@ config PLATFORM_APLITE
     bool "Aplite"
 config PLATFORM_BASALT
     bool "Basalt"
+config PLATFORM_CHALK
+    bool "Chalk"
 config PLATFORM_EMERY
     bool "Emery"
 config PLATFORM_FLINT
@@ -311,6 +321,7 @@ config APP_RAM_3X_SEGMENT_SIZE
     int
     default APP_RAM_APLITE_SEGMENT_SIZE if PLATFORM_APLITE
     default APP_RAM_BASALT_SEGMENT_SIZE if PLATFORM_BASALT
+    default APP_RAM_CHALK_SEGMENT_SIZE if PLATFORM_CHALK
     default APP_RAM_BASALT_SEGMENT_SIZE if PLATFORM_EMERY
     default APP_RAM_APLITE_SEGMENT_SIZE if PLATFORM_FLINT
     default APP_RAM_CHALK_SEGMENT_SIZE if PLATFORM_GABBRO
@@ -320,6 +331,7 @@ config APP_RAM_3X_RUNTIME_SIZE
     int
     default APP_RAM_APLITE_RUNTIME_SIZE if PLATFORM_APLITE
     default APP_RAM_BASALT_RUNTIME_SIZE if PLATFORM_BASALT
+    default APP_RAM_CHALK_RUNTIME_SIZE if PLATFORM_CHALK
     default APP_RAM_BASALT_RUNTIME_SIZE if PLATFORM_EMERY
     default APP_RAM_APLITE_RUNTIME_SIZE if PLATFORM_FLINT
     default APP_RAM_CHALK_RUNTIME_SIZE if PLATFORM_GABBRO
@@ -329,6 +341,7 @@ config APP_RAM_4X_SEGMENT_SIZE
     int
     default APP_RAM_APLITE_SEGMENT_SIZE if PLATFORM_APLITE
     default APP_RAM_BASALT_SEGMENT_SIZE if PLATFORM_BASALT
+    default APP_RAM_CHALK_SEGMENT_SIZE if PLATFORM_CHALK
     default APP_RAM_EMERY_SEGMENT_SIZE if PLATFORM_EMERY
     default APP_RAM_FLINT_SEGMENT_SIZE if PLATFORM_FLINT
     default APP_RAM_GABBRO_SEGMENT_SIZE if PLATFORM_GABBRO
@@ -338,6 +351,7 @@ config APP_RAM_4X_RUNTIME_SIZE
     int
     default APP_RAM_APLITE_RUNTIME_SIZE if PLATFORM_APLITE
     default APP_RAM_BASALT_RUNTIME_SIZE if PLATFORM_BASALT
+    default APP_RAM_CHALK_RUNTIME_SIZE if PLATFORM_CHALK
     default APP_RAM_EMERY_RUNTIME_SIZE if PLATFORM_EMERY
     default APP_RAM_FLINT_RUNTIME_SIZE if PLATFORM_FLINT
     default APP_RAM_GABBRO_RUNTIME_SIZE if PLATFORM_GABBRO
@@ -382,6 +396,14 @@ config CCM_SIZE
       Size of core-coupled RAM. When non-zero the kernel stacks and heap
       live there instead of in SRAM. DMA cannot reach it, so DMA buffers
       must not be on a kernel stack or the kernel heap.
+
+config ISR_STACK_CCM
+    bool "ISR stack in core-coupled RAM"
+    depends on CCM_SIZE != 0
+    help
+      Put the 1 KiB interrupt stack in core-coupled RAM, with the kernel
+      stacks, leaving that much more SRAM to the kernel and that much less
+      kernel heap.
 
 config FLASH_BASE
     hex

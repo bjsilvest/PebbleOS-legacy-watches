@@ -23,7 +23,6 @@ typedef struct MicState {
   CircularBuffer circ_buffer;
   bool initialized;
   bool running;
-  bool main_pending;
   bool bg_pending;
   uint32_t overflow_cnt;
   uint32_t bytes_received;

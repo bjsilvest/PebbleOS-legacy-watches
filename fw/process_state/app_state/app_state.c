@@ -154,6 +154,10 @@ static_assert(sizeof(AppState) <= CONFIG_APP_RAM_APLITE_RUNTIME_SIZE,
 
 KERNEL_READONLY_DATA static AppState *s_app_state_ptr;
 
+// Native apps get the 4.x runtime: AppState, with the native framebuffer, must fit.
+_Static_assert(sizeof(AppState) <= CONFIG_APP_RAM_4X_RUNTIME_SIZE,
+               "AppState does not fit in the app runtime RAM");
+
 bool app_state_configure(MemorySegment *app_state_ram, ProcessAppSDKType sdk_type,
                          int16_t obstruction_origin_y) {
   s_app_state_ptr = memory_segment_split(app_state_ram, nullptr, sizeof(AppState));

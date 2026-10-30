@@ -22,15 +22,26 @@ config HRM_AS7000
       only. The sensor is probed at boot, so the Pebble 2 SE runs the same
       firmware.
 
+config HRM_AS7000_HRV
+    bool "AS7000 HRV (PRV application)"
+    depends on HRM_AS7000
+    select HRM_HRV
+    help
+      While an app asks for HRV, ask the sensor to run its undocumented PRV
+      (pulse rate variability) application next to HRM, as the Pebble
+      Time 2 runs HRV only while an app asks. Falls back to HRM alone if
+      the sensor does not start with PRV. Never writes the sensor flash.
+      With PRV running the LEDs pulse too fast to see flicker, so they
+      look solid. Apps get no HRV data yet: the PRV results are not
+      decoded.
+
 config HRM_AS7000_PRV_PROBE
     bool "AS7000 PRV probe (diagnostic)"
-    depends on HRM_AS7000
+    depends on HRM_AS7000_HRV
     help
-      Ask the sensor to run its undocumented PRV (pulse rate variability)
-      application next to HRM, and record the registers around the PPG
-      block at each handshake for Settings > System > Information. Falls
-      back to HRM alone if the sensor does not start with PRV. Never
-      writes the sensor flash.
+      Record the registers around the PPG block at each handshake, for
+      Settings > System > Information and app logs, to work out the PRV
+      results. The Information row can also ask for HRV itself.
 
 config HRM_SPO2
     bool
@@ -42,13 +53,13 @@ config HRM_SPO2
 
 config HRM_HRV
     bool "HRV (RR interval) support"
-    depends on HRM_GH3X2X
+    depends on HRM_GH3X2X || HRM_AS7000_HRV
     default n
     help
       Expose heart-rate-variability (RR/inter-beat interval) data from the
-      HRM sensor. Enables the Goodix HRV algorithm and links the nonfree
-      HRV library. Off by default; HRV is only sampled while an app holds
-      an HRV subscription.
+      HRM sensor. On the GH3x2x, enables the Goodix HRV algorithm and links
+      the nonfree HRV library. Off by default; HRV is only sampled while an
+      app holds an HRV subscription.
 
 config HRM_QEMU
     bool "QEMU"

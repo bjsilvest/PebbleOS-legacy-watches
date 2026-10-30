@@ -109,6 +109,9 @@ static bool s_notification_vibe_delay =
 static bool s_notification_backlight =
     true; // true = enable backlight (default), false = disable backlight
 
+#define PREF_KEY_NOTIF_RESPECT_PHONE_SILENCE "notifRespectPhoneSilence"
+static bool s_notification_respect_phone_silence = false;
+
 #define PREF_KEY_NOTIF_GROUPING_RANGE "notifGroupingRange"
 static NotificationGroupingRange s_notification_grouping_range = NotificationGroupingRange_Never;
 
@@ -220,6 +223,7 @@ static const PrefVar s_pref_vars[] = {
   PREF_VAR(PREF_KEY_NOTIF_DESIGN_STYLE, s_notification_alternative_design, true),
   PREF_VAR(PREF_KEY_NOTIF_VIBE_DELAY, s_notification_vibe_delay, true),
   PREF_VAR(PREF_KEY_NOTIF_BACKLIGHT, s_notification_backlight, true),
+  PREF_VAR(PREF_KEY_NOTIF_RESPECT_PHONE_SILENCE, s_notification_respect_phone_silence, true),
   PREF_VAR(PREF_KEY_NOTIF_GROUPING_RANGE, s_notification_grouping_range, true),
   PREF_VAR(PREF_KEY_NOTIF_STATUS_BAR_STYLE, s_notification_status_bar_style, true),
   PREF_VAR(PREF_KEY_NOTIF_TEXT_SIZE, s_notification_content_size, true),
@@ -602,6 +606,15 @@ bool alerts_preferences_get_notification_backlight(void) {
 void alerts_preferences_set_notification_backlight(bool enable) {
   s_notification_backlight = enable;
   SET_PREF(PREF_KEY_NOTIF_BACKLIGHT, s_notification_backlight);
+}
+
+bool alerts_preferences_get_notification_respect_phone_silence(void) {
+  return s_notification_respect_phone_silence;
+}
+
+void alerts_preferences_set_notification_respect_phone_silence(bool enable) {
+  s_notification_respect_phone_silence = enable;
+  SET_PREF(PREF_KEY_NOTIF_RESPECT_PHONE_SILENCE, s_notification_respect_phone_silence);
 }
 
 NotificationGroupingRange alerts_preferences_get_notification_grouping_range(void) {

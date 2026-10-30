@@ -1,0 +1,49 @@
+# SPDX-FileCopyrightText: 2026 Brian Silvestri
+# SPDX-License-Identifier: Apache-2.0
+
+# 1 MiB of flash less the 16 KiB stock bootloader the image is linked past.
+config FW_FLASH_SIZE
+    default 0xfc000
+
+config QEMU_MACHINE
+    default "pebble-s4-bb"
+
+# The round framebuffer is 1.7K larger than snowy's: with PULSE's buffers,
+# the kernel SRAM is short, so the interrupt stack goes to CCM (1K less
+# kernel heap).
+config ISR_STACK_CCM
+    default y if PULSE_EVERYWHERE
+
+# Like the stock firmware, use the CC2564's factory (public, TI) address, so
+# the watch keeps its stock name and address. Fall back to one derived from
+# the serial number if the chip reports none.
+choice BT_ID_ADDR_SOURCE
+    default BT_ID_ADDR_SERIAL
+endchoice
+
+config BT_ID_ADDR_PREFER_PUBLIC
+    default y
+
+# The recovery firmware is the stock one, with its own (v2) shared PRF
+# storage. Import its keys and pairing so phones see one watch, already
+# paired, in either firmware. The stock firmware pinned no address.
+config SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK_V2
+    default y
+
+# Show the same 1% charge percent as the phone app (stock rounded to 10%).
+config BATTERY_EXACT_PERCENT
+    default y
+
+# The stock bootloader checks staged firmware, and the stock PRF image was
+# written, with the legacy STM32 CRC.
+config FIRMWARE_LEGACY_CRC
+    default y
+
+# As on silk: four event buffers run out under notification traffic, and the
+# HCI task then stops reading while the host waits on a write.
+config NIMBLE_BLE_TRANSPORT_EVT_COUNT
+    default 16
+
+# Stable on snowy hardware since -225: the chip sleeps and the host enters STOP.
+config BT_CC2564_SLEEP
+    default y

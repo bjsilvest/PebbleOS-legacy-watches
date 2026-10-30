@@ -188,4 +188,9 @@ void shared_prf_storage_wipe_all(void);
  */
 void shared_prf_storage_init(void);
 
+#ifdef CONFIG_SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK
+/** @return true if this boot copied the stock firmware's entry over ours. */
+bool shared_prf_storage_imported_stock(void);
+#endif
+
 /** @} */

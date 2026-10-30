@@ -22,6 +22,7 @@ CONFIG_RTC=y
 CONFIG_UART=y
 
 CONFIG_EXTI=y
+CONFIG_INPUT_STM32_KEYS=y
 
 CONFIG_DISPLAY=y
 
@@ -46,6 +47,11 @@ CONFIG_BACKLIGHT_PWM=y
 
 CONFIG_AMBIENT_LIGHT=y
 CONFIG_AMBIENT_LIGHT_STM32_ADC=y
+CONFIG_AMBIENT_LIGHT_THRESHOLD_LOCAL=y
+# Backlight brightness follows the light sensor (Settings > Display), with the
+# sensor's calibration table in board_snowy.h.
+CONFIG_AMBIENT_LIGHT_LUX_TABLE=y
+CONFIG_DYNAMIC_BACKLIGHT=y
 
 CONFIG_ACCEL=y
 CONFIG_ACCEL_BMI160=y
@@ -58,6 +64,8 @@ CONFIG_NIMBLE_BLE_TRANSPORT_ISO_COUNT=0
 
 CONFIG_BT_HCI_UART=y
 CONFIG_BT_CONTROLLER_CC2564=y
+# No Bluetooth bring-up rows under Information: the port is tested.
+CONFIG_BT_CONTROLLER_DIAGNOSTICS=n
 
 # The CC2564B (Bluetooth 4.1) as the pebble-dev firmware found it works:
 # legacy pairing allowed, no MITM (LE Secure Connections only with MITM
@@ -85,3 +93,8 @@ CONFIG_ORIENTATION_MANAGER=y
 # as the stock firmware did: the kernel heap is too small to copy the larger
 # vector animations (the incoming call one is 13.6K).
 CONFIG_MMAP_RESOURCES=y
+
+# No PULSE serial console: its port is only on internal test pads, and its
+# buffers (9K of SRAM) are better spent on the kernel. Logs and coredumps
+# still come over Bluetooth, and the serial port keeps plain text logs.
+CONFIG_PULSE_EVERYWHERE=n
