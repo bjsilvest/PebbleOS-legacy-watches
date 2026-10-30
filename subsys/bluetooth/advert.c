@@ -224,6 +224,10 @@ static void prv_handle_disconnection_event(struct ble_gap_event *event) {
 // Phone apps keep the attributes they found at connect for the whole link,
 // so drop the link a little after Service Changed: the reconnect uses ours.
 #define SVC_CHANGED_RECONNECT_MS 1000
+// After an update the phone rediscovers every handle while the watch discovers
+// the phone's: give it time to finish, or a cut-short rediscovery leaves it
+// with a mix of the old layout and ours.
+#define SVC_CHANGED_UPDATE_RECONNECT_MS 10000
 
 static struct ble_npl_callout s_svc_changed_reconnect;
 static uint16_t s_svc_changed_conn = BLE_HS_CONN_HANDLE_NONE;
@@ -277,7 +281,7 @@ static void prv_svc_changed_after_update(uint16_t conn_handle,
   }
   s_svc_changed_conn = conn_handle;
   ble_npl_callout_reset(&s_svc_changed_reconnect,
-                        ble_npl_time_ms_to_ticks32(SVC_CHANGED_RECONNECT_MS));
+                        ble_npl_time_ms_to_ticks32(SVC_CHANGED_UPDATE_RECONNECT_MS));
 }
 #endif
 
