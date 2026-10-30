@@ -23,7 +23,7 @@ Disclaimer: These ports were made with an assistance of LLM coding tools. Initia
 
 | Watch | Codename | Latest build | Branch |
 |---|---|---|---|
-| Pebble, Pebble Steel | tintin | [v4.43.0-legacy-lite.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`tintin-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/tintin-v4.43.0) |
+| Pebble, Pebble Steel | tintin | [v4.43.0-legacy-lite.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`tintin-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/tintin-v4.43.0) |
 | Pebble Time, Pebble Time Steel | snowy | [v4.43.0-legacy.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`snowy-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/snowy-v4.43.0) |
 | Pebble Time Round | spalding | [v4.43.0-legacy.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`spalding-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/spalding-v4.43.0) |
 | Pebble 2 | silk | [v4.43.0-legacy.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`silk-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/silk-v4.43.0) |
