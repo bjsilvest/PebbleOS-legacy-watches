@@ -470,9 +470,12 @@ static void prv_handle_subscription_event(struct ble_gap_event *event) {
               event->subscribe.prev_notify, event->subscribe.cur_notify,
               event->subscribe.prev_indicate, event->subscribe.cur_indicate);
 #ifdef CONFIG_BT_CONTROLLER_CC2564
+  // These watches indicate Service Changed themselves, with a reconnect, after pairing and after
+  // an update. The Service Changed server would indicate again 10 s into every reconnect:
+  // mid-link, the Core app rediscovers but loses its PPoGATT session, and the stalled link is
+  // dropped and retried.
   prv_svc_changed_after_pairing(event);
-#endif
-
+#else
   const ble_uuid16_t svc_uuid = BLE_UUID16_INIT(PBL_BT_GATT_SERVICE_UUID);
   const ble_uuid16_t chr_uuid = BLE_UUID16_INIT(BLE_SVC_GATT_CHR_SERVICE_CHANGED_UUID16);
   uint16_t val_handle;
@@ -494,6 +497,7 @@ static void prv_handle_subscription_event(struct ble_gap_event *event) {
   };
   nimble_addr_to_pebble_addr(&desc.peer_id_addr, &subscribe_event.dev_address);
   pbl_bt_cb_gatt_service_changed_server_subscribe(&subscribe_event);
+#endif
 }
 
 static void prv_handle_notification_rx_event(struct ble_gap_event *event) {
