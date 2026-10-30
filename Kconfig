@@ -57,6 +57,13 @@ config LTO_WHOLE_PROGRAM
       points-to analysis (-flto-partition=one -fipa-pta): about 0.6 KB
       smaller on tintin, at the cost of a slower, single-threaded link.
 
+config MERGE_ALL_CONSTANTS
+    bool "Merge identical constants"
+    help
+      Let the compiler merge identical constant objects
+      (-fmerge-all-constants): about 0.25 KB smaller on tintin. Breaks
+      code that relies on distinct constants having distinct addresses.
+
 choice
     prompt "Optimization level"
     default SIZE_OPTIMIZATIONS

@@ -74,6 +74,10 @@ if(CONFIG_COMPILER_SAVE_TEMPS)
   list(APPEND pbl_arch_flags -save-temps=obj)
 endif()
 
+if(CONFIG_MERGE_ALL_CONSTANTS)
+  list(APPEND pbl_arch_flags -fmerge-all-constants)
+endif()
+
 if(CONFIG_LTO_WHOLE_PROGRAM)
   set(pbl_lto_partition -flto-partition=one -fipa-pta)
 else()
