@@ -16,19 +16,14 @@
 #include <pbl/util/misc.h>
 
 //! Duty cycles are integers in [0, 100].
-#define PWM_TIMER_UPDATE_PERIOD (100)
-// The DRV2603 operates in the [10, 250] kHz range.
-#define PWM_OUTPUT_FREQUENCY_HZ (22 * 1000)
-#define PWM_TIMER_FREQUENCY_HZ  (PWM_TIMER_UPDATE_PERIOD * PWM_OUTPUT_FREQUENCY_HZ)
-
-#define PWM_DUTY_CYCLE_FULL (PWM_TIMER_UPDATE_PERIOD)
+#define PWM_DUTY_CYCLE_FULL (100)
 
 static const struct pbl_vibe_pwm *prv_get(const struct pbl_vibe *vibe) {
   return container_of(vibe, const struct pbl_vibe_pwm, vibe);
 }
 
 static uint32_t prv_duty_cycle_off(const struct pbl_vibe_pwm *dev) {
-  return dev->hbridge ? PWM_TIMER_UPDATE_PERIOD / 2 : 0;
+  return dev->hbridge ? PWM_DUTY_CYCLE_FULL / 2 : 0;
 }
 
 static int prv_init(const struct pbl_vibe *vibe) {
@@ -42,9 +37,7 @@ static int prv_init(const struct pbl_vibe *vibe) {
     }
   }
 
-  pwm_init(&dev->pwm, PWM_TIMER_UPDATE_PERIOD, PWM_TIMER_FREQUENCY_HZ);
-
-  return 0;
+  return pbl_device_init(&dev->pwm.ctrl->dev);
 }
 
 static uint16_t prv_get_vsys_mv(void) {
@@ -77,8 +70,13 @@ static uint32_t prv_duty_cycle(const struct pbl_vibe_pwm *dev, int8_t strength) 
 }
 
 static void prv_raw_ctl(const struct pbl_vibe_pwm *dev, bool on, uint32_t duty_cycle) {
-  pwm_enable(&dev->pwm, on);
-  pwm_set_duty_cycle(&dev->pwm, on ? duty_cycle : prv_duty_cycle_off(dev));
+  struct pbl_pwm_state state;
+
+  pbl_pwm_init_state(&dev->pwm, &state);
+  (void)pbl_pwm_set_relative_duty_cycle(&state, on ? duty_cycle : prv_duty_cycle_off(dev),
+                                        PWM_DUTY_CYCLE_FULL);
+  state.enabled = on;
+  (void)pbl_pwm_apply(&dev->pwm, &state);
   if (pbl_gpio_is_connected(&dev->ctl)) {
     (void)pbl_gpio_set(&dev->ctl, on);
   }

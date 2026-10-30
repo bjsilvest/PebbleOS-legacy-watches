@@ -86,17 +86,11 @@ static bool s_present;
 #define BATTERY_NOMINAL_MV 3900
 
 static bool prv_read_register(uint8_t reg, uint8_t *result) {
-  pbl_i2c_use(AS3701B->i2c);
-  const int ret = pbl_i2c_read_register(AS3701B->i2c, reg, result);
-  pbl_i2c_release(AS3701B->i2c);
-  return ret == 0;
+  return pbl_i2c_reg_read_byte(AS3701B->i2c, reg, result) == 0;
 }
 
 static bool prv_write_register(uint8_t reg, uint8_t value) {
-  pbl_i2c_use(AS3701B->i2c);
-  const int ret = pbl_i2c_write_register(AS3701B->i2c, reg, value);
-  pbl_i2c_release(AS3701B->i2c);
-  return ret == 0;
+  return pbl_i2c_reg_write_byte(AS3701B->i2c, reg, value) == 0;
 }
 
 static bool prv_set_register_bit(uint8_t reg, uint8_t bit, bool enable) {

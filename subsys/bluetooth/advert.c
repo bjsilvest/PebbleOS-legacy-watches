@@ -19,16 +19,16 @@
 #include <pbl/util/math.h>
 
 #include <host/ble_gap.h>
+#include <host/ble_gatt.h>
 #ifdef CONFIG_BT_CONTROLLER_CC2564
 #include <comm/ble/gatt_service_changed.h>
-#include <host/ble_gatt.h>
 #include <host/ble_uuid.h>
 #include <nimble/nimble_port.h>
 #include <pbl/services/new_timer/new_timer.h>
-#include <services/gatt/ble_svc_gatt.h>
 #endif
 #include <kernel/pbl_malloc.h>
 #include <os/os_mbuf.h>
+#include <services/gatt/ble_svc_gatt.h>
 
 PBL_LOG_MODULE_DECLARE(bt, CONFIG_BT_LOG_LEVEL);
 
@@ -309,25 +309,24 @@ static void prv_handle_enc_change_event(struct ble_gap_event *event) {
 }
 
 static void prv_handle_conn_params_updated_event(struct ble_gap_event *event) {
-  if (event->conn_update.status != 0) {
-    PBL_LOG_ERR("Connection parameters update failed: 0x%04x", (uint16_t)event->conn_update.status);
-    return;
-  }
-
   struct ble_gap_conn_desc desc;
   if (ble_gap_conn_find(event->conn_update.conn_handle, &desc) != 0) {
     PBL_LOG_ERR("prv_handle_conn_params_updated_event: Failed to find connection descriptor");
     return;
   }
 
-  PBL_LOG_INFO(
-      "Connection parameters updated: "
-      "itvl=%u ms, latency=%u, spvn timeout=%u ms",
-      desc.conn_itvl * BLE_HCI_CONN_ITVL / 1000, desc.conn_latency,
-      desc.supervision_timeout * BLE_HCI_CONN_SPVN_TMO_UNITS);
+  if (event->conn_update.status != 0) {
+    PBL_LOG_ERR("Connection parameters update failed: 0x%04x", (uint16_t)event->conn_update.status);
+  } else {
+    PBL_LOG_INFO(
+        "Connection parameters updated: "
+        "itvl=%u ms, latency=%u, spvn timeout=%u ms",
+        desc.conn_itvl * BLE_HCI_CONN_ITVL / 1000, desc.conn_latency,
+        desc.supervision_timeout * BLE_HCI_CONN_SPVN_TMO_UNITS);
+  }
 
   struct pbl_bt_conn_update_complete_event conn_params_update_event = {
-    .status = PBL_BT_HCI_STATUS_SUCCESS,
+    .status = nimble_hs_status_to_hci(event->conn_update.status),
   };
   nimble_conn_params_to_pebble(&desc, &conn_params_update_event.conn_params);
   nimble_addr_to_pebble_addr(&desc.peer_id_addr, &conn_params_update_event.dev_address);
@@ -435,17 +434,13 @@ static void prv_handle_mtu_change_event(struct ble_gap_event *event) {
 extern int pebble_pairing_service_get_connectivity_send_notification(uint16_t conn_handle,
                                                                      uint16_t attr_handle);
 
-static void prv_handle_subscription_event(struct ble_gap_event *event) {
-  PBL_LOG_DBG("prv_handle_subscription_event: connhandle: %d attr:%d notify:%d/%d indicate:%d/%d",
-              event->subscribe.conn_handle, event->subscribe.attr_handle,
-              event->subscribe.prev_notify, event->subscribe.cur_notify,
-              event->subscribe.prev_indicate, event->subscribe.cur_indicate);
 #ifdef CONFIG_BT_CONTROLLER_CC2564
-  // A phone enables Service Changed right after pairing. It may still hold the
-  // attribute cache of another firmware (the stock recovery it paired with),
-  // so tell it every handle changed and it rediscovers ours. Only on an
-  // encrypted link: iOS subscribes before pairing, and the reconnect below
-  // would cut its pairing short.
+// A phone enables Service Changed right after pairing. It may still hold the
+// attribute cache of another firmware (the stock recovery it paired with),
+// so tell it every handle changed and it rediscovers ours. Only on an
+// encrypted link: iOS subscribes before pairing, and the reconnect below
+// would cut its pairing short.
+static void prv_svc_changed_after_pairing(const struct ble_gap_event *event) {
   struct ble_gap_conn_desc desc;
   if (event->subscribe.reason == BLE_GAP_SUBSCRIBE_REASON_WRITE &&
       event->subscribe.cur_indicate && !event->subscribe.prev_indicate &&
@@ -466,7 +461,39 @@ static void prv_handle_subscription_event(struct ble_gap_event *event) {
                             ble_npl_time_ms_to_ticks32(SVC_CHANGED_RECONNECT_MS));
     }
   }
+}
 #endif
+
+static void prv_handle_subscription_event(struct ble_gap_event *event) {
+  PBL_LOG_DBG("prv_handle_subscription_event: connhandle: %d attr:%d notify:%d/%d indicate:%d/%d",
+              event->subscribe.conn_handle, event->subscribe.attr_handle,
+              event->subscribe.prev_notify, event->subscribe.cur_notify,
+              event->subscribe.prev_indicate, event->subscribe.cur_indicate);
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+  prv_svc_changed_after_pairing(event);
+#endif
+
+  const ble_uuid16_t svc_uuid = BLE_UUID16_INIT(PBL_BT_GATT_SERVICE_UUID);
+  const ble_uuid16_t chr_uuid = BLE_UUID16_INIT(BLE_SVC_GATT_CHR_SERVICE_CHANGED_UUID16);
+  uint16_t val_handle;
+  if (ble_gatts_find_chr(&svc_uuid.u, &chr_uuid.u, nullptr, &val_handle) != 0 ||
+      event->subscribe.attr_handle != val_handle ||
+      event->subscribe.cur_indicate == event->subscribe.prev_indicate) {
+    return;
+  }
+
+  struct ble_gap_conn_desc desc;
+  if (ble_gap_conn_find(event->subscribe.conn_handle, &desc) != 0) {
+    PBL_LOG_ERR("prv_handle_subscription_event: Failed to find connection descriptor");
+    return;
+  }
+
+  struct pbl_bt_gatt_server_subscribe_event subscribe_event = {
+    .connection_id = event->subscribe.conn_handle,
+    .is_subscribing = event->subscribe.cur_indicate,
+  };
+  nimble_addr_to_pebble_addr(&desc.peer_id_addr, &subscribe_event.dev_address);
+  pbl_bt_cb_gatt_service_changed_server_subscribe(&subscribe_event);
 }
 
 static void prv_handle_notification_rx_event(struct ble_gap_event *event) {

@@ -12,19 +12,21 @@
 #include <stm32f4xx.h>
 
 enum pbl_i2c_stm32_xfer_state {
-  PBL_I2C_STM32_WRITE_ADDRESS_TX,
-  PBL_I2C_STM32_WRITE_REG_ADDRESS,
-  PBL_I2C_STM32_REPEAT_START,
-  PBL_I2C_STM32_WRITE_ADDRESS_RX,
-  PBL_I2C_STM32_WAIT_FOR_DATA,
-  PBL_I2C_STM32_READ_DATA,
+  PBL_I2C_STM32_START,
+  PBL_I2C_STM32_ADDRESS_TX,
+  PBL_I2C_STM32_ADDRESS_RX,
   PBL_I2C_STM32_WRITE_DATA,
   PBL_I2C_STM32_END_WRITE,
+  PBL_I2C_STM32_READ_DATA,
   PBL_I2C_STM32_COMPLETE,
 };
 
 struct pbl_i2c_stm32_state {
   enum pbl_i2c_stm32_xfer_state xfer_state;
+  struct pbl_i2c_msg *msgs;
+  uint8_t num_msgs;
+  uint8_t msg;
+  uint16_t addr;
   uint32_t idx;
   //! A transfer holds off STOP mode, which would stop the controller.
   bool stop_blocked;

@@ -80,17 +80,11 @@ enum {
 #define HR_MAX_PLAUSIBLE_BPM 240
 
 static bool prv_read(HRMDevice *dev, uint8_t reg, void *buf, uint32_t len) {
-  pbl_i2c_use(dev->i2c);
-  int ret = pbl_i2c_read_register_block(dev->i2c, reg, len, buf);
-  pbl_i2c_release(dev->i2c);
-  return ret == 0;
+  return pbl_i2c_burst_read(dev->i2c, reg, buf, len) == 0;
 }
 
 static bool prv_write(HRMDevice *dev, uint8_t reg, const void *buf, uint32_t len) {
-  pbl_i2c_use(dev->i2c);
-  int ret = pbl_i2c_write_register_block(dev->i2c, reg, len, buf);
-  pbl_i2c_release(dev->i2c);
-  return ret == 0;
+  return pbl_i2c_burst_write(dev->i2c, reg, buf, len) == 0;
 }
 
 static bool prv_write_u8(HRMDevice *dev, uint8_t reg, uint8_t value) {

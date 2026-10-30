@@ -27,8 +27,8 @@
 struct pbl_vibe_pwm {
   /** Vibration motor. */
   struct pbl_vibe vibe;
-  /** PWM output. */
-  PwmConfig pwm;
+  /** PWM output, with the period to run it at. */
+  struct pbl_pwm pwm;
   /** Optional enable output, active while the motor runs. */
   struct pbl_gpio ctl;
   /** Motor on an H-bridge: 50% duty cycle stops it, lower ones run it in reverse to brake. */

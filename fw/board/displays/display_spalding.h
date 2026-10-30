@@ -28,5 +28,3 @@
 // first and after the last row.
 #define DISPLAY_FRAMEBUFFER_BYTES 25944
 
-extern const void *const g_gbitmap_data_row_infos;
-extern const void *const g_gbitmap_legacy_3x_data_row_infos;

@@ -12,36 +12,6 @@
 
 #include <cmsis_core.h>
 
-// Compatibility type for gpio.h (QEMU has no real GPIO peripheral struct)
-typedef void GPIO_TypeDef;
-
-#define GPIO_Port_NULL nullptr
-#define GPIO_Pin_NULL  0U
-
-typedef enum {
-  GPIO_PuPd_NOPULL,
-  GPIO_PuPd_UP,
-  GPIO_PuPd_DOWN,
-} GPIOPuPd_TypeDef;
-
-typedef struct {
-  int pad;
-  int func;
-  int flags;
-} Pinmux;
-
-typedef struct {
-  uint16_t value;
-  uint16_t resolution;
-  int enabled;
-  uint16_t channel;
-} PwmState;
-
-typedef struct {
-  Pinmux pwm_pin;
-  PwmState *state;
-} PwmConfig;
-
 typedef struct {
   uint8_t backlight_on_percent;
   uint32_t ambient_light_dark_threshold;
@@ -52,21 +22,6 @@ typedef struct {
   uint32_t backlight_default_color;
 #endif
 } BoardConfig;
-
-typedef struct {
-  const char *name;
-  void *const port;
-  uint8_t pin;
-  GPIOPuPd_TypeDef pull;
-  bool active_high;
-  uint16_t code;
-} ButtonConfig;
-
-typedef struct {
-  ButtonConfig buttons[NUM_BUTTONS];
-  void *timer;
-  int timer_irqn;
-} BoardConfigButton;
 
 typedef struct {
   const uint8_t low_power_threshold;
@@ -97,23 +52,12 @@ typedef struct {
 #define QEMU_EXTFLASH_XIP_BASE 0x10000000
 
 // Forward-declare device types
-typedef const struct UARTDevice UARTDevice;
+struct pbl_uart;
 typedef const struct QSPIPort QSPIPort;
 typedef const struct QSPIFlash QSPIFlash;
 typedef const struct HRMDevice HRMDevice;
 typedef const struct MicDevice MicDevice;
 typedef const struct AudioDevice AudioDevice;
-
-// QEMU display device
-typedef struct QemuDisplayDevice {
-  uint32_t base_addr;
-  uint32_t fb_addr;
-  uint16_t width;
-  uint16_t height;
-  uint8_t bpp;
-  int irqn;
-} QemuDisplayDevice;
-typedef const QemuDisplayDevice DisplayDevice;
 
 extern AudioDevice *const AUDIO;
 

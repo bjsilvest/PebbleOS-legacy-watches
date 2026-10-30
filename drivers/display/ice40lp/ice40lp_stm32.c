@@ -18,25 +18,26 @@
 //! Nothing here asserts on a misbehaving FPGA: a crash loop before the
 //! firmware is marked stable ends in the stock bootloader starting PRF.
 
+#include <errno.h>
 #include <stdint.h>
 #include <string.h>
 
-#include <pbl/drivers/display/display.h>
+#include <pbl/drivers/display/ice40lp.h>
 #include <pbl/drivers/dma/stm32.h>
 #include <pbl/drivers/exti.h>
 #include <pbl/drivers/gpio/stm32.h>
-#include <pbl/drivers/rtc.h>
 #include <pbl/kernel/irq.h>
+#include <pbl/kernel/timer.h>
 #include <pbl/logging/logging.h>
 #include <pbl/soc/stm32/sleep.h>
 
 #include <board/board.h>
-#include <kernel/events.h>
 #include <kernel/pbl_malloc.h>
 #include <pbl/kernel/delay.h>
 #include <stm32f4xx.h>
 #include <uzlib.h>
 #if PBL_ROUND
+#include <applib/graphics/framebuffer.h>
 #include <mfg/mfg_info.h>
 #endif
 
@@ -71,14 +72,15 @@
 extern const uint8_t ice40lp_bitstream_start[];
 extern const uint8_t ice40lp_bitstream_end[];
 
-static volatile bool s_updating;
+static const struct pbl_display *s_disp;
 static bool s_programmed;
 //! Watch worn rotated by 180 degrees: frames go out flipped both ways.
 static bool s_rotated_180;
-static UpdateCompleteCallback s_uccb;
+static struct pbl_timer s_frame_timer;
 #if PBL_ROUND
-//! Factory measured offset of the panel, in pixels.
+//! Factory measured offset of the panel, in pixels, read at the first frame.
 static GPoint s_offset;
+static bool s_offset_read;
 #endif
 
 // DMA frame state. Line n is prepared in s_lines[n & 1].
@@ -87,7 +89,6 @@ static const uint8_t *s_fb;
 static volatile int s_sent;
 static volatile bool s_frame_active;
 static volatile bool s_waiting_busy;
-static RtcTicks s_frame_start;
 
 static void prv_busy_isr(void);
 
@@ -284,8 +285,13 @@ static void prv_send_black_frame(void) {
   pbl_gpio_set(scs, false);
 }
 
-void display_init(void) {
+static void prv_frame_timeout(struct pbl_timer *timer);
+
+static int prv_init(const struct pbl_display *disp) {
   const BoardConfigIce40Display *cfg = &BOARD_CONFIG_DISPLAY;
+
+  s_disp = disp;
+  pbl_timer_init(&s_frame_timer, prv_frame_timeout);
 
   prv_mco1_enable();
 
@@ -307,15 +313,12 @@ void display_init(void) {
   s_programmed = prv_program();
   prv_power_enable();
 
-#if PBL_ROUND
-  s_offset = mfg_info_get_disp_offsets();
-  PBL_LOG_INFO("MFG display offsets (%d,%d)", s_offset.x, s_offset.y);
-#endif
+  return 0;
 }
 
 #if PBL_ROUND
 static const GBitmapDataRowInfoInternal *prv_row_info(int y) {
-  return &((const GBitmapDataRowInfoInternal *)g_gbitmap_data_row_infos)[y];
+  return &g_gbitmap_legacy_3x_data_row_infos[y];
 }
 
 //! Pixel x of a circular framebuffer row; black outside the circle.
@@ -365,45 +368,6 @@ static void prv_get_line(const uint8_t *fb, int index, uint8_t *line) {
 #endif
 }
 
-static void prv_send_frame(const uint8_t *fb) {
-  const struct pbl_gpio *scs = &BOARD_CONFIG_DISPLAY.scs;
-
-  if (!prv_wait_not_busy()) {
-    // A new frame (SCS falling edge) resets the FPGA's frame logic.
-    PBL_LOG_WRN("Display busy before frame");
-  }
-
-  pbl_gpio_set(scs, true);
-  pbl_busy_wait_us(5);
-  const uint8_t cmd = CMD_FRAME_BEGIN;
-  prv_spi_write(&cmd, 1);
-
-  // Before the kernel runs, so no DMA frame uses the line buffers.
-  uint8_t *line = s_lines[0];
-  for (int i = 0; i < DISP_LINES; i++) {
-    prv_get_line(fb, i, line);
-    if (!prv_wait_not_busy()) {
-      PBL_LOG_WRN("Display stuck busy at line %d", i);
-      break;
-    }
-    prv_spi_write(line, DISP_PIXELS);
-  }
-
-  pbl_gpio_set(scs, false);
-}
-
-static void prv_terminate_transfer(void *data);
-
-static void prv_post_terminate(void) {
-  PebbleEvent e = {
-    .type = PEBBLE_CALLBACK_EVENT,
-    .callback = {
-      .callback = prv_terminate_transfer,
-    },
-  };
-  event_put_isr(&e);
-}
-
 //! With interrupts locked or from an interrupt.
 static void prv_end_frame(void) {
   const BoardConfigIce40Display *cfg = &BOARD_CONFIG_DISPLAY;
@@ -419,6 +383,7 @@ static void prv_end_frame(void) {
   pbl_gpio_set(&cfg->scs, false);
   s_frame_active = false;
   soc_stm32_stop_release();
+  pbl_timer_stop(&s_frame_timer);
 }
 
 static void prv_dma_done(void *context, bool is_complete);
@@ -450,7 +415,7 @@ static void prv_dma_done(void *context, bool is_complete) {
   }
   if (s_sent >= DISP_LINES) {
     prv_end_frame();
-    prv_post_terminate();
+    pbl_display_complete(s_disp, 0);
     return;
   }
   if (prv_busy()) {
@@ -486,98 +451,84 @@ static void prv_start_dma_frame(const uint8_t *fb) {
   prv_spi_write(&cmd, 1);
   SPI_I2S_DMACmd(cfg->spi, SPI_I2S_DMAReq_Tx, ENABLE);
 
-  s_frame_start = rtc_get_ticks();
+  pbl_timer_start(&s_frame_timer, PBL_MSEC(FRAME_TIMEOUT_MS));
   pbl_irq_lock();
   s_frame_active = true;
   prv_send_next_line();
   pbl_irq_unlock();
 }
 
-void display_clear(void) {
-  if (!s_programmed) {
-    return;
-  }
+//! Stuck (e.g. BUSY never fell): end the frame rather than hang the UI.
+static void prv_frame_timeout(struct pbl_timer *timer) {
+  bool ended = false;
 
-  // Let a frame in flight finish; its line buffers are in use.
-  for (int ms = 0; display_update_in_progress() && ms < (int)FRAME_TIMEOUT_MS; ms++) {
-    pbl_busy_wait_us(1000);
+  pbl_irq_lock();
+  if (s_frame_active) {
+    pbl_dma_stm32_stop(BOARD_CONFIG_DISPLAY.tx_dma);
+    prv_end_frame();
+    ended = true;
+  }
+  pbl_irq_unlock();
+
+  if (ended) {
+    PBL_LOG_WRN("Display frame timed out at line %d", s_sent);
+    pbl_display_complete(s_disp, -ETIMEDOUT);
+  }
+}
+
+static int prv_clear(const struct pbl_display *disp) {
+  if (!s_programmed) {
+    return 0;
   }
 
   // One black frame, as on the stock firmware; the PMIC cuts the rails later.
   prv_send_black_frame();
+
+  return 0;
 }
 
 //! The rails are left to the PMIC power-off, as on the stock firmware.
-void display_set_enabled(bool enabled) {
+static int prv_enable(const struct pbl_display *disp) {
+  return 0;
 }
 
-void display_set_rotated(bool rotated) {
+static int prv_disable(const struct pbl_display *disp) {
+  return 0;
+}
+
+static int prv_set_rotated(const struct pbl_display *disp, bool rotated) {
   s_rotated_180 = rotated;
+
+  return 0;
 }
 
-static void prv_terminate_transfer(void *data) {
-  if (!s_updating) {
-    return;
+static int prv_update(const struct pbl_display *disp, const struct pbl_display_buffer *buf,
+                      uint16_t y0, uint16_t y1) {
+  if (!s_programmed) {
+    pbl_display_complete(disp, 0);
+    return 0;
   }
-  s_updating = false;
-  s_uccb(true);
-}
 
-void display_update(NextRowCallback nrcb, UpdateCompleteCallback uccb) {
-  DisplayRow row;
-  const uint8_t *fb = nullptr;
-
-  // Rows are contiguous in the compositor's framebuffer; the panel takes
-  // whole frames, so only the first row is needed to find it.
-  while (nrcb(&row)) {
-    if (!fb) {
 #if PBL_ROUND
-      fb = row.data - prv_row_info(row.address)->offset;
+  if (!s_offset_read) {
+    s_offset = mfg_info_get_disp_offsets();
+    s_offset_read = true;
+    PBL_LOG_INFO("MFG display offsets (%d,%d)", s_offset.x, s_offset.y);
+  }
+  // Rows sit at their row info offsets; the panel takes whole frames.
+  prv_start_dma_frame(buf->data - prv_row_info(0)->offset);
 #else
-      fb = row.data - (uintptr_t)row.address * PBL_DISPLAY_WIDTH;
+  prv_start_dma_frame(buf->data);
 #endif
-    }
-  }
 
-  s_uccb = uccb;
-  s_updating = true;
-
-  if (fb && s_programmed) {
-    prv_start_dma_frame(fb);
-    return;
-  }
-
-  PebbleEvent e = {
-    .type = PEBBLE_CALLBACK_EVENT,
-    .callback = {
-      .callback = prv_terminate_transfer,
-    },
-  };
-  event_put(&e);
+  return 0;
 }
 
-bool display_update_in_progress(void) {
-  if (s_updating && s_frame_active &&
-      (rtc_get_ticks() - s_frame_start) > (FRAME_TIMEOUT_MS * RTC_TICKS_HZ) / 1000U) {
-    // Stuck (e.g. BUSY never fell): end the frame rather than hang the UI.
-    bool ended = false;
-    pbl_irq_lock();
-    if (s_frame_active) {
-      pbl_dma_stm32_stop(BOARD_CONFIG_DISPLAY.tx_dma);
-      prv_end_frame();
-      ended = true;
-    }
-    pbl_irq_unlock();
-    if (ended) {
-      PBL_LOG_WRN("Display frame timed out at line %d", s_sent);
-      prv_post_terminate();
-    }
-  }
-  return s_updating;
-}
-
-void display_update_boot_frame(uint8_t *framebuffer) {
-  if (s_programmed) {
-    prv_send_frame(framebuffer);
-  }
-}
+const struct pbl_display_ops pbl_display_ice40lp_ops = {
+  .init = prv_init,
+  .enable = prv_enable,
+  .disable = prv_disable,
+  .set_rotated = prv_set_rotated,
+  .update = prv_update,
+  .clear = prv_clear,
+};

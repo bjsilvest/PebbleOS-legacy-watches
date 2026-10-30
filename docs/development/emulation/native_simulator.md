@@ -74,8 +74,15 @@ A reset of the watch restarts the process.
 | Right, Enter, Space | Select |
 | Left, Backspace, Escape | Back |
 
+`L` toggles showing the colors as a watch's panel does in sunlight, as
+measured for the color picker's "Sunlight" palette, rather than the exact
+colors the firmware draws.
+
 The mouse drives the touchscreen: click and drag, or scroll with the wheel
 or two fingers on a trackpad, which drags a finger from the pointer.
+
+From a shell, {doc}`../../pbl/emulator` taps, swipes, captures the screen
+and feeds phone data over the Pebble protocol port, as with the emulator.
 
 ### Console
 
@@ -99,11 +106,13 @@ quits.
   of the terminal. Its output still goes to stdout.
 - `-p PORT`: serve the QEMU serial protocol on a TCP port, where a phone
   connects with libpebble2's QEMU transport (`pebble --qemu`).
+  {doc}`../../pbl/run` serves it on 12344.
 - `-b PORT|DEVICE`: with `CONFIG_BT_HCI_UART`, connect the Bluetooth HCI
   UART to an H4 controller: a TCP port on the local host (e.g. Bumble's
   `tcp-server` transport) or a serial device, such as an nRF52840 dongle
   running `hci_uart`, as described for the {doc}`emulator <emulator>`.
 - `-S FILE`: save the last frame to a BMP file on quitting.
+- `-l`: start with the colors as in sunlight.
 - `-i FILE`: install a `.pbw` app and launch it; repeat for more.
 
 (native-third-party-apps)=
@@ -117,7 +126,6 @@ the QEMU serial protocol as a phone would:
 
 ```shell
 pbl run -- -i app.pbw
-pbl run -- -p 12344
 pebble install --qemu localhost:12344 app.pbw
 ```
 
@@ -186,7 +194,8 @@ pbl run
 <http://localhost:8000/pebbleos.html> in a browser. The watch has the emulator's
 frame: click its buttons, or use the arrow keys (left is back, right is
 select); on touch platforms the mouse is a finger on the screen. The
-firmware log is a click away. The flash lives in memory, so the watch starts
+firmware log is a click away. The Sunlight button, `L` or `?sunlight` in the
+page's address show the colors as in sunlight. The flash lives in memory, so the watch starts
 afresh on every load, and there is no shell. The {doc}`/playground` embeds
 these builds in the documentation, one per board in `pbl_playground_boards`
 in `docs/conf.py`.

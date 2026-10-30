@@ -76,17 +76,11 @@ static bool s_present;
 #define BATTERY_NOMINAL_MV 3900
 
 static bool prv_read_register(uint8_t reg, uint8_t *result) {
-  pbl_i2c_use(MAX14690->i2c);
-  const int ret = pbl_i2c_read_register(MAX14690->i2c, reg, result);
-  pbl_i2c_release(MAX14690->i2c);
-  return ret == 0;
+  return pbl_i2c_reg_read_byte(MAX14690->i2c, reg, result) == 0;
 }
 
 static bool prv_write_register(uint8_t reg, uint8_t value) {
-  pbl_i2c_use(MAX14690->i2c);
-  const int ret = pbl_i2c_write_register(MAX14690->i2c, reg, value);
-  pbl_i2c_release(MAX14690->i2c);
-  return ret == 0;
+  return pbl_i2c_reg_write_byte(MAX14690->i2c, reg, value) == 0;
 }
 
 //! Stock charger settings (PBL-15134, PBL-19186).

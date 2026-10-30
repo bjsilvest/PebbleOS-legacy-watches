@@ -26,7 +26,7 @@
 #include <pbl/drivers/bluetooth/cc2564.h>
 #include <pbl/drivers/exti.h>
 #include <pbl/drivers/gpio/stm32.h>
-#include <pbl/drivers/uart.h>
+#include <pbl/drivers/uart/stm32.h>
 #include <pbl/kernel/sem.h>
 #include <pbl/kernel/thread.h>
 #include <pbl/logging/logging.h>

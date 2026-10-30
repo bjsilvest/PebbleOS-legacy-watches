@@ -4,12 +4,15 @@
 
 #include <pbl/drivers/ambient/stm32_adc.h>
 #include <pbl/drivers/backlight/pwm.h>
+#include <pbl/drivers/display/ice40lp.h>
 #include <pbl/drivers/dma/stm32.h>
 #include <pbl/drivers/i2c/stm32.h>
 #include <pbl/drivers/imu/bmi160/bmi160.h>
 #include <pbl/drivers/imu/mag3110/mag3110.h>
+#include <pbl/drivers/input/stm32_keys.h>
 #include <pbl/drivers/mic/stm32/i2s_pdm_definitions.h>
 #include <pbl/drivers/pmic/max14690.h>
+#include <pbl/drivers/pwm/stm32.h>
 #include <pbl/drivers/temperature/stm32.h>
 #include <pbl/drivers/uart/stm32.h>
 #include <pbl/drivers/vibe/pwm.h>
@@ -31,8 +34,9 @@ static UARTDevice DBG_UART_DEVICE = {
   .af = GPIO_AF_USART3,
   .irqn = PBL_IRQN(USART3),
 };
-UARTDevice *const DBG_UART = &DBG_UART_DEVICE;
-PBL_IRQ_CONNECT(USART3, 13, uart_irq_handler, DBG_UART, 0);
+PBL_IRQ_CONNECT(USART3, 13, uart_irq_handler, &DBG_UART_DEVICE, 0);
+PBL_UART_STM32_DEFINE(s_dbg_uart, "usart3", 115200, &DBG_UART_DEVICE);
+const struct pbl_uart *const DBG_UART = &s_dbg_uart.uart;
 
 #ifdef CONFIG_BT_HCI_UART
 // Bluetooth HCI
@@ -70,6 +74,9 @@ const struct pbl_dma_stm32_stream ICE40LP_TX_DMA = {
   .it_tc = DMA_IT_TCIF5,
   .irqn = PBL_IRQN(DMA2_Stream5),
 };
+
+PBL_DISPLAY_ICE40LP_DEFINE(s_display, "display", PBL_DISPLAY_WIDTH, PBL_DISPLAY_HEIGHT);
+const struct pbl_display *const DISPLAY = &s_display.disp;
 // Same priority as the EXTI handlers, so the DMA handler cannot preempt the
 // BUSY one.
 PBL_IRQ_CONNECT(DMA2_Stream5, 14, pbl_dma_stm32_irq_handler, &ICE40LP_TX_DMA, 0);
@@ -83,6 +90,19 @@ PBL_IRQ_CONNECT(I2C1_EV, 12, pbl_i2c_stm32_ev_irq_handler, &s_i2c1, 0);
 PBL_IRQ_CONNECT(I2C1_ER, 12, pbl_i2c_stm32_er_irq_handler, &s_i2c1, 0);
 
 static const struct pbl_i2c_dev I2C_SLAVE_MAX14690 = PBL_I2C_DEV(&s_i2c1.bus, 0x28);
+
+// Buttons: active low with pull-ups; Back has an external one
+///////////////////////////////////////////////////////////////////////////////
+
+PBL_STM32_KEYS_DEFINE(
+    BUTTONS, "buttons",
+    PBL_GPIO_KEYS_KEY("Back", PBL_GPIO(STM32_GPIOG, 4, PBL_GPIO_ACTIVE_LOW), PBL_INPUT_KEY_BACK, 40),
+    PBL_GPIO_KEYS_KEY("Up", PBL_GPIO(STM32_GPIOG, 3, PBL_GPIO_ACTIVE_LOW | PBL_GPIO_PULL_UP),
+                      PBL_INPUT_KEY_UP, 40),
+    PBL_GPIO_KEYS_KEY("Select", PBL_GPIO(STM32_GPIOG, 1, PBL_GPIO_ACTIVE_LOW | PBL_GPIO_PULL_UP),
+                      PBL_INPUT_KEY_SELECT, 40),
+    PBL_GPIO_KEYS_KEY("Down", PBL_GPIO(STM32_GPIOG, 2, PBL_GPIO_ACTIVE_LOW | PBL_GPIO_PULL_UP),
+                      PBL_INPUT_KEY_DOWN, 40));
 
 // Compass: MAG3110, data ready active high on PF14
 PBL_MAG3110_DEFINE(s_mag3110, &s_i2c1.bus, 0x0e, .int_gpio = PBL_GPIO(STM32_GPIOF, 14, 0),
@@ -105,31 +125,20 @@ const struct pbl_max14690 *const MAX14690 = &s_max14690;
 // Backlight: TIM12 CH1
 ///////////////////////////////////////////////////////////////////////////////
 
-PBL_BACKLIGHT_PWM_DEFINE(s_backlight,
-                         .pwm =
-                             {
-                               .output = PBL_GPIO(STM32_GPIOB, 14, 0),
-                               .timer = TIM12,
-                               .rcc = RCC_APB1Periph_TIM12,
-                               .af = GPIO_AF_TIM12,
-                               .channel = 1,
-                             },
+PBL_PWM_STM32_DEFINE(s_tim12, "tim12", TIM12, RCC_APB1Periph_TIM12, false, GPIO_AF_TIM12,
+                     PBL_GPIO(STM32_GPIOB, 14, 0));
+
+PBL_BACKLIGHT_PWM_DEFINE(s_backlight, .pwm = PBL_PWM(&s_tim12.ctrl, 0, PBL_PWM_HZ(256), 0),
                          .max_duty_cycle_percent = 100);
 const struct pbl_backlight *const BACKLIGHT = &s_backlight.backlight;
 
 // Vibe: H-bridge driven by TIM10 CH1, enabled by PF4
 ///////////////////////////////////////////////////////////////////////////////
 
-PBL_VIBE_PWM_DEFINE(s_vibe, true,
-                    .pwm =
-                        {
-                          .output = PBL_GPIO(STM32_GPIOB, 8, 0),
-                          .timer = TIM10,
-                          .rcc = RCC_APB2Periph_TIM10,
-                          .apb2 = true,
-                          .af = GPIO_AF_TIM10,
-                          .channel = 1,
-                        },
+PBL_PWM_STM32_DEFINE(s_tim10, "tim10", TIM10, RCC_APB2Periph_TIM10, true, GPIO_AF_TIM10,
+                     PBL_GPIO(STM32_GPIOB, 8, 0));
+
+PBL_VIBE_PWM_DEFINE(s_vibe, true, .pwm = PBL_PWM(&s_tim10.ctrl, 0, PBL_PWM_HZ(22000), 0),
                     .ctl = PBL_GPIO(STM32_GPIOF, 4, 0));
 const struct pbl_vibe *const VIBE = &s_vibe.vibe;
 
