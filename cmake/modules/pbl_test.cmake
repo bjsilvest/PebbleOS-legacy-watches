@@ -86,6 +86,10 @@ function(_pbl_test_platform_defines platform out_defines out_bitdepth)
   endif()
   string(TOUPPER ${platform} upper)
   set(defines CONFIG_PLATFORM_${upper}=1)
+  # Kconfig default: album art and pictures on these platforms.
+  if(bitdepth EQUAL 8)
+    list(APPEND defines CONFIG_SERVICE_IMAGING_PICTURES=1)
+  endif()
 
   # app_manager.c sizes app segments from these; the values are the ones
   # the old sdk_memory_limits.auto.h test override carried.
