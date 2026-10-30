@@ -80,4 +80,4 @@ Third-party components keep their own licenses, listed in
 used for voice replies is under a BSD 3-clause license, attached to each
 release as `LICENSE-Speex.txt`. The TI Bluetooth init script
 (`TIInit_6.7.16.bts`) is licensed by Texas Instruments for use only with
-TI devices; its license is attached to each release.
+TI devices.
