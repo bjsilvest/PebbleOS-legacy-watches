@@ -19,7 +19,7 @@ v4.43.0 to the **Pebble Time Round**. It uses Bluetooth Low Energy
 
 ## Download
 
-Latest build: v4.43.0-legacy.1, in the release [Legacy watches 4.43.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy)
+Latest build: v4.43.0-legacy.2, in the release [Legacy watches 4.43.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy)
 with the builds for the other watches.
 
 | Watch             | Board      | Status |
@@ -37,6 +37,10 @@ notes list what was tested and what changed.
   notifications, calls, voice replies, music control, app installs,
   firmware updates from the phone app, language packs, battery life and
   the dynamic backlight.
+- **After a factory reset,** pair the phone with the recovery firmware to
+  install (it shows no code). This firmware takes over that pairing, so
+  the phone reconnects without pairing again (tested with Android on
+  the Time Round).
 - **If you want to go back to the stock firmware,** do a factory reset
   first: pairings made with this firmware may not be removable otherwise.
 
