@@ -114,6 +114,11 @@ The Pebble 2 also needs an image for its Bluetooth chip, built from the
 Renesas (Dialog) DA1468x SDK, which you have to get yourself: the SDK cannot
 be shared here. The `silk-v4.43.0` branch's README explains how to build it.
 
+## Support
+
+This project is provided as-is, and may be updated over time. If you have
+questions, please [open an issue](https://github.com/bjsilvest/PebbleOS-legacy-watches/issues).
+
 ## Licensing
 
 PebbleOS and the modifications made for these ports are licensed under the Apache License 2.0 (`LICENSE`). PebbleOS is developed by Core Devices and builds upon source code released by Google. Third-party components retain their respective licenses, which are documented in `third_party/sbom.yml`. The TI Bluetooth initialization scripts are provided under a Texas Instruments license restricted to use with TI devices. A copy of that license is included with each release containing those scripts.
