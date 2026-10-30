@@ -69,6 +69,11 @@ This branch is one of several ports in this repository. The
 them all, with their latest releases. The earlier ports are on the
 `snowy-v4.42.0` (PebbleOS v4.42.0) and `snowy-port` (v4.41.2) branches.
 
+## Support
+
+This project is provided as-is, and may be updated over time. If you have
+questions, please [open an issue](https://github.com/bjsilvest/PebbleOS-legacy-watches/issues).
+
 ## Licenses
 
 PebbleOS and the changes in this port are under the Apache License 2.0
