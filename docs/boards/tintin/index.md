@@ -87,10 +87,10 @@ phone connected since -312 (notifications, watchface installs, reconnects).
 ## Pairing after installing from recovery
 
 The usual install goes through the stock recovery firmware: factory reset,
-pair the phone with recovery, install. Recovery's pairing cannot be carried
-over: its key is not derivable from what it stores in its shared storage
-(the EDIV matches, the key does not), so the phone's first encryption fails.
-Then:
+pair the phone with recovery, install. This applies after every factory
+reset, since a factory reset boots recovery. Recovery's pairing is not
+carried over on this watch (snowy and spalding import it, see below), so the
+phone's first encryption fails. Then:
 
 1. Open Settings, Bluetooth on the watch. While it is open, the watch accepts
    a pairing request from a phone it already has a bond with, deletes the old
@@ -112,6 +112,46 @@ Recovery advertises from a different (random) address than this firmware
 (the chip's public address), so Android may still list "Pebble-LE ####", the
 recovery's pairing, next to "Pebble ####". It can be forgotten. Snowy and
 spalding carry the same three changes.
+
+After an update that changes our attribute layout, the watch indicates
+Service Changed on the first encrypted link even without a subscription
+(`e405743be`), and reconnects 10 seconds later (`542a30106`) so the phone
+can finish rediscovering first.
+
+### Importing recovery's pairing (not done here)
+
+Snowy and spalding import recovery's pairing, so the phone reconnects
+without pairing again (tested on both, 2026-10-30). Tintin's recovery keeps
+the same stock (v2) shared storage, at `STOCK_SHARED_PRF_STORAGE`
+(0x100000), so the same code should work here, but it costs about 832 B
+(measured on ev2_4): over the limit by 203 B on ev2_4 and 331 B on v1_5, with
+21 B left on v2_0. To add it later, free that space, then:
+
+1. Turn on `SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK_V2` (`6c58a0187`, already
+   in this tree).
+2. Take the stock key derivation from the snowy or spalding branch
+   (`shared_prf_storage: regenerate stock pairing keys as stock does`,
+   e2f8f99f6 on snowy-v4.43.0) and the transport check (`nimble: hci_uart:
+   check an imported stock key by regenerating it`, 7859b5f2e).
+3. Test the full flow: factory reset, pair with recovery, install. The phone
+   should reconnect with no code.
+
+Stock recovery stores only the DIV and EDIV it gave the phone, not the key or
+the Rand. Pebble's stock Bluetooth driver (Bluetopia, through the CC2564's
+LE Encrypt command) swaps the roles of the legacy key generation in the
+specification: its DHK is the stored encryption root key, and its ER is
+d1(IR, 3, 0). Bluetopia's dm also keeps the top 16 bits of e(k, padding ||
+Rand), not the bottom ones. So EDIV = DIV ^ dm(DHK, Rand) and LTK = d1(ER,
+DIV, 0). This was checked against recovery pairings captured with Android's
+HCI snoop log: the stored DIV and the key recovery handed the phone come out
+exactly. The import stores that key with Rand 0. Our shared storage keeps no
+DIV, so when the phone asks for the key, the transport regenerates it from
+the phone's EDIV and Rand, compares it with the stored key, and stands in
+Rand 0 so NimBLE finds it.
+
+Recovery pairs with "Just Works" (no code), so an imported pairing has no
+protection against a man-in-the-middle during that pairing. Pairing again in
+this firmware uses a code.
 
 ## Temporary diagnostics
 
