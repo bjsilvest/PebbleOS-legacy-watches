@@ -194,24 +194,27 @@ any record, on every boot, so such watches stayed on 1.13.16 without harm.
 The loader returns to a valid application by itself about 12.7 s after it
 was entered, whether or not it is polled.
 
-`CONFIG_HRM_AS7000_FW_UPDATE` (on in the silk defconfig) fixes this. The
-sensor application is not redistributable, so builds never carry it: users
-extract it from a stock firmware they obtained themselves and send it to the
-watch as the `as7000fw` file:
+**This firmware never writes the sensor.** A sensor update was built and
+tested in a private development tree, but it is not part of this port: the
+ams application image is not redistributable, and a failed update can leave
+the sensor where only hardware can recover it. What that work found:
 
-    pbl-watch install-hrm-fw --phone <ip> Pebble-4.4.3-rbl-silk.pbz
-
-The command also takes a stock `system_resources.pbpack` or a raw image, and
-`--output FILE` saves the image instead of sending it. At boot, if the file
-exists and the sensor runs another version or has no application, the driver
-checks the image structure and flashes it, waiting up to 300 ms for the
-loader. The image's last segment is the valid application marker, so an
-interrupted update leaves the sensor in its loader and the next boot flashes
-again. Once the versions match, boot skips it. The file is kept, so a sensor
-reverted by the stock PRF (which may flash 1.13.16 back) is updated again;
-send another version's image to go back. "HRM update" in Information shows
-the outcome ("no image" without the file). Tested on hardware from a
-built-in image: 1.13.16 to 1.14.4.
+- Waiting up to 300 ms for the loader to answer is enough. With that, a
+  stock 1.14.4 image (from a stock firmware the owner obtained) flashed
+  cleanly on hardware, from 1.13.16 to 1.14.4. The image is a two-byte
+  application version followed by `{address, length - 1, data}` segments,
+  sent to the loader as Intel HEX records; the last segment is the valid
+  application marker, so an interrupted update leaves the sensor in its
+  loader and a retry can finish it.
+- The stock recovery firmware may flash 1.13.16 back.
+- A sensor whose application hangs before it answers I2C ignores the
+  enable line, so the driver cannot reset it into the loader. Releasing
+  the enable line keeps the loader in force-loader mode, but only at a cold
+  power-up of the sensor, which on the Pebble 2 means unplugging and
+  replugging its flex cable (the sensor has no software-switchable supply).
+  That is how a test sensor hung by experimental firmware was brought back.
+- 1.13.16 and 1.14.4 both report heart rate with this driver; nothing here
+  needs 1.14.4.
 
 **HRV is not available to apps.** The sensor also runs its undocumented PRV
 (pulse rate variability) application next to HRM when asked

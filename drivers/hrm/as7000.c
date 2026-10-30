@@ -2,7 +2,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 //! ams AS7000 heart rate sensor on the Pebble 2 HR. Runs the HRM application already in the
-//! sensor's flash. With CONFIG_HRM_AS7000_FW_UPDATE, it is reflashed from a user-supplied image.
+//! sensor's flash and never writes it.
 
 #include <string.h>
 
@@ -20,9 +20,6 @@
 #include <applib/app_logging.h>
 #include <board/board.h>
 #include <mfg/mfg_info.h>
-#ifdef CONFIG_HRM_AS7000_FW_UPDATE
-#include <pbl/services/filesystem/pfs.h>
-#endif
 
 PBL_LOG_MODULE_DEFINE(driver_hrm_as7000, CONFIG_DRIVER_HRM_LOG_LEVEL);
 
@@ -551,226 +548,6 @@ static bool prv_wait_app(HRMDevice *dev, uint32_t max_ms, AS7000InfoRecord *info
   return false;
 }
 
-#ifdef CONFIG_HRM_AS7000_FW_UPDATE
-// The sensor stops answering for 36 to 75 ms while it switches to the loader. Stock firmware read
-// once after 35 ms, so its updates never started on such sensors.
-#define LOADER_SWITCH_MAX_MS 300
-#define LOADER_READY_MAX_MS  500
-#define LOADER_STATUS_BUSY1  0x3a
-#define LOADER_STATUS_BUSY2  0xff
-// Data bytes per record; the loader takes records of up to 256 characters
-#define HEX_DATA_MAX      96
-#define HEX_RECORD_LEN(n) ((n) * 2 + 11)
-#define HEX_TYPE_DATA     0x00
-#define HEX_TYPE_EOF      0x01
-
-// Image file, sent by the user (pbl-watch install-hrm-fw). Not redistributable, so never built in.
-#define FW_IMAGE_FILE     "as7000fw"
-#define FW_APP_SPACE      0x8000
-#define FW_MARKER_ADDRESS 0x7ffc
-#define FW_MARKER_LEN     4
-
-// The image starts with the application version (two bytes, as in the information registers),
-// followed by segments of {address, length - 1, data}
-typedef struct PBL_PACKED {
-  uint16_t address;
-  uint16_t len_minus_1;
-} AS7000FwSegment;
-
-static AS7000FwUpdate s_fw_update;
-
-static char *prv_hex_put(char *out, uint32_t value, int num_bytes) {
-  static const char digits[] = "0123456789ABCDEF";
-  for (int i = num_bytes * 2 - 1; i >= 0; i--) {
-    *out++ = digits[(value >> (4 * i)) & 0xf];
-  }
-  return out;
-}
-
-// Intel HEX record, without a terminator
-static size_t prv_hex_record(char *out, uint8_t type, uint16_t address, const uint8_t *data,
-                             uint8_t len) {
-  uint8_t sum = len + (address >> 8) + (address & 0xff) + type;
-  char *pos = out;
-  *pos++ = ':';
-  pos = prv_hex_put(pos, len, 1);
-  pos = prv_hex_put(pos, address, 2);
-  pos = prv_hex_put(pos, type, 1);
-  for (uint8_t i = 0; i < len; i++) {
-    sum += data[i];
-    pos = prv_hex_put(pos, data[i], 1);
-  }
-  pos = prv_hex_put(pos, (uint8_t)(~sum + 1), 1);
-  return pos - out;
-}
-
-static bool prv_loader_ready(HRMDevice *dev) {
-  for (int i = 0; i < LOADER_READY_MAX_MS; i++) {
-    uint8_t status;
-    if (prv_read(dev, ADDR_LOADER_STATUS, &status, 1)) {
-      if (status == AS7000_LOADER_STATUS_READY) {
-        return true;
-      } else if (status != LOADER_STATUS_BUSY1 && status != LOADER_STATUS_BUSY2) {
-        s_fw_update.status = status;
-        return false;
-      }
-    }
-    pbl_sleep_ms(1);
-  }
-  return false;
-}
-
-static bool prv_enter_loader(HRMDevice *dev) {
-  uint8_t apps;
-  if (prv_read(dev, ADDR_APP_IDS, &apps, 1) && (apps & AS7000AppId_Loader)) {
-    return true;
-  }
-  if (!prv_write_u8(dev, ADDR_APP_IDS, AS7000AppId_Loader)) {
-    return false;
-  }
-  for (int i = 0; i < LOADER_SWITCH_MAX_MS; i++) {
-    if (prv_read(dev, ADDR_APP_IDS, &apps, 1) && (apps & AS7000AppId_Loader)) {
-      return true;
-    }
-    pbl_sleep_ms(1);
-  }
-  return false;
-}
-
-// Send the image record by record. The valid application marker is its last segment, so an
-// interrupted update leaves the sensor in its loader, to be flashed again at the next boot.
-static bool prv_image_read(int fd, uint32_t offset, void *buf, size_t len) {
-  return pfs_seek(fd, offset, FSeekSet) >= 0 && pfs_read(fd, buf, len) == (int)len;
-}
-
-// Segments must fill the image exactly, stay in the application space and end with the marker
-static bool prv_image_valid(int fd, uint32_t image_len) {
-  uint32_t cursor = 2;
-  AS7000FwSegment segment = {};
-  while (cursor < image_len) {
-    if (!prv_image_read(fd, cursor, &segment, sizeof(segment))) {
-      return false;
-    }
-    const uint32_t len = segment.len_minus_1 + 1;
-    if (segment.address + len > FW_APP_SPACE) {
-      return false;
-    }
-    cursor += sizeof(segment) + len;
-  }
-  return cursor == image_len && segment.address == FW_MARKER_ADDRESS &&
-         segment.len_minus_1 + 1 == FW_MARKER_LEN;
-}
-
-static AS7000FwUpdateResult prv_flash(HRMDevice *dev, int fd, uint32_t image_len) {
-  if (!prv_enter_loader(dev)) {
-    return AS7000FwUpdateResult_NoLoader;
-  }
-  if (!prv_loader_ready(dev)) {
-    return AS7000FwUpdateResult_NotReady;
-  }
-
-  char record[HEX_RECORD_LEN(HEX_DATA_MAX)];
-  uint32_t cursor = 2;
-  while (cursor + sizeof(AS7000FwSegment) < image_len) {
-    AS7000FwSegment segment;
-    if (!prv_image_read(fd, cursor, &segment, sizeof(segment))) {
-      return AS7000FwUpdateResult_BadImage;
-    }
-    cursor += sizeof(segment);
-    uint16_t address = segment.address;
-    uint32_t remaining = segment.len_minus_1 + 1;
-    while (remaining > 0) {
-      uint8_t chunk[HEX_DATA_MAX];
-      const uint8_t len = MIN(remaining, HEX_DATA_MAX);
-      if (!prv_image_read(fd, cursor, chunk, len)) {
-        return AS7000FwUpdateResult_BadImage;
-      }
-      const size_t record_len = prv_hex_record(record, HEX_TYPE_DATA, address, chunk, len);
-      if (!prv_write(dev, ADDR_LOADER_STATUS, record, record_len)) {
-        return AS7000FwUpdateResult_WriteFailed;
-      }
-      if (!prv_loader_ready(dev)) {
-        return AS7000FwUpdateResult_NotReady;
-      }
-      s_fw_update.records++;
-      watchdog_feed();
-      cursor += len;
-      address += len;
-      remaining -= len;
-    }
-  }
-
-  const size_t eof_len = prv_hex_record(record, HEX_TYPE_EOF, 0, nullptr, 0);
-  if (!prv_write(dev, ADDR_LOADER_STATUS, record, eof_len)) {
-    return AS7000FwUpdateResult_WriteFailed;
-  }
-  return AS7000FwUpdateResult_Flashed;
-}
-
-// At init, with the enable line high. Flashes the image file when the sensor runs another
-// version or has no application, then waits for the new application. The file is kept, so a
-// sensor reverted by the stock PRF is updated again.
-static void prv_fw_update_from_file(HRMDevice *dev, AS7000InfoRecord *info, int fd) {
-  AS7000FwUpdate *u = &s_fw_update;
-  const uint32_t image_len = pfs_get_file_size(fd);
-  uint8_t version[2];
-
-  if (image_len <= 2 + sizeof(AS7000FwSegment) ||
-      !prv_image_read(fd, 0, version, sizeof(version))) {
-    u->result = AS7000FwUpdateResult_BadImage;
-    return;
-  }
-  u->image_major = version[0];
-  u->image_minor = version[1];
-  u->from = *info;
-
-  const bool has_app = info->application_id != AS7000AppId_Loader &&
-                       info->protocol_version_major == EXPECTED_PROTOCOL_VERSION_MAJOR;
-  if (has_app && info->sw_version_major == version[0] && info->sw_version_minor == version[1]) {
-    u->result = AS7000FwUpdateResult_Current;
-    return;
-  }
-  if (!prv_image_valid(fd, image_len)) {
-    PBL_LOG_ERR("AS7000 image file is malformed");
-    u->result = AS7000FwUpdateResult_BadImage;
-    return;
-  }
-
-  PBL_LOG_WRN("AS7000 flashing %u.%u.%u over %u.%u.%u app 0x%x", version[0] >> 6, version[0] & 0x3f,
-              version[1], info->sw_version_major >> 6, info->sw_version_major & 0x3f,
-              info->sw_version_minor, info->application_id);
-  u->result = prv_flash(dev, fd, image_len);
-
-  // The loader starts the new application, or returns to the old one after its timeout. The
-  // enable line must stay high until then.
-  const bool back = prv_wait_app(dev, LOADER_TIMEOUT_MS, info);
-  if (u->result == AS7000FwUpdateResult_Flashed) {
-    u->result =
-        (back && info->sw_version_major == version[0] && info->sw_version_minor == version[1])
-            ? AS7000FwUpdateResult_Updated
-            : AS7000FwUpdateResult_NotRunning;
-  }
-  PBL_LOG_WRN("AS7000 update result %u after %u records (status 0x%x), now %u.%u.%u app 0x%x",
-              u->result, u->records, u->status, info->sw_version_major >> 6,
-              info->sw_version_major & 0x3f, info->sw_version_minor, info->application_id);
-}
-
-static void prv_fw_update(HRMDevice *dev, AS7000InfoRecord *info) {
-  const int fd = pfs_open(FW_IMAGE_FILE, OP_FLAG_READ, FILE_TYPE_STATIC, 0);
-  if (fd < 0) {
-    s_fw_update.result = AS7000FwUpdateResult_NoImage;
-    return;
-  }
-  prv_fw_update_from_file(dev, info, fd);
-  pfs_close(fd);
-}
-
-void as7000_get_fw_update(HRMDevice *dev, AS7000FwUpdate *update) {
-  (void)dev;
-  *update = s_fw_update;
-}
-#endif
-
 void hrm_init(HRMDevice *dev) {
   HRMDeviceState *state = dev->state;
   AS7000InfoRecord info;
@@ -793,11 +570,6 @@ void hrm_init(HRMDevice *dev) {
     PBL_LOG_WRN("AS7000 in its loader, waiting for the application");
     prv_wait_app(dev, LOADER_TIMEOUT_MS, &info);
   }
-#ifdef CONFIG_HRM_AS7000_FW_UPDATE
-  if (found) {
-    prv_fw_update(dev, &info);
-  }
-#endif
   pbl_gpio_set(&dev->enable, false);
   state->power_off_ticks = rtc_get_ticks();
 

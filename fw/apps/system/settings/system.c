@@ -87,9 +87,6 @@ enum {
 #ifdef CONFIG_HRM_AS7000
   SystemInformationItemHrm,
 #endif
-#ifdef CONFIG_HRM_AS7000_FW_UPDATE
-  SystemInformationItemHrmUpdate,
-#endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   SystemInformationItemHrmPrv,
   SystemInformationItemHrmChanged,
@@ -184,9 +181,6 @@ typedef struct SystemInformationData {
 #endif
 #ifdef CONFIG_HRM_AS7000
   char hrm_string[32];
-#endif
-#ifdef CONFIG_HRM_AS7000_FW_UPDATE
-  char hrm_update_string[40];
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   char hrm_prv_string[64];
@@ -291,9 +285,6 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
 #endif
 #ifdef CONFIG_HRM_AS7000
   [SystemInformationItemHrm] = i18n_noop("HRM sensor"),
-#endif
-#ifdef CONFIG_HRM_AS7000_FW_UPDATE
-  [SystemInformationItemHrmUpdate] = i18n_noop("HRM update"),
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   [SystemInformationItemHrmPrv] = i18n_noop("HRM PRV"),
@@ -516,26 +507,6 @@ static void prv_information_window_push(SettingsSystemData *data) {
     strncpy(info->hrm_string, "none", sizeof(info->hrm_string) - 1);
   }
   info->subtitle_text[SystemInformationItemHrm] = info->hrm_string;
-#endif
-#ifdef CONFIG_HRM_AS7000_FW_UPDATE
-  // <result> <image version> from <version before> r<records>
-  static const char *const s_update_results[] = {
-    "none",         "current",   "UPDATED", "no loader",   "not ready",
-    "write failed", "bad image", "flashed", "not running", "no image",
-  };
-  AS7000FwUpdate update;
-  as7000_get_fw_update(HRM, &update);
-  if (update.result == AS7000FwUpdateResult_NoImage) {
-    strncpy(info->hrm_update_string, s_update_results[update.result],
-            sizeof(info->hrm_update_string) - 1);
-  } else {
-    sniprintf(info->hrm_update_string, sizeof(info->hrm_update_string),
-              "%s %u.%u.%u<%u.%u.%u r%u", s_update_results[update.result],
-              update.image_major >> 6, update.image_major & 0x3f, update.image_minor,
-              update.from.sw_version_major >> 6, update.from.sw_version_major & 0x3f,
-              update.from.sw_version_minor, update.records);
-  }
-  info->subtitle_text[SystemInformationItemHrmUpdate] = info->hrm_update_string;
 #endif
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
   AS7000Probe probe = {};

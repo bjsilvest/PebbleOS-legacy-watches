@@ -8,7 +8,6 @@ from .commands import (
     coredump,
     flash_logs,
     install_firmware,
-    install_hrm_fw,
     install_lang,
     test,
 )
@@ -54,7 +53,6 @@ __all__ = [
     "coredump",
     "flash_logs",
     "install_firmware",
-    "install_hrm_fw",
     "install_lang",
     "test",
 ]

@@ -20,8 +20,8 @@
  * @ingroup drivers_hrm
  * @brief @ref drivers_hrm implementation for the ams AS7000 (Pebble 2 HR).
  *
- * Runs the HRM application already in the sensor's flash; only personal builds with
- * CONFIG_HRM_AS7000_FW_UPDATE write the sensor firmware. The sensor reports heart rate only.
+ * Runs the HRM application already in the sensor's flash and never writes it. The sensor
+ * reports heart rate only.
  * Whether it is fitted is probed at init.
  * @{
  */
@@ -142,53 +142,6 @@ typedef struct {
  * @return True if the sensor is present.
  */
 bool as7000_get_probe(HRMDevice *dev, AS7000Probe *probe);
-#endif
-
-#ifdef CONFIG_HRM_AS7000_FW_UPDATE
-/** @brief Outcome of the sensor firmware update at init. */
-typedef enum {
-  AS7000FwUpdateResult_None,
-  /** The sensor already runs the image's version. */
-  AS7000FwUpdateResult_Current,
-  /** Flashed, and the new version runs. */
-  AS7000FwUpdateResult_Updated,
-  /** The sensor never switched to its loader. Nothing was written. */
-  AS7000FwUpdateResult_NoLoader,
-  /** The loader did not report ready, or reported an error. */
-  AS7000FwUpdateResult_NotReady,
-  /** A record could not be written. */
-  AS7000FwUpdateResult_WriteFailed,
-  /** The image file is malformed, or could not be read. */
-  AS7000FwUpdateResult_BadImage,
-  /** All records were sent; still waiting to verify. */
-  AS7000FwUpdateResult_Flashed,
-  /** All records were sent, but the new version did not start. */
-  AS7000FwUpdateResult_NotRunning,
-  /** No image file on the watch. Nothing was done. */
-  AS7000FwUpdateResult_NoImage,
-} AS7000FwUpdateResult;
-
-/** @brief Sensor firmware update record. */
-typedef struct {
-  AS7000FwUpdateResult result;
-  /** Version of the image file. */
-  uint8_t image_major;
-  uint8_t image_minor;
-  /** Sensor information before the update. */
-  AS7000InfoRecord from;
-  /** Records the loader accepted. */
-  uint16_t records;
-  /** Unexpected loader status, if any. */
-  uint8_t status;
-} AS7000FwUpdate;
-
-/**
- * @brief Get the sensor firmware update record.
- *
- * @param dev HRM device.
- * @param[out] update Record.
- */
-void as7000_get_fw_update(HRMDevice *dev, AS7000FwUpdate *update);
 #endif
 
 /**
