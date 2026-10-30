@@ -26,7 +26,7 @@ Disclaimer: These ports were made with an assistance of LLM coding tools. Initia
 | Pebble, Pebble Steel | tintin | [v4.43.0-legacy-lite.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`tintin-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/tintin-v4.43.0) |
 | Pebble Time, Pebble Time Steel | snowy | [v4.43.0-legacy.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`snowy-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/snowy-v4.43.0) |
 | Pebble Time Round | spalding | [v4.43.0-legacy.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`spalding-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/spalding-v4.43.0) |
-| Pebble 2 | silk | [v4.43.0-legacy.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`silk-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/silk-v4.43.0) |
+| Pebble 2 (HR and SE) | silk | [v4.43.0-legacy.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`silk-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/silk-v4.43.0) |
 
 All watches share one release per PebbleOS version. Download the
 `.pbz` that matches your watch from the latest release,
@@ -41,6 +41,9 @@ watch, which hardware revisions have been tested and what changed.
   tested; the later Pebble (v1_5) and Pebble Steel (v2_0) builds have not.
 - **Pebble Time Steel** has not been tested. It uses the Pebble Time's
   light-sensor calibration.
+- **Pebble 2** has one build for the HR and the SE. Only the Pebble 2 HR
+  has been tested; the SE has not. Heart rate uses the application already
+  in the sensor, and this firmware never updates the sensor.
 - **Pairings from stock firmware are not carried over.** Pair your phone
   again after installing.
 - **If you want to return to the -rbl firmware, it is recommended you do a factory reset first** You may not be able to delete paired Bluetooth devices made from the newer firmware.
@@ -110,6 +113,10 @@ the `.pbz` as in step 3.
 
 Follow Core's [getting started guide](https://developer.repebble.com/pebbleos/docs/getting_started/)
 on the branch for your watch.
+
+The Pebble 2 also needs an image for its Bluetooth chip, built from the
+Renesas (Dialog) DA1468x SDK, which you have to get yourself: the SDK cannot
+be shared here. The `silk-v4.43.0` branch's README explains how to build it.
 
 ## Licenses
 
