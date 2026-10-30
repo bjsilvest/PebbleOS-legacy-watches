@@ -439,8 +439,8 @@ static void prv_import_stock_v2(void) {
   uint8_t er[16];
   if (ble->is_local_encryption_info_valid && pbl_bt_le_d1(stock_ir->data, 3, 0, er) &&
       pbl_bt_le_d1(er, ble->local_div, 0, info.local_encryption_info.ltk.data)) {
+    // The shared storage keeps no DIV: the transport regenerates the key instead.
     info.local_encryption_info.ediv = ble->local_ediv;
-    info.local_encryption_info.div = ble->local_div;
     info.local_encryption_info.rand = 0;
     info.is_local_encryption_info_valid = true;
   }

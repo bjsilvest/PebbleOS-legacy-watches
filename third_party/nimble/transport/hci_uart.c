@@ -461,10 +461,11 @@ static volatile uint32_t s_legacy_ltk_mismatch;
 
 //! A bond imported from the stock firmware has its LTK regenerated but not
 //! the Rand the phone holds (stock never stored it), so it is stored with
-//! Rand 0. When the phone asks for that key, check its EDIV is the stock
-//! one, DIV ^ dm(DHK, Rand) with stock's DHK (the encryption root key) and
-//! dm, and stand in Rand 0 so NimBLE finds the key. Otherwise leave the
-//! request alone: NimBLE declines and the phone pairs again.
+//! Rand 0. When the phone asks for that key, regenerate it from the phone's
+//! EDIV and Rand as stock does (DIV = EDIV ^ dm(DHK, Rand), LTK =
+//! d1(ER, DIV, 0), with stock's DHK, ER and dm) and, if it is the stored
+//! one, stand in Rand 0 so NimBLE finds it. Otherwise leave the request
+//! alone: NimBLE declines and the phone pairs again.
 static void prv_ltk_req_imported_bond(struct ble_hci_ev *ev) {
   if (ev->opcode != BLE_HCI_EVCODE_LE_META || ev->length != LE_LTK_REQ_LEN ||
       ev->data[0] != BLE_HCI_LE_SUBEV_LT_KEY_REQ) {
@@ -481,18 +482,23 @@ static void prv_ltk_req_imported_bond(struct ble_hci_ev *ev) {
 
   struct pbl_bt_sm_pairing_info info;
   struct pbl_bt_sm_key dhk;
+  struct pbl_bt_sm_key ir;
   if (!shared_prf_storage_get_ble_pairing_data(&info, nullptr, nullptr, nullptr) ||
       !info.is_local_encryption_info_valid || info.local_encryption_info.rand != 0U ||
       info.local_encryption_info.ediv != ediv ||
-      !shared_prf_storage_get_root_key(PBL_BT_SM_ROOT_KEY_TYPE_ENCRYPTION, &dhk)) {
+      !shared_prf_storage_get_root_key(PBL_BT_SM_ROOT_KEY_TYPE_ENCRYPTION, &dhk) ||
+      !shared_prf_storage_get_root_key(PBL_BT_SM_ROOT_KEY_TYPE_IDENTITY, &ir)) {
     return;
   }
 
   uint16_t y;
-  if (!pbl_bt_le_dm_stock(dhk.data, rand, &y)) {
+  uint8_t er[16];
+  uint8_t ltk[16];
+  if (!pbl_bt_le_dm_stock(dhk.data, rand, &y) || !pbl_bt_le_d1(ir.data, 3U, 0U, er) ||
+      !pbl_bt_le_d1(er, (uint16_t)(ediv ^ y), 0U, ltk)) {
     return;
   }
-  if ((uint16_t)(ediv ^ y) != info.local_encryption_info.div) {
+  if (memcmp(ltk, info.local_encryption_info.ltk.data, sizeof(ltk)) != 0) {
     s_legacy_ltk_mismatch++;
     return;
   }
