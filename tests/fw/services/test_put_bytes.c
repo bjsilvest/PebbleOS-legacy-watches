@@ -22,6 +22,7 @@
 #include <fake_session.h>
 #include <fake_spi_flash.h>
 #include <fake_system_task.h>
+#include <kernel/kernel_heap.h>
 #include <system/bootbits.h>
 #include <system/firmware_storage.h>
 
@@ -54,6 +55,10 @@ bool firmware_update_is_in_progress(void) {
 }
 
 void pbl_sleep_ms(uint32_t ms) {
+}
+
+Heap *kernel_heap_get(void) {
+  return NULL;
 }
 
 void app_storage_get_file_name(char *name, size_t buf_length, AppInstallId app_id,

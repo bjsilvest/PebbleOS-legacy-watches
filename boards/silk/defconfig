@@ -22,6 +22,7 @@ CONFIG_RTC=y
 CONFIG_UART=y
 
 CONFIG_EXTI=y
+CONFIG_INPUT_STM32_KEYS=y
 
 CONFIG_DISPLAY=y
 
@@ -54,12 +55,28 @@ CONFIG_ACCEL_BMA255=y
 
 CONFIG_AMBIENT_LIGHT=y
 CONFIG_AMBIENT_LIGHT_STM32_ADC=y
+CONFIG_AMBIENT_LIGHT_THRESHOLD_LOCAL=y
+# Backlight brightness follows the light sensor (Settings > Display), with the
+# sensor's calibration table in board_silk.c.
+CONFIG_AMBIENT_LIGHT_LUX_TABLE=y
+CONFIG_DYNAMIC_BACKLIGHT=y
 
 CONFIG_HRM=y
 CONFIG_HRM_AS7000=y
-# Diagnostic: probe the sensor's PRV application
-CONFIG_HRM_AS7000_PRV_PROBE=y
+# HRV while an app asks (Pebble 2 apps need an updated SDK to ask)
+CONFIG_HRM_AS7000_HRV=y
 
 # Settings: motion sensitivity and left-handed (rotated) wear
 CONFIG_ACCEL_SENSITIVITY=y
 CONFIG_ORIENTATION_MANAGER=y
+
+# GAP Peripheral Preferred Connection Parameters, as the stock firmware has:
+# Service Changed then sits at the stock handle, which phones that cached the
+# stock layout honor. Values match our low-power connection parameters.
+CONFIG_NIMBLE_BLE_SVC_GAP_PPCP_MIN_CONN_INTERVAL=24
+CONFIG_NIMBLE_BLE_SVC_GAP_PPCP_MAX_CONN_INTERVAL=36
+CONFIG_NIMBLE_BLE_SVC_GAP_PPCP_SLAVE_LATENCY=30
+CONFIG_NIMBLE_BLE_SVC_GAP_PPCP_SUPERVISION_TMO=600
+
+# No Bluetooth bring-up rows under Information: the port is tested.
+CONFIG_BT_CONTROLLER_DIAGNOSTICS=n

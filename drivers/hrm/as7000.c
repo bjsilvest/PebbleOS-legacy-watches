@@ -2,13 +2,15 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 //! ams AS7000 heart rate sensor on the Pebble 2 HR. Runs the HRM application already in the
-//! sensor's flash: the loader is never entered and nothing is ever written to the sensor flash.
+//! sensor's flash and never writes it.
 
 #include <string.h>
 
 #include <pbl/drivers/gpio/stm32.h>
 #include <pbl/drivers/hrm.h>
 #include <pbl/drivers/hrm/as7000.h>
+#include <pbl/drivers/watchdog.h>
+#include <pbl/kernel/delay.h>
 #include <pbl/logging/logging.h>
 #include <pbl/services/hrm/hrm_manager.h>
 #include <pbl/services/system_task.h>
@@ -17,7 +19,6 @@
 
 #include <applib/app_logging.h>
 #include <board/board.h>
-#include <pbl/kernel/delay.h>
 #include <mfg/mfg_info.h>
 
 PBL_LOG_MODULE_DEFINE(driver_hrm_as7000, CONFIG_DRIVER_HRM_LOG_LEVEL);
@@ -31,6 +32,9 @@ PBL_LOG_MODULE_DEFINE(driver_hrm_as7000, CONFIG_DRIVER_HRM_LOG_LEVEL);
 #define WARMUP_HANDSHAKES 2
 // Seconds without a handshake before the sensor is power cycled
 #define WATCHDOG_TIMEOUT_S 5
+// The loader returns to a valid application about 12.7 s after it was entered, whether or not
+// it is polled meanwhile
+#define LOADER_TIMEOUT_MS 15000
 // Failed boots before hrm_enable() gives up until reboot
 #define MAX_BOOT_FAILURES 3
 
@@ -47,11 +51,14 @@ _Static_assert(ACCEL_RATE_MILLIHZ >= 10000 && ACCEL_RATE_MILLIHZ <= 20000,
 #define PRES_DETECT_THRSH_BLACK 54 // 3500 counts
 
 #define ADDR_INFO_START 0x00
+// In the loader
+#define ADDR_LOADER_STATUS         0x00
 #define ADDR_APP_IDS 0x04
 #define ADDR_ACCEL_SAMPLE_FREQ_MSB 0x08
 // Host time of one sensor second, in 0.1 ms, for clock skew compensation
 #define ADDR_HOST_ONE_SECOND_TIME_MSB 0x0a
 #define ADDR_NUM_ACCEL_SAMPLES 0x0e
+#define ADDR_NUM_PPG_SAMPLES 0x0f
 #define ADDR_ACCEL_SAMPLE_IDX 0x14
 #define ADDR_PRES_DETECT_THRSH 0x26
 #define ADDR_LED_CURRENT_MSB 0x34
@@ -67,6 +74,7 @@ enum {
   AS7000AppId_PRV = 0x04,
 };
 
+#define AS7000_LOADER_STATUS_READY 0x00
 
 // Signal quality index thresholds, upper bounds
 #define SQI_EXCELLENT 2
@@ -96,6 +104,11 @@ static bool prv_write_u16(HRMDevice *dev, uint8_t reg, uint16_t value) {
   return prv_write(dev, reg, buf, sizeof(buf));
 }
 
+#ifdef CONFIG_HRM_AS7000_HRV
+// Set when the sensor did not start with PRV; HRM runs alone from then on
+static bool s_prv_failed;
+#endif
+
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
 // Undocumented registers around the PPG block, where the PRV results may be
 static const uint8_t s_probe_ranges[][2] = {{0x10, 4}, {0x20, 20}};
@@ -122,9 +135,9 @@ static void prv_probe_app_log(const uint8_t *regs, const uint8_t third[AS7000_PR
   prv_hex(second, sample->second, AS7000_PROBE_BLOCK_LEN);
   prv_hex(third_hex, third, AS7000_PROBE_BLOCK_LEN);
   prv_hex(dump, &regs[4], 20);
-  app_log(APP_LOG_LEVEL_INFO, "as7000", 0, "PRV n%lu b%u s%02x q%u 12=%02x %s %s %s",
-          (unsigned long)s_probe.handshakes, s_probe.bpm, status, sqi, sample->reg12, first,
-          second, third_hex);
+  app_log(APP_LOG_LEVEL_INFO, "as7000", 0, "PRV n%lu b%u p%u s%02x q%u 12=%02x %s %s %s",
+          (unsigned long)s_probe.handshakes, s_probe.bpm, s_probe.ppg_samples, status, sqi,
+          sample->reg12, first, second, third_hex);
   app_log(APP_LOG_LEVEL_INFO, "as7000", 0, "PRV n%lu 20-33 %s", (unsigned long)s_probe.handshakes,
           dump);
 }
@@ -160,6 +173,17 @@ static void prv_probe_read(HRMDevice *dev, uint8_t bpm, uint8_t status, uint8_t 
     s_probe.regs[i] = regs[i];
   }
   s_probe.bpm = bpm;
+  s_probe.status = status;
+  s_probe.sqi = sqi;
+  // The sampling rate, to see whether PRV samples faster than HRM alone
+  uint8_t ppg_samples;
+  if (prv_read(dev, ADDR_NUM_PPG_SAMPLES, &ppg_samples, 1)) {
+    s_probe.ppg_samples = ppg_samples;
+    if (s_probe.handshakes == 0 || ppg_samples < s_probe.ppg_min) {
+      s_probe.ppg_min = ppg_samples;
+    }
+    s_probe.ppg_max = MAX(s_probe.ppg_max, ppg_samples);
+  }
   s_probe.handshakes++;
 
   if (app_log_is_bt_enabled()) {
@@ -207,6 +231,7 @@ static void prv_write_accel(HRMDevice *dev) {
     }
   }
 
+  dev->state->accel_sent = count;
   prv_write_u8(dev, ADDR_NUM_ACCEL_SAMPLES, count);
   for (uint8_t i = 0; i < count; i++) {
     // Accel samples are in mG, the sensor wants 0.5 mG
@@ -276,6 +301,13 @@ static void prv_handle_handshake(void *context) {
     }
   }
 
+  // Log when the sensor starts or stops missing accel data, with what it was sent
+  const bool no_accel = (regs.status & AS7000_STATUS_NO_ACCEL) != 0;
+  if (no_accel != state->no_accel || (no_accel && state->handshake_count % 30 == 0)) {
+    state->no_accel = no_accel;
+    PBL_LOG_WRN("AS7000 %s accel data (sent %u, status 0x%x)", no_accel ? "lacks" : "has",
+                state->accel_sent, regs.status);
+  }
   PBL_LOG_DBG("AS7000 BPM %u status 0x%x sqi %u", regs.bpm, regs.status, regs.sqi);
   hrm_manager_new_data_cb(&data);
 }
@@ -318,6 +350,7 @@ static void prv_power_off(HRMDevice *dev) {
   if (dev->led_supply != nullptr) {
     (void)pbl_regulator_disable(dev->led_supply);
   }
+  state->power_off_ticks = rtc_get_ticks();
   state->state = AS7000State_Off;
   PBL_LOG_DBG("AS7000 off");
 }
@@ -329,7 +362,6 @@ static void prv_watchdog_system_cb(void *context) {
   if (dev->state->state == AS7000State_On && dev->state->missed_seconds >= WATCHDOG_TIMEOUT_S) {
     PBL_LOG_ERR("AS7000 stopped handshaking, power cycling");
     prv_power_off(dev);
-    pbl_sleep_ms(SHUT_DOWN_DELAY_MS);
     prv_power_on(dev);
   }
   pbl_mutex_unlock(&dev->state->lock);
@@ -382,11 +414,13 @@ static bool prv_start_hrm_app(HRMDevice *dev) {
   pbl_gpio_configure(&dev->int_gpio, PBL_GPIO_INPUT | PBL_GPIO_PULL_UP);
 
   uint8_t apps = AS7000AppId_HRM;
-#ifdef CONFIG_HRM_AS7000_PRV_PROBE
-  // Ask for PRV too until a boot with it fails, then fall back to HRM alone
-  if (!s_probe.prv_failed) {
+#ifdef CONFIG_HRM_AS7000_HRV
+  // Ask for PRV too while an app wants HRV, until a boot with it fails
+  if ((state->features & HRMFeature_HRV) && !s_prv_failed) {
     apps |= AS7000AppId_PRV;
   }
+#endif
+#ifdef CONFIG_HRM_AS7000_PRV_PROBE
   s_probe.requested = apps;
 #endif
   if (!prv_write_u8(dev, ADDR_APP_IDS, apps)) {
@@ -400,9 +434,9 @@ static bool prv_start_hrm_app(HRMDevice *dev) {
   }
   if (!prv_wait_int(dev, false, 2000)) {
     PBL_LOG_ERR("AS7000 HRM app not ready");
-#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+#ifdef CONFIG_HRM_AS7000_HRV
     if (apps & AS7000AppId_PRV) {
-      s_probe.prv_failed = true;
+      s_prv_failed = true;
     }
 #endif
     return false;
@@ -459,12 +493,22 @@ static void prv_boot_timer_cb(void *context) {
 static void prv_power_on(HRMDevice *dev) {
   HRMDeviceState *state = dev->state;
 
+  // A restart (e.g. for new features) must let the last application tear down first
+  if (state->power_off_ticks != 0) {
+    const uint32_t off_ms =
+        (uint32_t)((rtc_get_ticks() - state->power_off_ticks) * 1000 / RTC_TICKS_HZ);
+    if (off_ms < SHUT_DOWN_DELAY_MS) {
+      pbl_sleep_ms(SHUT_DOWN_DELAY_MS - off_ms);
+    }
+  }
+
   if (dev->led_supply != nullptr) {
     (void)pbl_regulator_enable(dev->led_supply);
   }
   pbl_gpio_set(&dev->enable, true);
   state->power_on_ticks = rtc_get_ticks();
   state->handshake_count = 0;
+  state->no_accel = false;
   state->state = AS7000State_Booting;
   new_timer_start(state->boot_timer, BOOT_DELAY_MS, prv_boot_timer_cb, (void *)dev, 0);
 }
@@ -483,6 +527,28 @@ static uint8_t prv_pres_detect_thrsh(void) {
   }
 }
 
+static void prv_sleep_fed(uint32_t ms) {
+  while (ms > 0) {
+    const uint32_t step = MIN(ms, 50U);
+    watchdog_feed();
+    pbl_sleep_ms(step);
+    ms -= step;
+  }
+}
+
+// At init, with the enable line high: wait until the sensor runs an idle application
+static bool prv_wait_app(HRMDevice *dev, uint32_t max_ms, AS7000InfoRecord *info) {
+  for (uint32_t waited = 0; waited < max_ms; waited += 100) {
+    if (prv_read(dev, ADDR_INFO_START, info, sizeof(*info)) &&
+        info->application_id == AS7000AppId_Idle &&
+        info->protocol_version_major == EXPECTED_PROTOCOL_VERSION_MAJOR) {
+      return true;
+    }
+    prv_sleep_fed(100);
+  }
+  return false;
+}
+
 void hrm_init(HRMDevice *dev) {
   HRMDeviceState *state = dev->state;
   AS7000InfoRecord info;
@@ -499,7 +565,14 @@ void hrm_init(HRMDevice *dev) {
   pbl_gpio_configure(&dev->enable, PBL_GPIO_OUTPUT_ACTIVE);
   pbl_sleep_ms(BOOT_DELAY_MS);
   const bool found = prv_read(dev, ADDR_INFO_START, &info, sizeof(info));
+  if (found && info.application_id == AS7000AppId_Loader) {
+    // Give the loader its timeout to return to a valid application. The enable line must stay
+    // high meanwhile, or the loader stays in force loader mode.
+    PBL_LOG_WRN("AS7000 in its loader, waiting for the application");
+    prv_wait_app(dev, LOADER_TIMEOUT_MS, &info);
+  }
   pbl_gpio_set(&dev->enable, false);
+  state->power_off_ticks = rtc_get_ticks();
 
   if (!found) {
     // A Pebble 2 SE
@@ -516,7 +589,7 @@ void hrm_init(HRMDevice *dev) {
 
   if (info.application_id == AS7000AppId_Loader ||
       info.protocol_version_major != EXPECTED_PROTOCOL_VERSION_MAJOR) {
-    // No usable application in the sensor flash, and it is never reflashed
+    // No usable application in the sensor flash
     PBL_LOG_ERR("AS7000 has no usable firmware");
     state->state = AS7000State_Absent;
     return;
@@ -534,7 +607,6 @@ bool hrm_enable(HRMDevice *dev, HRMFeature features, bool low_latency) {
   HRMDeviceState *state = dev->state;
   bool ret = true;
 
-  (void)features;
   (void)low_latency;
 
   if (!hrm_is_present(dev)) {
@@ -546,6 +618,7 @@ bool hrm_enable(HRMDevice *dev, HRMFeature features, bool low_latency) {
     if (state->boot_failures >= MAX_BOOT_FAILURES) {
       ret = false;
     } else {
+      state->features = features;
       prv_power_on(dev);
     }
   }
@@ -577,6 +650,7 @@ void hrm_set_activity_scene(HRMDevice *dev, HRMActivityScene scene) {
 bool as7000_get_probe(HRMDevice *dev, AS7000Probe *probe) {
   pbl_mutex_lock(&dev->state->lock, PBL_FOREVER);
   *probe = s_probe;
+  probe->prv_failed = s_prv_failed;
   pbl_mutex_unlock(&dev->state->lock);
   return hrm_is_present(dev);
 }

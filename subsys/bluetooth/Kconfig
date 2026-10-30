@@ -57,6 +57,16 @@ config BT_HCI_FAKE
 
 endchoice
 
+config BT_OWN_SERVICE_CHANGED
+    bool "Service Changed with a reconnect"
+    default y if BT_CONTROLLER_CC2564 || BT_CONTROLLER_DA1468X
+    help
+      Indicate Service Changed after pairing, after an update that changed
+      the attribute layout and after importing the stock pairing, then
+      drop the link so the phone app reconnects with the new layout. The
+      watches that share the filesystem with the stock firmware need it:
+      phones keep the stock firmware's attribute cache otherwise.
+
 choice BT_ID_ADDR_SOURCE
     prompt "Identity address"
     default BT_ID_ADDR_CONTROLLER

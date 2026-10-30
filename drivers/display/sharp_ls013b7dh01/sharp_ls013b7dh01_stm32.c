@@ -5,30 +5,26 @@
 //! Sharp LS013B7DH01 on an STM32F4 SPI, write-only and LSB first.
 //!
 //! On silk the panel's VCOM (EXTCOMIN) is driven by the PMIC, not the MCU.
-//! Transfers are polled for now; completion is still reported through a
-//! kernel event, as with a DMA transfer.
+//! Transfers are polled: an update completes before it returns.
 
 #include <stdint.h>
 #include <string.h>
 
-#include <pbl/drivers/display/sharp_ls013b7dh01/sharp_ls013b7dh01.h>
+#include <pbl/drivers/display/sharp_ls013b7dh01_stm32.h>
 #include <pbl/drivers/gpio/stm32.h>
 #include <pbl/util/bitops.h>
 
 #include <board/board.h>
-#include <kernel/events.h>
 #include <stm32f4xx.h>
-#include <pbl/kernel/assert.h>
-#include <pbl/kernel/fatal.h>
 
 #define DISP_MODE_WRITE 0x01U
 #define DISP_MODE_CLEAR 0x04U
 
 #define DISP_SPI_CLOCK_HZ 2000000
 
+#define DISP_LINE_BYTES (PBL_DISPLAY_WIDTH / 8)
+
 static uint8_t s_buf[2 + ((DISP_LINE_BYTES + 2) * PBL_DISPLAY_HEIGHT)];
-static bool s_updating;
-static UpdateCompleteCallback s_uccb;
 
 // watch rotation
 static bool s_rotated_180 = false;
@@ -69,7 +65,7 @@ static void prv_spi_write(const uint8_t *buf, size_t len) {
   pbl_gpio_set(&BOARD_CONFIG_DISPLAY.cs, false);
 }
 
-void display_init(void) {
+static int prv_init(const struct pbl_display *disp) {
   RCC_APB1PeriphClockCmd(BOARD_CONFIG_DISPLAY.spi_rcc, ENABLE);
 
   pbl_gpio_stm32_af(&BOARD_CONFIG_DISPLAY.clk, BOARD_CONFIG_DISPLAY.spi_af, 0, GPIO_Speed_50MHz);
@@ -90,47 +86,54 @@ void display_init(void) {
   spi_cfg.SPI_FirstBit = SPI_FirstBit_LSB;
   SPI_Init(BOARD_CONFIG_DISPLAY.spi, &spi_cfg);
   SPI_Cmd(BOARD_CONFIG_DISPLAY.spi, ENABLE);
+
+  return 0;
 }
 
-void display_clear(void) {
+static int prv_clear(const struct pbl_display *disp) {
   const uint8_t buf[] = {DISP_MODE_CLEAR, 0x00};
 
-  PBL_ASSERTN(!s_updating);
-
   prv_spi_write(buf, sizeof(buf));
+
+  return 0;
 }
 
-void display_set_enabled(bool enabled) {
-  pbl_gpio_set(&BOARD_CONFIG_DISPLAY.on_ctrl, enabled);
+static int prv_enable(const struct pbl_display *disp) {
+  pbl_gpio_set(&BOARD_CONFIG_DISPLAY.on_ctrl, true);
+
+  return 0;
 }
 
-void display_set_rotated(bool rotated) {
+static int prv_disable(const struct pbl_display *disp) {
+  pbl_gpio_set(&BOARD_CONFIG_DISPLAY.on_ctrl, false);
+
+  return 0;
+}
+
+static int prv_set_rotated(const struct pbl_display *disp, bool rotated) {
   s_rotated_180 = rotated;
+
+  return 0;
 }
 
-static void prv_terminate_transfer(void *data) {
-  s_updating = false;
-  s_uccb(true);
-}
-
-void display_update(NextRowCallback nrcb, UpdateCompleteCallback uccb) {
-  DisplayRow row;
+static int prv_update(const struct pbl_display *disp, const struct pbl_display_buffer *buf,
+                      uint16_t y0, uint16_t y1) {
   uint8_t *pbuf = s_buf;
-
-  PBL_ASSERTN(!s_updating);
 
   // write command
   *pbuf++ = DISP_MODE_WRITE;
 
-  while (nrcb(&row)) {
+  for (uint16_t y = y0; y <= y1; y++) {
+    const uint8_t *row = buf->data + (uint32_t)y * buf->pitch;
+
     // row address, data and trailing dummy
-    *pbuf++ = s_rotated_180 ? (PBL_DISPLAY_HEIGHT - 1) - row.address + 1 : row.address + 1;
+    *pbuf++ = s_rotated_180 ? (PBL_DISPLAY_HEIGHT - 1) - y + 1 : y + 1;
     if (s_rotated_180) {
       for (int i = DISP_LINE_BYTES - 1; i >= 0; --i) {
-        *pbuf++ = pbl_bitrev8(row.data[i]);
+        *pbuf++ = pbl_bitrev8(row[i]);
       }
     } else {
-      memcpy(pbuf, row.data, DISP_LINE_BYTES);
+      memcpy(pbuf, row, DISP_LINE_BYTES);
       pbuf += DISP_LINE_BYTES;
     }
     *pbuf++ = 0x00;
@@ -139,23 +142,17 @@ void display_update(NextRowCallback nrcb, UpdateCompleteCallback uccb) {
   // last trailing dummy
   *pbuf++ = 0x00;
 
-  s_uccb = uccb;
-  s_updating = true;
-
   prv_spi_write(s_buf, pbuf - s_buf);
+  pbl_display_complete(disp, 0);
 
-  PebbleEvent e = {
-    .type = PEBBLE_CALLBACK_EVENT,
-    .callback = {
-      .callback = prv_terminate_transfer,
-    },
-  };
-  event_put(&e);
+  return 0;
 }
 
-bool display_update_in_progress(void) {
-  return s_updating;
-}
-
-void display_update_boot_frame(uint8_t *framebuffer) {
-}
+const struct pbl_display_ops pbl_display_sharp_stm32_ops = {
+  .init = prv_init,
+  .enable = prv_enable,
+  .disable = prv_disable,
+  .set_rotated = prv_set_rotated,
+  .update = prv_update,
+  .clear = prv_clear,
+};

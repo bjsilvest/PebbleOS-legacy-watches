@@ -20,8 +20,9 @@
  * @ingroup drivers_hrm
  * @brief @ref drivers_hrm implementation for the ams AS7000 (Pebble 2 HR).
  *
- * Runs the HRM application already in the sensor's flash; the driver never writes the sensor
- * firmware. The sensor reports heart rate only. Whether it is fitted is probed at init.
+ * Runs the HRM application already in the sensor's flash and never writes it. The sensor
+ * reports heart rate only.
+ * Whether it is fitted is probed at init.
  * @{
  */
 
@@ -49,10 +50,16 @@ typedef struct HRMDeviceState {
   struct pbl_mutex lock;
   TimerID boot_timer;
   RtcTicks power_on_ticks;
+  RtcTicks power_off_ticks;
   uint32_t handshake_count;
   uint8_t boot_failures;
   uint8_t pres_detect_thrsh;
+  // HRMFeature bits the sensor was last enabled for
+  uint32_t features;
   bool accel_skip_next;
+  // Accel samples sent at the last handshake, and whether the sensor said it lacked them
+  uint8_t accel_sent;
+  bool no_accel;
   volatile bool handshake_pending;
   volatile uint8_t missed_seconds;
   RegularTimerInfo watchdog;
@@ -106,8 +113,14 @@ typedef struct {
   uint16_t boots;
   /** Handshakes sampled. */
   uint32_t handshakes;
-  /** BPM register at the last handshake. */
+  /** BPM, status and signal quality (254 = off wrist) at the last handshake. */
   uint8_t bpm;
+  uint8_t status;
+  uint8_t sqi;
+  /** PPG samples the sensor took in the last second, and the range seen. */
+  uint8_t ppg_samples;
+  uint8_t ppg_min;
+  uint8_t ppg_max;
   /** Register values at the last handshake. */
   uint8_t regs[AS7000_PROBE_NUM_REGS];
   /** Bit n set once register n changed between handshakes. */

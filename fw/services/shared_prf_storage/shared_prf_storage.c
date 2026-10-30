@@ -11,6 +11,9 @@
 #include <pbl/kernel/fatal.h>
 #include <pbl/kernel/mutex.h>
 #include <pbl/logging/logging.h>
+#ifdef CONFIG_SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK
+#include <pbl/services/filesystem/pfs.h>
+#endif
 #include <pbl/services/shared_prf_storage/shared_prf_storage.h>
 #include <pbl/services/shared_prf_storage/v3_sprf/shared_prf_storage_private.h>
 #include <pbl/util/size.h>
@@ -285,13 +288,71 @@ static bool prv_fetch_field(uint8_t *field_out, size_t offset, size_t field_size
   ((FLASH_REGION_STOCK_SHARED_PRF_STORAGE_END - FLASH_REGION_STOCK_SHARED_PRF_STORAGE_BEGIN) / \
    sizeof(SharedPRFData))
 
+// CRC of the stock entry last imported or seen, to notice a pairing made in the stock firmware
+#define STOCK_SPRF_SEEN_FILE "sprf_stock_seen"
+// Our bonding database, which survives everything but a factory reset
+#define BONDING_DB_FILE "gap_bonding_db"
+
+static bool s_imported_stock;
+
 static bool prv_key_is_nil(const struct pbl_bt_sm_key *key) {
   const struct pbl_bt_sm_key nil_key = {};
   return memcmp(key, &nil_key, sizeof(nil_key)) == 0;
 }
 
-//! Copies the stock firmware's entry over ours when its identity root key differs from ours, so
-//! both firmwares use the same IRK, pinned address and bonding. Never writes the stock region.
+static bool prv_file_exists(const char *name) {
+  const int fd = pfs_open(name, OP_FLAG_READ, FILE_TYPE_STATIC, 0);
+  if (fd < 0) {
+    return false;
+  }
+  pfs_close(fd);
+  return true;
+}
+
+static bool prv_get_stock_seen_crc(uint32_t *crc_out) {
+  const int fd = pfs_open(STOCK_SPRF_SEEN_FILE, OP_FLAG_READ, FILE_TYPE_STATIC, 0);
+  if (fd < 0) {
+    return false;
+  }
+  const bool rv = pfs_read(fd, crc_out, sizeof(*crc_out)) == (int)sizeof(*crc_out);
+  pfs_close(fd);
+  return rv;
+}
+
+static void prv_set_stock_seen_crc(uint32_t crc) {
+  uint32_t seen_crc;
+  if (prv_get_stock_seen_crc(&seen_crc)) {
+    if (seen_crc == crc) {
+      return;
+    }
+    pfs_remove(STOCK_SPRF_SEEN_FILE);
+  }
+  const int fd = pfs_open(STOCK_SPRF_SEEN_FILE, OP_FLAG_WRITE, FILE_TYPE_STATIC, sizeof(crc));
+  if (fd < 0) {
+    PBL_LOG_ERR("Could not open %s: %d", STOCK_SPRF_SEEN_FILE, fd);
+    return;
+  }
+  if (pfs_write(fd, &crc, sizeof(crc)) != (int)sizeof(crc)) {
+    PBL_LOG_ERR("Could not write %s", STOCK_SPRF_SEEN_FILE);
+  }
+  pfs_close(fd);
+}
+
+//! Whether the stock entry should replace ours although both use the same identity root key:
+//! when it changed since we last saw it, i.e. the phone paired with the stock firmware (which
+//! means it forgot our bonding). Without a record of the last one seen, only after a factory
+//! reset, so a pairing made with this firmware is not replaced by an older stock one.
+static bool prv_stock_changed(uint32_t stock_crc) {
+  uint32_t seen_crc;
+  if (prv_get_stock_seen_crc(&seen_crc)) {
+    return seen_crc != stock_crc;
+  }
+  return !prv_file_exists(BONDING_DB_FILE);
+}
+
+//! Copies the stock firmware's entry over ours when its identity root key differs from ours, or
+//! when the phone paired with the stock firmware since, so both firmwares use the same IRK,
+//! pinned address and bonding. Never writes the stock region.
 static void prv_import_stock(void) {
   SharedPRFData *stock = kernel_zalloc_check(sizeof(*stock));
   bool found = false;
@@ -311,12 +372,15 @@ static void prv_import_stock(void) {
     goto done;
   }
 
+  const uint32_t stock_crc = pbl_crc32(0, stock, sizeof(*stock));
   SprfRootKeys ours;
   flash_read_bytes((uint8_t *)&ours,
                    prv_current_page_flash_addr() + offsetof(SharedPRFData, root_keys),
                    sizeof(ours));
   if (ours.crc != SPRF_UNWRITTEN_CRC &&
-      memcmp(&ours.keys[PBL_BT_SM_ROOT_KEY_TYPE_IDENTITY], stock_irk, sizeof(*stock_irk)) == 0) {
+      memcmp(&ours.keys[PBL_BT_SM_ROOT_KEY_TYPE_IDENTITY], stock_irk, sizeof(*stock_irk)) == 0 &&
+      !prv_stock_changed(stock_crc)) {
+    prv_set_stock_seen_crc(stock_crc);
     goto done;
   }
 
@@ -339,9 +403,15 @@ static void prv_import_stock(void) {
 
   PBL_LOG_INFO("Importing the stock shared PRF storage");
   prv_erase_region_and_save(stock);
+  prv_set_stock_seen_crc(stock_crc);
+  s_imported_stock = true;
 
 done:
   kernel_free(stock);
+}
+
+bool shared_prf_storage_imported_stock(void) {
+  return s_imported_stock;
 }
 #endif
 

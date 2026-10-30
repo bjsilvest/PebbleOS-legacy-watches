@@ -4,7 +4,13 @@ import pebble_tool
 from libpebble2.communication.transports.pulse import PULSETransport
 from libpebble2.exceptions import PebbleError
 
-from .commands import coredump, flash_logs, install_firmware, install_lang, test
+from .commands import (
+    coredump,
+    flash_logs,
+    install_firmware,
+    install_lang,
+    test,
+)
 
 # TODO: unopened logging ports cause super noisy logs, fix this in the
 # pulse package then remove this
@@ -30,8 +36,8 @@ class PebbleTransportPULSE(pebble_tool.commands.base.PebbleTransportConfiguratio
         return (link,)
 
     @classmethod
-    def add_argument_handler(cls, parser):
-        parser.add_argument(
+    def add_argument_handler(cls, group, parser):
+        group.add_argument(
             "--pulse",
             type=str,
             help="Use this option to connect to your Pebble via"
@@ -41,6 +47,7 @@ class PebbleTransportPULSE(pebble_tool.commands.base.PebbleTransportConfiguratio
 
 def run_tool(args=None):
     pebble_tool.run_tool(args)
+
 
 __all__ = [
     "coredump",

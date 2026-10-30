@@ -20,7 +20,7 @@
 
 #include <host/ble_gap.h>
 #include <host/ble_gatt.h>
-#ifdef CONFIG_BT_CONTROLLER_CC2564
+#ifdef CONFIG_BT_OWN_SERVICE_CHANGED
 #include <comm/ble/gap_le_connection.h>
 #include <comm/ble/gatt_service_changed.h>
 #include <comm/bt_conn_mgr.h>
@@ -30,6 +30,7 @@
 #include <pbl/crc/crc.h>
 #include <pbl/services/new_timer/new_timer.h>
 #include <pbl/services/settings/settings_file.h>
+#include <pbl/services/shared_prf_storage/shared_prf_storage.h>
 #endif
 #include <kernel/pbl_malloc.h>
 #include <os/os_mbuf.h>
@@ -225,7 +226,9 @@ static void prv_handle_disconnection_event(struct ble_gap_event *event) {
   pbl_bt_handle_le_disconnection_complete_event(&disconnection_event);
 }
 
-#ifdef CONFIG_BT_CONTROLLER_CC2564
+#ifdef CONFIG_BT_OWN_SERVICE_CHANGED
+// A phone that paired with the stock firmware keeps its attribute cache, even
+// when it pairs again: Android drops it only on unbonding or on Service Changed.
 // Phone apps keep the attributes they found at connect for the whole link,
 // so drop the link a little after Service Changed: the reconnect uses ours.
 #define SVC_CHANGED_RECONNECT_MS 1000
@@ -368,6 +371,10 @@ static bool prv_layout_may_have_changed(void) {
 
   s_changed = gatt_service_changed_server_fw_updated() &&
               !(have_noted && noted == prv_layout_hash());
+#ifdef CONFIG_SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK
+  // An imported stock bonding has the stock firmware's cache and no subscriptions.
+  s_changed = s_changed || shared_prf_storage_imported_stock();
+#endif
   PBL_LOG_INFO("Service Changed after update: %s", s_changed ? "needed" : "layout unchanged");
   return s_changed;
 }
@@ -431,7 +438,7 @@ static void prv_handle_enc_change_event(struct ble_gap_event *event) {
   nimble_addr_to_pebble_addr(&desc.peer_id_addr, &enc_change_event.dev_address);
   pbl_bt_handle_le_encryption_change_event(&enc_change_event);
 
-#ifdef CONFIG_BT_CONTROLLER_CC2564
+#ifdef CONFIG_BT_OWN_SERVICE_CHANGED
   prv_svc_changed_after_update(event->enc_change.conn_handle, &desc);
 #endif
 }
@@ -562,7 +569,7 @@ static void prv_handle_mtu_change_event(struct ble_gap_event *event) {
 extern int pebble_pairing_service_get_connectivity_send_notification(uint16_t conn_handle,
                                                                      uint16_t attr_handle);
 
-#ifdef CONFIG_BT_CONTROLLER_CC2564
+#ifdef CONFIG_BT_OWN_SERVICE_CHANGED
 // A phone enables Service Changed right after pairing. It may still hold the
 // attribute cache of another firmware (the stock recovery it paired with),
 // so tell it every handle changed and it rediscovers ours. Only on an
@@ -591,7 +598,7 @@ static void prv_handle_subscription_event(struct ble_gap_event *event) {
               event->subscribe.conn_handle, event->subscribe.attr_handle,
               event->subscribe.prev_notify, event->subscribe.cur_notify,
               event->subscribe.prev_indicate, event->subscribe.cur_indicate);
-#ifdef CONFIG_BT_CONTROLLER_CC2564
+#ifdef CONFIG_BT_OWN_SERVICE_CHANGED
   // These watches indicate Service Changed themselves, with a reconnect, after pairing and after
   // an update. The Service Changed server would indicate again 10 s into every reconnect:
   // mid-link, the Core app rediscovers but loses its PPoGATT session, and the stalled link is
