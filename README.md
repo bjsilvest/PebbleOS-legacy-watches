@@ -5,7 +5,7 @@
 # PebbleOS for the Pebble 2 (silk)
 
 An unofficial port of [Core Devices' PebbleOS](https://github.com/coredevices/PebbleOS)
-v4.43.0 to the **Pebble 2** (heart rate and SE). It uses Bluetooth Low
+v4.43.0 to the **Pebble 2** (HR and SE). It uses Bluetooth Low
 Energy (NimBLE) in place of the original Bluetooth stack.
 
 > **Not official.** This project is not made, endorsed or supported by Core
