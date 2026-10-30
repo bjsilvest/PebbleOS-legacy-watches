@@ -538,10 +538,18 @@ static int prv_handle_pairing_request_event(struct ble_gap_event *event) {
     return BLE_SM_ERR_UNSPECIFIED;
   }
 
-  // Bonded peers are handled by the repeat pairing policy
+  // Bonded peers are handled by the repeat pairing policy, where it lets them pair again.
+  // Otherwise refuse now: an ignored request leaves the phone waiting out its 30 s SMP
+  // timeout and retrying on every reconnect.
   struct ble_store_key_sec key_sec = {.peer_addr = desc.peer_id_addr};
   if (ble_store_read_peer_sec(&key_sec, &value_sec) == 0) {
+#if defined(CONFIG_RECOVERY_FW) || \
+    (MYNEWT_VAL(BLE_SM_SC_ONLY) && (MYNEWT_VAL(BLE_SM_IO_CAP) == BLE_HS_IO_DISPLAY_YESNO))
     return 0;
+#else
+    PBL_LOG_INFO("Pairing request from bonded peer rejected: not pairable");
+    return BLE_SM_ERR_PAIR_NOT_SUPP;
+#endif
   }
 
   PBL_LOG_INFO("Pairing request rejected: not pairable");
