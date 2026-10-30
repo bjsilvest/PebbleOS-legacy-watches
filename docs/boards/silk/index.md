@@ -225,7 +225,10 @@ with it. Tested on hardware: PRV starts and the LEDs look solid while it
 runs, as on the Time 2. Two things still keep HRV from apps:
 
 - The Pebble 2 (diorite) SDK is frozen, so `health_service_set_hrv_sample_period`
-  is a stub for Pebble 2 apps. Apps need an updated SDK to ask for HRV.
+  is a stub for Pebble 2 apps. Checked with app SDK 4.33.1 and pebble-tool
+  5.1.1 (the latest on 2026-10-30): the diorite header defines it as `(0)`,
+  so a test app built for diorite never calls the firmware, while the same
+  app built for emery does. Apps need an updated SDK to ask for HRV.
 - The PRV results are not decoded, so no HRV values reach apps even when
   PRV runs. `CONFIG_HRM_AS7000_PRV_PROBE` (diagnostic, off) records the
   registers around the PPG block in Settings > System > Information and

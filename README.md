@@ -47,15 +47,16 @@ notes list what was tested and what changed.
   sensor updates.
 - **Heart rate variability (HRV)** is on: while an app asks for HRV, the
   sensor runs its HRV mode, which stock firmware never used (the Pebble
-  Time 2 works the same way). Pebble 2 apps need an updated SDK to ask
-  for it, and the sensor's HRV results are not decoded yet, so no app can
-  use it today.
+  Time 2 works the same way). Pebble 2 apps cannot ask for it yet: in the
+  latest app SDK (4.33.1, with pebble-tool 5.1.1) the HRV request is still
+  a stub for the Pebble 2, so apps need an updated SDK. The sensor's HRV
+  results are not decoded yet either.
 - **If you want to go back to the stock firmware,** do a factory reset
   first: pairings made with this firmware may not be removable otherwise.
 
 ## Building
 
-Follow Core's [getting started guide](https://pebbleos.readthedocs.io/en/latest/getting_started/index.html)
+Follow Core's [getting started guide](https://developer.repebble.com/pebbleos/docs/getting_started/)
 to install the SDK.
 
 The Pebble 2's Bluetooth chip (Dialog DA14681) needs a controller image
