@@ -83,4 +83,4 @@ PebbleOS and the changes in this port are under the Apache License 2.0
 by Google. Third-party components keep their own licenses, listed in
 `third_party/sbom.yml`. The TI Bluetooth init script
 (`bluetooth_init_cc2564_2.14.bts`) is licensed by Texas Instruments for use
-only with TI devices; its license is attached to each release.
+only with TI devices.
