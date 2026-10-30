@@ -132,7 +132,7 @@ STM32 drivers are rewritten against the current APIs, using the old drivers
 | Hardware platform ID (`PebbleSilk`), bundle `hwrev: silk` | done |
 | DMA for display, QSPI, UART RX | todo (polled for now) |
 | Bluetooth (DA14681, H4 over UART, NimBLE host) | done, untested on hardware; needs the Dialog SDK, see below |
-| Heart rate (AS7000 on I2C3, Pebble 2 HR only) | done, BPM and LED pulsing tested on hardware: probed at boot (the SE runs the same image), runs the ams application in the sensor flash; BPM only, no SpO2; optional sensor firmware update for personal builds, see [Heart rate sensor](#heart-rate-sensor); QEMU does not emulate it |
+| Heart rate (AS7000 on I2C3, Pebble 2 HR only) | done, BPM and LED pulsing tested on hardware: probed at boot (the SE runs the same image), runs the ams application in the sensor flash; BPM, HRV mode while an app asks (results not decoded), no SpO2; never writes the sensor flash, see [Heart rate sensor](#heart-rate-sensor); QEMU does not emulate it |
 | Motion sensitivity setting (`ACCEL_SENSITIVITY`; default "Medium" keeps the stock threshold) | on, untested on hardware |
 | Left-handed wear (`ORIENTATION_MANAGER`: display, buttons, BMA255 rotate 180°) | on; display checked in QEMU |
 
@@ -216,11 +216,20 @@ the sensor where only hardware can recover it. What that work found:
 - 1.13.16 and 1.14.4 both report heart rate with this driver; nothing here
   needs 1.14.4.
 
-**HRV is not available to apps.** The sensor also runs its undocumented PRV
-(pulse rate variability) application next to HRM when asked
-(`CONFIG_HRM_AS7000_PRV_PROBE`, diagnostic, off by default), but its results
-are not decoded, and the Health service API is frozen for Pebble 2 apps, so
-no SDK app on silk can request or read HRV.
+**HRV is on, but apps cannot use it yet.** The sensor has an undocumented
+PRV (pulse rate variability) application that stock firmware never used.
+With `CONFIG_HRM_AS7000_HRV` (on in the silk defconfig) the driver runs it
+next to HRM while an app asks for HRV, as the Pebble Time 2 runs HRV only
+for such apps, and falls back to HRM alone if the sensor does not start
+with it. Tested on hardware: PRV starts and the LEDs look solid while it
+runs, as on the Time 2. Two things still keep HRV from apps:
+
+- The Pebble 2 (diorite) SDK is frozen, so `health_service_set_hrv_sample_period`
+  is a stub for Pebble 2 apps. Apps need an updated SDK to ask for HRV.
+- The PRV results are not decoded, so no HRV values reach apps even when
+  PRV runs. `CONFIG_HRM_AS7000_PRV_PROBE` (diagnostic, off) records the
+  registers around the PPG block in Settings > System > Information and
+  app logs, to work them out.
 
 ## Resources
 

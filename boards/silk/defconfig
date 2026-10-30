@@ -62,6 +62,8 @@ CONFIG_DYNAMIC_BACKLIGHT=y
 
 CONFIG_HRM=y
 CONFIG_HRM_AS7000=y
+# HRV while an app asks (Pebble 2 apps need an updated SDK to ask)
+CONFIG_HRM_AS7000_HRV=y
 
 # Settings: motion sensitivity and left-handed (rotated) wear
 CONFIG_ACCEL_SENSITIVITY=y

@@ -110,6 +110,11 @@ static bool prv_write_u16(HRMDevice *dev, uint8_t reg, uint16_t value) {
   return prv_write(dev, reg, buf, sizeof(buf));
 }
 
+#ifdef CONFIG_HRM_AS7000_HRV
+// Set when the sensor did not start with PRV; HRM runs alone from then on
+static bool s_prv_failed;
+#endif
+
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
 // Undocumented registers around the PPG block, where the PRV results may be
 static const uint8_t s_probe_ranges[][2] = {{0x10, 4}, {0x20, 20}};
@@ -415,11 +420,13 @@ static bool prv_start_hrm_app(HRMDevice *dev) {
   pbl_gpio_configure(&dev->int_gpio, PBL_GPIO_INPUT | PBL_GPIO_PULL_UP);
 
   uint8_t apps = AS7000AppId_HRM;
-#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+#ifdef CONFIG_HRM_AS7000_HRV
   // Ask for PRV too while an app wants HRV, until a boot with it fails
-  if ((state->features & HRMFeature_HRV) && !s_probe.prv_failed) {
+  if ((state->features & HRMFeature_HRV) && !s_prv_failed) {
     apps |= AS7000AppId_PRV;
   }
+#endif
+#ifdef CONFIG_HRM_AS7000_PRV_PROBE
   s_probe.requested = apps;
 #endif
   if (!prv_write_u8(dev, ADDR_APP_IDS, apps)) {
@@ -433,9 +440,9 @@ static bool prv_start_hrm_app(HRMDevice *dev) {
   }
   if (!prv_wait_int(dev, false, 2000)) {
     PBL_LOG_ERR("AS7000 HRM app not ready");
-#ifdef CONFIG_HRM_AS7000_PRV_PROBE
+#ifdef CONFIG_HRM_AS7000_HRV
     if (apps & AS7000AppId_PRV) {
-      s_probe.prv_failed = true;
+      s_prv_failed = true;
     }
 #endif
     return false;
@@ -649,6 +656,7 @@ void hrm_set_activity_scene(HRMDevice *dev, HRMActivityScene scene) {
 bool as7000_get_probe(HRMDevice *dev, AS7000Probe *probe) {
   pbl_mutex_lock(&dev->state->lock, PBL_FOREVER);
   *probe = s_probe;
+  probe->prv_failed = s_prv_failed;
   pbl_mutex_unlock(&dev->state->lock);
   return hrm_is_present(dev);
 }
