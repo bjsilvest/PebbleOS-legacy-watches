@@ -46,7 +46,10 @@ build and its version ends in **-lite**.
   cannot connect. iPhones work over LE.
 - No serial debug console, and only error logs are kept.
 - **Pairings from stock firmware are not carried over.** Pair your phone
-  again after installing.
+  again after installing. This also applies after every factory reset: a
+  factory reset starts the recovery firmware, you pair with it to install,
+  and then pair again with this firmware. Open **Settings → Bluetooth** on
+  the watch while the phone pairs, or forget the watch on both sides first.
 - **If you want to go back to the stock firmware,** do a factory reset
   first: pairings made with this firmware may not be removable otherwise.
 
