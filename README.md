@@ -40,7 +40,7 @@ The original Pebble has very little flash and RAM, so this is a cut-down
 build and its version ends in **-lite**.
 
 - The timeline is a plain list.
-- Not included: Health, Weather, Timeline Quick View, voice replies,
+- Not included: Health, Weather, Timeline Quick View,
   Reminders, the Sports app and the large Gothic 36 / LECO 60 fonts.
 - Bluetooth LE only: the original Pebble phone app (Bluetooth Classic)
   cannot connect. iPhones work over LE.
