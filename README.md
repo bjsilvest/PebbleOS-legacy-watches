@@ -14,8 +14,7 @@ Bluetooth Low Energy (NimBLE) in place of the original Bluetooth stack.
 >
 > **Use at your own risk.** The software comes with no warranty (see
 > Apache 2.0, sections 7–8). These builds leave the watch's bootloader and
-> recovery firmware (PRF) alone, so recovery mode stays available, but
-> flashing third-party firmware can still go wrong.
+> recovery firmware (PRF) alone, so recovery mode stays available in the event of a crash or update failure.
 
 ## Download
 
