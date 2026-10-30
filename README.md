@@ -114,22 +114,10 @@ The Pebble 2 also needs an image for its Bluetooth chip, built from the
 Renesas (Dialog) DA1468x SDK, which you have to get yourself: the SDK cannot
 be shared here. The `silk-v4.43.0` branch's README explains how to build it.
 
-## Licenses
+## Licensing
 
-PebbleOS and the changes in these ports are under the Apache License 2.0
-(`LICENSE`). PebbleOS is by Core Devices and builds on the source released
-by Google. Third-party components keep their own licenses, listed in
-`third_party/sbom.yml`. The TI Bluetooth init scripts are licensed by Texas
-Instruments for use only with TI devices; their license is attached to
-each release.
+PebbleOS and the modifications made for these ports are licensed under the Apache License 2.0 (`LICENSE`). PebbleOS is developed by Core Devices and builds upon source code released by Google. Third-party components retain their respective licenses, which are documented in `third_party/sbom.yml`. The TI Bluetooth initialization scripts are provided under a Texas Instruments license restricted to use with TI devices. A copy of that license is included with each release containing those scripts.
 
-Every port except the Pebble and Pebble Steel builds includes the
-[Speex](https://github.com/xiph/speex) speech codec for voice replies.
-Speex is under a BSD 3-clause license; its copyright notice and license
-are attached to each release that includes it as `LICENSE-Speex.txt`.
+All ports except the Pebble and Pebble Steel include [Speex](https://github.com/xiph/speex), a speech codec used for voice replies. Speex is licensed under the BSD 3-Clause License. Its copyright notice and license are included with each applicable release as `LICENSE-Speex.txt`.
 
-The Pebble 2 firmware includes an image for its Dialog DA14681 Bluetooth
-chip, built from the Renesas (Dialog) DA1468x SDK and FreeRTOS. That image
-is not under the Apache License: it is distributed with Renesas's
-permission, and its notices (`NOTICE-silk-Bluetooth.txt`) and the FreeRTOS
-source are attached to each release that includes it.
+The Pebble 2 firmware also includes a separate image for its Dialog DA14681 Bluetooth chip, built using the Renesas (Dialog) DA1468x SDK and FreeRTOS. This image is not covered by the Apache License 2.0 and is distributed with permission from Renesas. The applicable notices (`NOTICE-silk-Bluetooth.txt`) and FreeRTOS source code are included with each release containing this image.
