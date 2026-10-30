@@ -44,6 +44,12 @@ void gatt_service_changed_server_handle_fw_update(void);
 //! @return true if this boot follows a firmware update, so remotes may hold a stale cache.
 bool gatt_service_changed_server_fw_updated(void);
 
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+//! Before rebooting into an update, note the attribute layout, so the next boot can tell
+//! whether the phone's cache still matches.
+void gatt_service_changed_note_update_layout(void);
+#endif
+
 ////////////////////////////
 // For Testing:
 
