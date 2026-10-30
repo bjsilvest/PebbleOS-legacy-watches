@@ -78,6 +78,21 @@ update.
 The watch is already paired over Bluetooth LE, so only step 3 is needed:
 sideload the new `.pbz`.
 
+### After a factory reset
+
+A factory reset starts the stock recovery firmware. To install again, pair
+the phone with recovery from the Core app (it shows no code), then sideload
+the `.pbz` as in step 3.
+
+- **Pebble and Pebble Steel:** recovery's pairing is not carried over, so
+  pair once more after the install. Open **Settings → Bluetooth** on the
+  watch and keep it open while the phone pairs, then enter the code the
+  watch shows. Alternatively, forget the watch on both sides and pair
+  again.
+- **Pebble Time, Pebble Time Steel and Pebble Time Round:** in the
+  4.43.0-legacy.1 builds, the same applies. From the next release, these
+  watches keep recovery's pairing and reconnect without pairing again.
+
 ## Branches
 
 - `<watch>-v4.43.0`: the current port, based on PebbleOS v4.43.0.
