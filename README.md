@@ -5,7 +5,7 @@
 # PebbleOS for the Pebble and Pebble Steel (tintin)
 
 An unofficial port of [Core Devices' PebbleOS](https://github.com/coredevices/PebbleOS)
-v4.43.0 to the original **Pebble** and the **Pebble Steel**. It uses
+v4.44.0 to the original **Pebble** and the **Pebble Steel**. It uses
 Bluetooth Low Energy (NimBLE) in place of the original Bluetooth stack.
 
 > **Not official.** This project is not made, endorsed or supported by Core
@@ -19,7 +19,7 @@ Bluetooth Low Energy (NimBLE) in place of the original Bluetooth stack.
 
 ## Download
 
-Latest build: v4.43.0-legacy-lite.2, in the release [Legacy watches 4.43.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy)
+Latest build: v4.44.0-legacy-lite.1, in the release [Legacy watches 4.44.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.0-legacy)
 with the builds for the other watches.
 
 | Watch                               | Board          | Status       |
@@ -71,10 +71,18 @@ The board's page in `docs/boards/tintin` has the hardware details.
 
 ## Other watches
 
-This branch is one of several ports in this repository. The
-[front page](https://github.com/bjsilvest/PebbleOS-legacy-watches) lists
-them all, with their latest releases. The earlier ports are on the
-`tintin-v4.42.0` (PebbleOS v4.42.0) and `tintin-lite-fork` (v4.41.2) branches.
+This branch is the original Pebble's cut-down build of the
+[`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy)
+branch, which the Pebble Time, Time Round and Pebble 2 share, and follows
+it. The [front page](https://github.com/bjsilvest/PebbleOS-legacy-watches)
+lists every watch with its latest release. The earlier ports are on the
+`tintin-v4.43.0`, `tintin-v4.42.0` and `tintin-lite-fork` (v4.41.2)
+branches.
+
+## Support
+
+This project is provided as-is, and may be updated over time. If you have
+questions, please [open an issue](https://github.com/bjsilvest/PebbleOS-legacy-watches/issues).
 
 ## Licenses
 
