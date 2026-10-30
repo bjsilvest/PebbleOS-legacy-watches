@@ -2,11 +2,12 @@
   <img src="docs/_static/images/logo.svg" alt="PebbleOS" width="320">
 </p>
 
-# PebbleOS for the Pebble Time and Pebble Time Steel (snowy)
+# PebbleOS for the Pebble Time, Time Round and Pebble 2
 
 An unofficial port of [Core Devices' PebbleOS](https://github.com/coredevices/PebbleOS)
-v4.43.0 to the **Pebble Time** and the **Pebble Time Steel**. It uses
-Bluetooth Low Energy (NimBLE) in place of the original Bluetooth stack.
+v4.44.0 to the **Pebble Time**, **Pebble Time Steel**, **Pebble Time
+Round** and **Pebble 2** (HR and SE). It uses Bluetooth Low Energy (NimBLE)
+in place of the original Bluetooth stack.
 
 > **Not official.** This project is not made, endorsed or supported by Core
 > Devices, Google or Pebble Technology. "Pebble" is a trademark of its owner
@@ -18,13 +19,15 @@ Bluetooth Low Energy (NimBLE) in place of the original Bluetooth stack.
 
 ## Download
 
-Latest build: v4.43.0-legacy.2, in the release [Legacy watches 4.43.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy)
-with the builds for the other watches.
+Latest build: v4.44.0-legacy.1, in the release [Legacy watches 4.44.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.0-legacy)
+with the builds for the original Pebble.
 
-| Watch             | Board       | Status       |
-|-------------------|-------------|--------------|
-| Pebble Time       | `snowy@dvt` | Tested       |
-| Pebble Time Steel | `snowy@s3`  | **Untested** |
+| Watch                | Board       | Status       |
+|----------------------|-------------|--------------|
+| Pebble Time          | `snowy@dvt` | Tested       |
+| Pebble Time Steel    | `snowy@s3`  | **Untested** |
+| Pebble Time Round    | `spalding`  | Tested       |
+| Pebble 2 (HR and SE) | `silk`      | Tested on HR |
 
 Download the `.pbz` for your watch and sideload it from the Core app.
 Coming from stock firmware, you also need to pair again over Bluetooth
@@ -33,41 +36,90 @@ notes list what was tested and what changed.
 
 ## Notes
 
-- Tested on the Pebble Time: pairing with Android and iPhone,
-  notifications, voice replies, music control, app and watchface installs,
-  firmware updates, battery life and the dynamic backlight. Language packs
-  have not been tested on this watch yet.
+- Tested, pairing with Android and iPhone:
+  - **Pebble Time:** notifications, voice replies, music control, app and
+    watchface installs, firmware updates, battery life and the dynamic
+    backlight. Language packs have not been tested on this watch yet.
+  - **Pebble Time Round:** notifications, calls, voice replies, music
+    control, app installs, firmware updates, language packs, battery life
+    and the dynamic backlight.
+  - **Pebble 2 HR:** voice replies and the microphone, heart rate,
+    language packs, firmware updates, factory reset, battery life and the
+    dynamic backlight.
 - **Pebble Time Steel** has never run this firmware. It uses the Pebble
   Time's light-sensor calibration, so the backlight may come on at the
   wrong light levels. Please report back if you try it.
+- **Pebble 2 SE** (no heart rate sensor) has never run this firmware. The
+  driver looks for the sensor at boot and should leave it out. Please
+  report back if you try it.
 - **After a factory reset,** pair the phone with the recovery firmware to
   install (it shows no code). This firmware takes over that pairing, so
-  the phone reconnects without pairing again (tested with Android on
-  the Pebble Time).
+  the phone reconnects without pairing again.
 - **Pairings from the stock 4.x firmware** should carry over the same way,
   but this has not been tested. If your phone does not reconnect, forget
   the watch on both sides and pair again.
+- **After a firmware update** the watch may drop the connection once,
+  about 10 seconds after it reconnects, so the phone picks up the changed
+  Bluetooth services. It only does this when they changed, and waits for
+  an app install to finish first.
+- **Heart rate** on the Pebble 2 uses the application already in the
+  sensor. This firmware never updates the sensor; see `docs/boards/silk`
+  for what is known about sensor updates.
+- **Heart rate variability (HRV)** is on for the Pebble 2: while an app
+  asks for HRV, the sensor runs its HRV mode, which stock firmware never
+  used (the Pebble Time 2 works the same way). Pebble 2 apps cannot ask for
+  it yet: in the latest app SDK (4.33.1, with pebble-tool 5.1.1) the HRV
+  request is still a stub for the Pebble 2, so apps need an updated SDK.
+  The sensor's HRV results are not decoded yet either.
 - **If you want to go back to the stock firmware,** do a factory reset
   first: pairings made with this firmware may not be removable otherwise.
 
 ## Building
 
 Follow Core's [getting started guide](https://developer.repebble.com/pebbleos/docs/getting_started/)
-to install the SDK, then build a bundle:
+to install the SDK, then build a bundle for your watch:
 
 ```shell
-pbl configure --board snowy@dvt   # or snowy@s3 for the Time Steel
+pbl configure --board snowy@dvt   # snowy@s3 for the Time Steel, spalding for the Time Round
 pbl bundle
 ```
 
-The board's page in `docs/boards/snowy` has the hardware details.
+The boards' pages in `docs/boards` have the hardware details.
+
+### Pebble 2
+
+The Pebble 2's Bluetooth chip (Dialog DA14681) needs a controller image
+that is built from the Dialog DA1468x SDK 1.0.14.1081. Dialog's license
+does not allow the SDK or the images built from it to be redistributed, so
+they are not in this repository. Get the SDK yourself and build the images
+with `tools/silk_bt`:
+
+```shell
+make -C tools/silk_bt SDK=/path/to/DA1468x_DA15xxx_SDK_1.0.14.1081
+```
+
+Then point the firmware build at them:
+
+```shell
+pbl configure --board silk \
+  -DCONFIG_BT_HCI_UART=y -DCONFIG_BT_CONTROLLER_DA1468X=y \
+  -DCONFIG_BT_DA1468X_STAGE2_IMAGE=$PWD/tools/silk_bt/build/silk_bt_stage2.bin \
+  -DCONFIG_BT_DA1468X_CONTROLLER_IMAGE=$PWD/tools/silk_bt/build/silk_bt.bin
+pbl bundle
+```
+
+A plain `pbl configure --board silk` builds without a Bluetooth radio, so
+the phone will not find the watch. That build is only useful in the
+emulator.
 
 ## Other watches
 
-This branch is one of several ports in this repository. The
-[front page](https://github.com/bjsilvest/PebbleOS-legacy-watches) lists
-them all, with their latest releases. The earlier ports are on the
-`snowy-v4.42.0` (PebbleOS v4.42.0) and `snowy-port` (v4.41.2) branches.
+The original Pebble and Pebble Steel have their own cut-down build on the
+[`legacy-lite`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy-lite)
+branch. The [front page](https://github.com/bjsilvest/PebbleOS-legacy-watches)
+lists every watch with its latest release. Up to PebbleOS v4.43.0 each
+watch had its own branch (`snowy-v4.43.0`, `spalding-v4.43.0`,
+`silk-v4.43.0` and earlier).
 
 ## Support
 
@@ -78,10 +130,15 @@ questions, please [open an issue](https://github.com/bjsilvest/PebbleOS-legacy-w
 
 PebbleOS and the changes in this port are under the Apache License 2.0
 (`LICENSE`). PebbleOS is by Core Devices and builds on the source released
-by Google; the display FPGA bitstream also comes from that source.
-Third-party components keep their own licenses, listed in
-`third_party/sbom.yml`. The [Speex](https://github.com/xiph/speex) codec
-used for voice replies is under a BSD 3-clause license, attached to each
-release as `LICENSE-Speex.txt`. The TI Bluetooth init script
-(`TIInit_6.7.16.bts`) is licensed by Texas Instruments for use only with
-TI devices.
+by Google; the Pebble Time's and Time Round's display FPGA bitstreams also
+come from that source. Third-party components keep their own licenses,
+listed in `third_party/sbom.yml`. The [Speex](https://github.com/xiph/speex)
+codec used for voice replies is under a BSD 3-clause license, attached to
+each release as `LICENSE-Speex.txt`. The TI Bluetooth init script used on
+the Pebble Time and Time Round (`TIInit_6.7.16.bts`) is licensed by Texas
+Instruments for use only with TI devices; its license is attached to each
+release. The Pebble 2's Bluetooth controller image inside its firmware is
+built from the Renesas (Dialog) DA1468x SDK and FreeRTOS and is not under
+the Apache License; it is distributed with Renesas's permission, and its
+notices (`NOTICE-silk-Bluetooth.txt`) and the FreeRTOS source are attached
+to each release.
