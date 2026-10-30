@@ -20,7 +20,6 @@
 #include <pbl/drivers/bluetooth/da1468x.h>
 #endif
 #include <pbl/kernel/assert.h>
-#include <pbl/kernel/delay.h>
 #include <pbl/kernel/fatal.h>
 #include <pbl/services/app_fetch_endpoint.h>
 #include <pbl/services/blob_db/api.h>
@@ -96,9 +95,6 @@ enum {
   SystemInformationItemHrmChanged,
   SystemInformationItemHrmHistory,
   SystemInformationItemHrmHistoryLast = SystemInformationItemHrmHistory + AS7000_PROBE_HISTORY - 1,
-#endif
-#ifdef CONFIG_AMBIENT_LIGHT_STM32_ADC
-  SystemInformationItemLight,
 #endif
   SystemInformationItemFirmware,
   SystemInformationItemLanguage,
@@ -198,9 +194,6 @@ typedef struct SystemInformationData {
   // Per handshake: 0x12 and the first read of the 0x2c block as the title, the second read below
   char hrm_history_title[AS7000_PROBE_HISTORY][16];
   char hrm_history_string[AS7000_PROBE_HISTORY][12];
-#endif
-#ifdef CONFIG_AMBIENT_LIGHT_STM32_ADC
-  char light_string[24];
 #endif
   char const *subtitle_text[SystemInformationItem_Count];
   char language_string[16];
@@ -306,9 +299,6 @@ static const char *s_information_titles[SystemInformationItem_Count] = {
   [SystemInformationItemHrmPrv] = i18n_noop("HRM PRV"),
   [SystemInformationItemHrmChanged] = i18n_noop("HRM changed"),
 #endif
-#ifdef CONFIG_AMBIENT_LIGHT_STM32_ADC
-  [SystemInformationItemLight] = i18n_noop("Light"),
-#endif
   [SystemInformationItemFirmware] = i18n_noop("Firmware"),
   [SystemInformationItemLanguage] = i18n_noop("Language"),
   [SystemInformationItemRecovery] = i18n_noop("Recovery"),
@@ -363,39 +353,6 @@ static uint16_t prv_information_get_num_rows_callback(MenuLayer *menu_layer, uin
   return SystemInformationItem_Count;
 }
 
-#ifdef CONFIG_AMBIENT_LIGHT_STM32_ADC
-//! Times after the backlight goes off to read the light sensor. A phototransistor
-//! can take a long time to settle in the dark after the backlight lit it.
-static const uint32_t s_light_read_ms[] = {250, 1000, 3000};
-
-//! Read the light sensor with the backlight off, for calibrating it.
-static void prv_read_light(SystemInformationData *info) {
-  uint32_t raw[ARRAY_LENGTH(s_light_read_ms)];
-  uint32_t elapsed_ms = 0;
-
-  light_allow(false);
-  for (size_t i = 0; i < ARRAY_LENGTH(s_light_read_ms); i++) {
-    pbl_sleep_ms(s_light_read_ms[i] - elapsed_ms);
-    elapsed_ms = s_light_read_ms[i];
-    raw[i] = 0;
-    (void)pbl_als_read(ALS, &raw[i]);
-  }
-  light_allow(true);
-  light_enable_interaction();
-
-  const uint32_t settled = raw[ARRAY_LENGTH(raw) - 1];
-  if (pbl_als_has_lux(ALS)) {
-    // Keep the raw readings: the lux conversion may still need calibrating.
-    sniprintf(info->light_string, sizeof(info->light_string),
-              "%" PRIu32 " %" PRIu32 " %" PRIu32 " %" PRIu32 "lx", raw[0], raw[1], raw[2],
-              pbl_als_to_lux(ALS, settled));
-  } else {
-    sniprintf(info->light_string, sizeof(info->light_string), "%" PRIu32 " %" PRIu32 " %" PRIu32,
-              raw[0], raw[1], raw[2]);
-  }
-}
-#endif
-
 #ifdef CONFIG_HRM_AS7000_PRV_PROBE
 //! The HRV request the Settings app holds, if any
 static bool prv_hrv_requested(void) {
@@ -438,13 +395,6 @@ static void prv_information_select_callback(MenuLayer *menu_layer, MenuIndex *ce
   if (cell_index->row == SystemInformationItemHrmPrv) {
     SettingsSystemData *data = (SettingsSystemData *)context;
     prv_toggle_hrv(&data->information_data);
-    menu_layer_reload_data(menu_layer);
-  }
-#endif
-#ifdef CONFIG_AMBIENT_LIGHT_STM32_ADC
-  if (cell_index->row == SystemInformationItemLight) {
-    SettingsSystemData *data = (SettingsSystemData *)context;
-    prv_read_light(&data->information_data);
     menu_layer_reload_data(menu_layer);
   }
 #endif
@@ -608,10 +558,6 @@ static void prv_information_window_push(SettingsSystemData *data) {
             (unsigned long)probe.changed);
   info->subtitle_text[SystemInformationItemHrmPrv] = info->hrm_prv_string;
   info->subtitle_text[SystemInformationItemHrmChanged] = info->hrm_changed_string;
-#endif
-#ifdef CONFIG_AMBIENT_LIGHT_STM32_ADC
-  strncpy(info->light_string, "Select to read", sizeof(info->light_string) - 1);
-  info->subtitle_text[SystemInformationItemLight] = info->light_string;
 #endif
   info->subtitle_text[SystemInformationItemFirmware] =
       (char *)(strlen(TINTIN_METADATA.version_tag) >= 2 ? TINTIN_METADATA.version_tag
