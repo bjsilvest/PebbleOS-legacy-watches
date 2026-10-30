@@ -67,8 +67,21 @@
 
         . = ALIGN(8);
         __data_end = .;
+#ifdef CONFIG_COMPRESSED_DATA
+    } >RAM
+
+    /* The deflated .kernel_data, written in after the link
+       (tools/cmake/firmware.py compress-data). */
+    .kernel_data_z : {
+        __data_z_start = .;
+        BYTE(0)
+        . = __data_z_start + CONFIG_COMPRESSED_DATA_RESERVE;
+        __data_z_end = .;
+    } >FLASH
+#else
     } >RAM AT>FLASH
     __data_load_start = LOADADDR(.kernel_data);
+#endif
 
     .stack (NOLOAD) : {
         . = ALIGN(__stack_guard_size__);

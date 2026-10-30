@@ -125,6 +125,7 @@ CONFIG_DEFAULT_LOG_LEVEL_ERROR=y
 CONFIG_CORE_DUMP=y
 CONFIG_LTO_WHOLE_PROGRAM=y
 CONFIG_MERGE_ALL_CONSTANTS=y
+CONFIG_COMPRESSED_DATA=y
 
 # Room for the hourly analytics heartbeat (the phone app's battery page):
 # no fault dump on the serial console, which needs the case opened.

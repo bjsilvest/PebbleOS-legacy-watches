@@ -57,6 +57,21 @@ config LTO_WHOLE_PROGRAM
       points-to analysis (-flto-partition=one -fipa-pta): about 0.6 KB
       smaller on tintin, at the cost of a slower, single-threaded link.
 
+config COMPRESSED_DATA
+    bool "Store the initialized data deflated"
+    help
+      Keep the kernel's initialized data (.data) deflated in flash and
+      inflate it at boot, with the uzlib the resources already use: about
+      1.8 KB smaller on tintin. The image is patched after the link, into a
+      reserve of COMPRESSED_DATA_RESERVE bytes.
+
+config COMPRESSED_DATA_RESERVE
+    int "Flash reserved for the deflated data"
+    depends on COMPRESSED_DATA
+    default 1088
+    help
+      The build fails if the deflated data outgrows it.
+
 config MERGE_ALL_CONSTANTS
     bool "Merge identical constants"
     help

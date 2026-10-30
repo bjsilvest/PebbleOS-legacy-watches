@@ -144,6 +144,17 @@ function(pbl_link_firmware)
   set(bin ${PROJECT_BINARY_DIR}/pebbleos.bin)
   set(objcopy_args -S -R .stack -R .priv_bss -R .bss -R .retained)
 
+  if(CONFIG_COMPRESSED_DATA)
+    # .kernel_data only lives in RAM; the images carry it deflated.
+    list(APPEND objcopy_args -R .kernel_data)
+    add_custom_command(TARGET pebbleos POST_BUILD
+      COMMAND ${PBL_TOOLCHAIN_ENV} ${PYTHON_EXECUTABLE} ${PBL_FIRMWARE_PY} compress-data
+              --elf ${elf} --objcopy ${CMAKE_OBJCOPY}
+      WORKING_DIRECTORY ${PBL_BASE}
+      VERBATIM
+    )
+  endif()
+
   if(CONFIG_PBLBOOT)
     # The bootloader expects an image header ahead of the firmware.
     set(nohdr_hex ${PROJECT_BINARY_DIR}/pebbleos.nohdr.hex)

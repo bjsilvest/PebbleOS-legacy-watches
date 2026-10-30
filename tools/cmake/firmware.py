@@ -212,6 +212,42 @@ def cmd_qemu_image_spi(args):
         f.write(b"\xff" * (image_size - resources_begin - len(resources)))
 
 
+def cmd_compress_data(args):
+    import tempfile
+    import zlib
+
+    with tempfile.TemporaryDirectory() as tmp:
+        data_path = os.path.join(tmp, "data.bin")
+        reserve_path = os.path.join(tmp, "reserve.bin")
+        subprocess.check_call(
+            [args.objcopy, "-O", "binary", "--only-section=.kernel_data", args.elf, data_path]
+        )
+        subprocess.check_call(
+            [args.objcopy, "-O", "binary", "--only-section=.kernel_data_z", args.elf, reserve_path]
+        )
+        with open(data_path, "rb") as f:
+            data = f.read()
+        reserve = os.path.getsize(reserve_path)
+
+        # Raw deflate, as uzlib inflates it in kernel_prep_c()
+        c = zlib.compressobj(9, zlib.DEFLATED, -15, 9)
+        packed = c.compress(data) + c.flush()
+        if zlib.decompress(packed, -15) != data:
+            sys.exit("compress-data: round trip failed")
+        if len(packed) > reserve:
+            sys.exit(
+                f"compress-data: {len(packed)} B of deflated data, "
+                f"CONFIG_COMPRESSED_DATA_RESERVE is {reserve}"
+            )
+
+        with open(reserve_path, "wb") as f:
+            f.write(packed + bytes(reserve - len(packed)))
+        subprocess.check_call(
+            [args.objcopy, f"--update-section=.kernel_data_z={reserve_path}", args.elf]
+        )
+    pprint(f"Initialized data: {len(data)} B, deflated {len(packed)} of {reserve} B")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -237,6 +273,11 @@ def main():
     p.add_argument("--loghash")
     p.add_argument("--layouts")
     p.set_defaults(func=cmd_bundle)
+
+    p = sub.add_parser("compress-data")
+    p.add_argument("--elf", required=True)
+    p.add_argument("--objcopy", required=True)
+    p.set_defaults(func=cmd_compress_data)
 
     p = sub.add_parser("qemu-image-micro")
     p.add_argument("--input", required=True)
