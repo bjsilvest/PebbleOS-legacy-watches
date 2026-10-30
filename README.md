@@ -22,10 +22,9 @@ Energy (NimBLE) in place of the original Bluetooth stack.
 Latest build: v4.43.0-legacy.2, in the release [Legacy watches 4.43.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy)
 with the builds for the other watches.
 
-| Watch       | Board  | Status       |
-|-------------|--------|--------------|
-| Pebble 2 HR | `silk` | Tested       |
-| Pebble 2 SE | `silk` | **Untested** |
+| Watch                | Board  | Status       |
+|----------------------|--------|--------------|
+| Pebble 2 (HR and SE) | `silk` | Tested on HR |
 
 Download `normal_silk_v4.43.0-legacy.2.pbz` and sideload it from the Core
 app. Coming from stock firmware, you also need to pair again over
@@ -34,9 +33,9 @@ notes list what was tested and what changed.
 
 ## Notes
 
-- Tested on the Pebble 2 HR: pairing with Android and iPhone, battery
-  life, the dynamic backlight, heart rate, language packs, firmware
-  updates and factory reset.
+- Tested on the Pebble 2 HR: pairing with Android and iPhone, voice
+  replies and the microphone, battery life, the dynamic backlight, heart
+  rate, language packs, firmware updates and factory reset.
 - **Pebble 2 SE** (no heart rate sensor) has never run this firmware. The
   driver looks for the sensor at boot and should leave it out. Please
   report back if you try it.
