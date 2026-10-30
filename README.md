@@ -45,6 +45,11 @@ notes list what was tested and what changed.
 - **Heart rate** uses the application already in the sensor. This firmware
   never updates the sensor; see `docs/boards/silk` for what is known about
   sensor updates.
+- **Heart rate variability (HRV)** is on: while an app asks for HRV, the
+  sensor runs its HRV mode, which stock firmware never used (the Pebble
+  Time 2 works the same way). Pebble 2 apps need an updated SDK to ask
+  for it, and the sensor's HRV results are not decoded yet, so no app can
+  use it today.
 - **If you want to go back to the stock firmware,** do a factory reset
   first: pairings made with this firmware may not be removable otherwise.
 
