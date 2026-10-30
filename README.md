@@ -19,7 +19,7 @@ Bluetooth Low Energy (NimBLE) in place of the original Bluetooth stack.
 
 ## Download
 
-Latest build: v4.43.0-legacy.1, in the release [Legacy watches 4.43.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy)
+Latest build: v4.43.0-legacy.2, in the release [Legacy watches 4.43.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy)
 with the builds for the other watches.
 
 | Watch             | Board       | Status       |
@@ -41,9 +41,13 @@ notes list what was tested and what changed.
 - **Pebble Time Steel** has never run this firmware. It uses the Pebble
   Time's light-sensor calibration, so the backlight may come on at the
   wrong light levels. Please report back if you try it.
-- **Pairings from stock firmware** are carried over, but this has not been
-  tested with an iPhone. If your iPhone does not reconnect, forget the
-  watch on both sides and pair again.
+- **After a factory reset,** pair the phone with the recovery firmware to
+  install (it shows no code). This firmware takes over that pairing, so
+  the phone reconnects without pairing again (tested with Android on
+  the Pebble Time).
+- **Pairings from the stock 4.x firmware** should carry over the same way,
+  but this has not been tested. If your phone does not reconnect, forget
+  the watch on both sides and pair again.
 - **If you want to go back to the stock firmware,** do a factory reset
   first: pairings made with this firmware may not be removable otherwise.
 
