@@ -23,14 +23,14 @@ Disclaimer: These ports were made with the assistance of LLM coding tools, used 
 
 | Watch | Codename | Latest build | Branch |
 |---|---|---|---|
-| Pebble, Pebble Steel | tintin | [v4.43.0-legacy-lite.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`tintin-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/tintin-v4.43.0) |
-| Pebble Time, Pebble Time Steel | snowy | [v4.43.0-legacy.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`snowy-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/snowy-v4.43.0) |
-| Pebble Time Round | spalding | [v4.43.0-legacy.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`spalding-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/spalding-v4.43.0) |
-| Pebble 2 (HR and SE) | silk | [v4.43.0-legacy.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`silk-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/silk-v4.43.0) |
+| Pebble, Pebble Steel | tintin | [v4.44.0-legacy-lite.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.0-legacy) | [`legacy-lite`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy-lite) |
+| Pebble Time, Pebble Time Steel | snowy | [v4.44.0-legacy.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.0-legacy) | [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) |
+| Pebble Time Round | spalding | [v4.44.0-legacy.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.0-legacy) | [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) |
+| Pebble 2 (HR and SE) | silk | [v4.44.0-legacy.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.0-legacy) | [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) |
 
 All watches share one release per PebbleOS version. Download the
 `.pbz` that matches your watch from the latest release,
-[Legacy watches 4.43.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy). Its notes list, for each
+[Legacy watches 4.44.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.0-legacy). Its notes list, for each
 watch, which hardware revisions have been tested and what changed.
 
 ### Notes per watch
@@ -97,8 +97,14 @@ the `.pbz` as in step 3.
 
 ## Branches
 
-- `<watch>-v4.43.0`: the current port, based on PebbleOS v4.43.0.
-- `<watch>-v4.42.0`: the previous port, based on PebbleOS v4.42.0 (release
+- `legacy`: the Pebble Time, Pebble Time Steel, Pebble Time Round and
+  Pebble 2, from PebbleOS v4.44.0 on. It follows Core's releases; each
+  release is a tag on it.
+- `legacy-lite`: the original Pebble and Pebble Steel's cut-down build of
+  `legacy`.
+- `<watch>-v4.43.0`: one branch per watch, based on PebbleOS v4.43.0
+  (release [Legacy watches 4.43.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy)).
+- `<watch>-v4.42.0`: based on PebbleOS v4.42.0 (release
   [Legacy watches 4.42.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.42.0-legacy)).
 - `snowy-port`, `spalding-port`, `tintin-lite-fork`: the earlier ports,
   based on PebbleOS v4.41.2 (release
@@ -108,11 +114,12 @@ the `.pbz` as in step 3.
 ## Building
 
 Follow Core's [getting started guide](https://developer.repebble.com/pebbleos/docs/getting_started/)
-on the branch for your watch.
+on the branch for your watch: `legacy`, or `legacy-lite` for the
+Pebble and Pebble Steel.
 
 The Pebble 2 also needs an image for its Bluetooth chip, built from the
 Renesas (Dialog) DA1468x SDK, which you have to get yourself: the SDK cannot
-be shared here. The `silk-v4.43.0` branch's README explains how to build it.
+be shared here. The `legacy` branch's README explains how to build it.
 
 ## Support
 
