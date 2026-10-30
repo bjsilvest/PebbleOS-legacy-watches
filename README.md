@@ -26,7 +26,7 @@ Disclaimer: These ports were made with an assistance of LLM coding tools. Initia
 | Pebble, Pebble Steel | tintin | [v4.43.0-legacy-lite.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`tintin-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/tintin-v4.43.0) |
 | Pebble Time, Pebble Time Steel | snowy | [v4.43.0-legacy.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`snowy-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/snowy-v4.43.0) |
 | Pebble Time Round | spalding | [v4.43.0-legacy.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`spalding-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/spalding-v4.43.0) |
-| Pebble 2 | silk | In progress, no release yet | [`silk-port`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/silk-port) |
+| Pebble 2 | silk | [v4.43.0-legacy.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy) | [`silk-v4.43.0`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/silk-v4.43.0) |
 
 All watches share one release per PebbleOS version. Download the
 `.pbz` that matches your watch from the latest release,
@@ -93,6 +93,8 @@ the `.pbz` as in step 3.
   4.43.0-legacy.2, the firmware takes over recovery's pairing, so the phone
   reconnects without pairing again. With 4.43.0-legacy.1, pair again as
   above.
+- **Pebble 2:** the firmware takes over recovery's pairing, so the phone
+  reconnects without pairing again.
 
 ## Branches
 
@@ -122,3 +124,9 @@ Every port except the Pebble and Pebble Steel builds includes the
 [Speex](https://github.com/xiph/speex) speech codec for voice replies.
 Speex is under a BSD 3-clause license; its copyright notice and license
 are attached to each release that includes it as `LICENSE-Speex.txt`.
+
+The Pebble 2 firmware includes an image for its Dialog DA14681 Bluetooth
+chip, built from the Renesas (Dialog) DA1468x SDK and FreeRTOS. That image
+is not under the Apache License: it is distributed with Renesas's
+permission, and its notices (`NOTICE-silk-Bluetooth.txt`) and the FreeRTOS
+source are attached to each release that includes it.
