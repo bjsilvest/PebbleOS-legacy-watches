@@ -37,9 +37,8 @@ static uint32_t prv_timer_clock(const struct pbl_pwm_stm32 *pwm) {
   return pclk * ((clocks.HCLK_Frequency == pclk) ? 1 : 2);
 }
 
-static int prv_timing(const struct pbl_pwm_stm32 *pwm, uint32_t period, uint32_t *prescaler,
-                      uint32_t *reload) {
-  const uint64_t counts = ((uint64_t)prv_timer_clock(pwm) * period) / PBL_NSEC_PER_SEC;
+static int prv_timing(uint32_t clock, uint32_t period, uint32_t *prescaler, uint32_t *reload) {
+  const uint64_t counts = ((uint64_t)clock * period) / PBL_NSEC_PER_SEC;
   const uint64_t psc = (counts > 0U) ? (counts - 1U) / (RELOAD_MAX + 1U) : 0U;
 
   if (counts < 2U || psc > 0xFFFFU) {
@@ -52,33 +51,21 @@ static int prv_timing(const struct pbl_pwm_stm32 *pwm, uint32_t period, uint32_t
   return 0;
 }
 
+//! PWM mode 1 with preload, as TIM_OCxInit() and TIM_OCxPreloadConfig() set it,
+//! without pulling in all four of them.
 static void prv_oc_init(const struct pbl_pwm_stm32 *pwm, uint8_t channel, uint32_t pulse,
                         bool inversed) {
-  TIM_OCInitTypeDef oc;
-  TIM_OCStructInit(&oc);
-  oc.TIM_OCMode = TIM_OCMode_PWM1;
-  oc.TIM_OutputState = TIM_OutputState_Enable;
-  oc.TIM_Pulse = pulse;
-  oc.TIM_OCPolarity = inversed ? TIM_OCPolarity_Low : TIM_OCPolarity_High;
+  TIM_TypeDef *tim = pwm->timer;
+  volatile uint16_t *ccmr = (channel < 2U) ? &tim->CCMR1 : &tim->CCMR2;
+  const uint32_t ccmr_shift = (channel & 1U) * 8U;
+  const uint32_t ccer_shift = channel * 4U;
 
-  switch (channel) {
-    case 0:
-      TIM_OC1Init(pwm->timer, &oc);
-      TIM_OC1PreloadConfig(pwm->timer, TIM_OCPreload_Enable);
-      break;
-    case 1:
-      TIM_OC2Init(pwm->timer, &oc);
-      TIM_OC2PreloadConfig(pwm->timer, TIM_OCPreload_Enable);
-      break;
-    case 2:
-      TIM_OC3Init(pwm->timer, &oc);
-      TIM_OC3PreloadConfig(pwm->timer, TIM_OCPreload_Enable);
-      break;
-    default:
-      TIM_OC4Init(pwm->timer, &oc);
-      TIM_OC4PreloadConfig(pwm->timer, TIM_OCPreload_Enable);
-      break;
-  }
+  tim->CCER &= ~(TIM_CCER_CC1E << ccer_shift);
+  *ccmr = (*ccmr & ~(0xFFU << ccmr_shift)) |
+          ((TIM_OCMode_PWM1 | TIM_OCPreload_Enable) << ccmr_shift);
+  (&tim->CCR1)[channel] = pulse;
+  tim->CCER = (tim->CCER & ~((TIM_CCER_CC1P | TIM_CCER_CC1NP) << ccer_shift)) |
+              ((TIM_CCER_CC1E | (inversed ? TIM_CCER_CC1P : 0U)) << ccer_shift);
 }
 
 static int prv_apply(const struct pbl_pwm_controller *ctrl, uint8_t channel,
@@ -95,7 +82,8 @@ static int prv_apply(const struct pbl_pwm_controller *ctrl, uint8_t channel,
     return -EINVAL;
   }
 
-  ret = prv_timing(pwm, state->period, &prescaler, &reload);
+  const uint32_t clock = prv_timer_clock(pwm);
+  ret = prv_timing(clock, state->period, &prescaler, &reload);
   if (ret != 0) {
     return ret;
   }
@@ -123,7 +111,7 @@ static int prv_apply(const struct pbl_pwm_controller *ctrl, uint8_t channel,
     return -EBUSY;
   }
 
-  const uint32_t tick_hz = prv_timer_clock(pwm) / (prescaler + 1U);
+  const uint32_t tick_hz = clock / (prescaler + 1U);
   const uint32_t pulse =
       MIN((uint32_t)(((uint64_t)state->duty_cycle * tick_hz) / PBL_NSEC_PER_SEC), reload + 1U);
 
@@ -132,14 +120,11 @@ static int prv_apply(const struct pbl_pwm_controller *ctrl, uint8_t channel,
     soc_stm32_stop_block();
     prv_clock(pwm, true);
 
-    TIM_TimeBaseInitTypeDef tim_config;
-    TIM_TimeBaseStructInit(&tim_config);
-    tim_config.TIM_Period = reload;
-    tim_config.TIM_Prescaler = prescaler;
-    tim_config.TIM_CounterMode = TIM_CounterMode_Up;
-    tim_config.TIM_ClockDivision = 0;
-    TIM_TimeBaseInit(pwm->timer, &tim_config);
-    TIM_ARRPreloadConfig(pwm->timer, ENABLE);
+    // Up counting, no clock division, ARR preloaded; UG loads PSC and ARR now.
+    pwm->timer->CR1 = TIM_CR1_ARPE;
+    pwm->timer->ARR = reload;
+    pwm->timer->PSC = prescaler;
+    pwm->timer->EGR = TIM_PSCReloadMode_Immediate;
 
     st->prescaler = prescaler;
     st->reload = reload;
