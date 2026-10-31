@@ -5,7 +5,7 @@
 # PebbleOS for the Pebble and Pebble Steel (tintin)
 
 An unofficial port of [Core Devices' PebbleOS](https://github.com/coredevices/PebbleOS)
-v4.44.0 to the original **Pebble** and the **Pebble Steel**. It uses
+v4.44.1 to the original **Pebble** and the **Pebble Steel**. It uses
 Bluetooth Low Energy (NimBLE) in place of the original Bluetooth stack.
 
 > **Not official.** This project is not made, endorsed or supported by Core
@@ -19,7 +19,7 @@ Bluetooth Low Energy (NimBLE) in place of the original Bluetooth stack.
 
 ## Download
 
-Latest build: v4.44.0-legacy-lite.1, in the release [Legacy watches 4.44.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.0-legacy)
+Latest build: v4.44.1-legacy-lite.1, in the release [Legacy watches 4.44.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.1-legacy)
 with the builds for the other watches.
 
 | Watch                               | Board          | Status       |
@@ -50,6 +50,9 @@ build and its version ends in **-lite**.
   factory reset starts the recovery firmware, you pair with it to install,
   and then pair again with this firmware. Open **Settings → Bluetooth** on
   the watch while the phone pairs, or forget the watch on both sides first.
+  The watch shows a code that you type on the phone: its Bluetooth chip
+  (Bluetooth 4.0) is older than the pairing method that only asks you to
+  confirm a code.
 - **If you want to go back to the stock firmware,** do a factory reset
   first: pairings made with this firmware may not be removable otherwise.
 
