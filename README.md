@@ -23,29 +23,34 @@ Disclaimer: These ports were made with the assistance of LLM coding tools, used 
 
 | Watch | Codename | Latest build | Branch |
 |---|---|---|---|
-| Pebble, Pebble Steel | tintin | [v4.44.0-legacy-lite.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.0-legacy) | [`legacy-lite`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy-lite) |
-| Pebble Time, Pebble Time Steel | snowy | [v4.44.0-legacy.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.0-legacy) | [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) |
-| Pebble Time Round | spalding | [v4.44.0-legacy.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.0-legacy) | [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) |
-| Pebble 2 (HR and SE) | silk | [v4.44.0-legacy.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.0-legacy) | [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) |
+| Pebble, Pebble Steel | tintin | [v4.44.1-legacy-lite.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.1-legacy) | [`legacy-lite`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy-lite) |
+| Pebble Time, Pebble Time Steel | snowy | [v4.44.1-legacy.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.1-legacy) | [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) |
+| Pebble Time Round | spalding | [v4.44.1-legacy.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.1-legacy) | [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) |
+| Pebble 2 (HR and SE) | silk | [v4.44.1-legacy.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.1-legacy) | [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) |
 
 All watches share one release per PebbleOS version. Download the
 `.pbz` that matches your watch from the latest release,
-[Legacy watches 4.44.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.0-legacy). Its notes list, for each
+[Legacy watches 4.44.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.1-legacy). Its notes list, for each
 watch, which hardware revisions have been tested and what changed.
 
 ### Notes per watch
 
-- **Pebble and Pebble Steel** run a cut-down `-lite` build: as the full release does not fit the original Pebble's flash.
-  The timeline is a plain list, and Health, Weather, and the
-  Sports app are not included. Only the Kickstarter Pebble (ev2_4) has been
-  tested; the later Pebble (v1_5) and Pebble Steel (v2_0) builds have not.
+- **Pebble and Pebble Steel** run a cut-down `-lite` build, as the full
+  release does not fit the original Pebble's flash. The timeline is a plain
+  list, and Health, Weather, Timeline Quick View, voice replies, Reminders,
+  the Sports app and the large Gothic 36 / LECO 60 fonts are not included.
+  Only the Kickstarter Pebble (ev2_4) has been tested; the later Pebble
+  (v1_5) and Pebble Steel (v2_0) builds have not.
 - **Pebble Time Steel** has not been tested. It uses the Pebble Time's
   light-sensor calibration.
 - **Pebble 2** has one build for the HR and the SE. Only the Pebble 2 HR
   has been tested; the SE has not. Heart rate uses the application already
   in the sensor, and this firmware never updates the sensor.
-- **Pairings from stock firmware are not carried over.** Pair your phone
-  again after installing.
+- **Pair your phone again after installing from stock firmware.** On the
+  Pebble and Pebble Steel, stock pairings are never carried over. The other
+  watches try to take over a stock Bluetooth LE pairing, but this has not
+  been confirmed, and Android phones paired with stock firmware over
+  Bluetooth Classic, which these builds do not use.
 - **If you want to return to the -rbl firmware, it is recommended you do a factory reset first.** You may not be able to delete paired Bluetooth devices made from the newer firmware.
 
 ## Installing
@@ -74,7 +79,10 @@ update.
    phone's Bluetooth settings.
 5. **Android:** in the Core app, go to **Settings → Connectivity** and
    turn on **Show legacy watches in BLE scan**. iPhones don't need this.
-6. Pair the watch again from the Core app.
+6. Pair the watch again from the Core app. The Pebble 2 pairs like Core's
+   newer watches. The Pebble, Pebble Steel, Pebble Time and Time Round show
+   a code on the watch that you type on the phone: their Bluetooth chips
+   are older than the pairing method that only asks you to confirm a code.
 
 ### Updating from an earlier build of these ports
 
