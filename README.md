@@ -5,7 +5,7 @@
 # PebbleOS for the Pebble Time, Time Round and Pebble 2
 
 An unofficial port of [Core Devices' PebbleOS](https://github.com/coredevices/PebbleOS)
-v4.44.0 to the **Pebble Time**, **Pebble Time Steel**, **Pebble Time
+v4.44.1 to the **Pebble Time**, **Pebble Time Steel**, **Pebble Time
 Round** and **Pebble 2** (HR and SE). It uses Bluetooth Low Energy (NimBLE)
 in place of the original Bluetooth stack.
 
@@ -19,7 +19,7 @@ in place of the original Bluetooth stack.
 
 ## Download
 
-Latest build: v4.44.0-legacy.1, in the release [Legacy watches 4.44.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.0-legacy)
+Latest build: v4.44.1-legacy.1, in the release [Legacy watches 4.44.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.1-legacy)
 with the builds for the original Pebble.
 
 | Watch                | Board       | Status       |
@@ -55,9 +55,15 @@ notes list what was tested and what changed.
 - **After a factory reset,** pair the phone with the recovery firmware to
   install (it shows no code). This firmware takes over that pairing, so
   the phone reconnects without pairing again.
-- **Pairings from the stock 4.x firmware** should carry over the same way,
-  but this has not been tested. If your phone does not reconnect, forget
-  the watch on both sides and pair again.
+- **Pairings from the stock 4.x firmware:** the firmware tries to take
+  over a stock Bluetooth LE pairing the same way, but this has not been
+  confirmed. Android phones paired with stock firmware over Bluetooth
+  Classic, which this firmware does not use, so pair again as in the
+  installing steps.
+- **Pairing a phone:** the Pebble 2 pairs like Core's newer watches. The
+  Pebble Time and Time Round show a code on the watch that you type on the
+  phone: their Bluetooth chip (Bluetooth 4.1) is older than the pairing
+  method that only asks you to confirm a code.
 - **After a firmware update** the watch may drop the connection once,
   about 10 seconds after it reconnects, so the phone picks up the changed
   Bluetooth services. It only does this when they changed, and waits for
