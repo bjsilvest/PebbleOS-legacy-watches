@@ -1,54 +1,49 @@
 # Security Policy
 
+These are unofficial ports of PebbleOS to the original Pebble watches. They
+are not made or supported by Core Devices, so please do not send reports about
+these builds to Core.
+
 ## Supported Versions
 
-Only the firmware version currently published to watches through the official
-Pebble mobile app is supported. This is not necessarily the latest GitHub
-release. A security fix ships either as a fix release of that version (e.g.
-v4.38.4 -> v4.38.5) or in a new minor or major release, also through the
-mobile app. Security updates are free of charge and are released without
-undue delay.
+Only the latest release, listed in the [README](README.md#watches), is
+supported. A fix ships as a new point release of that version (for example
+v4.44.0-legacy.1 -> v4.44.0-legacy.2), which you sideload as described in the
+README. These builds are not delivered through the Pebble mobile app.
 
 ## Reporting a Vulnerability
 
-Please do not report security vulnerabilities in public issues, pull requests
-or forum posts. Report them privately in either of these ways:
-
-- GitHub: open the repository's
-  [Security tab](https://github.com/coredevices/pebbleos/security) and select
-  **Report a vulnerability**.
-- Email: security@repebble.com
+Please do not report security vulnerabilities in public issues or pull
+requests. Instead, open this repository's
+[Security tab](https://github.com/bjsilvest/PebbleOS-legacy-watches/security)
+and select **Report a vulnerability**.
 
 Include:
 
-- the affected firmware version and watch model
+- the watch model and the firmware build (for example v4.44.0-legacy.1)
 - a description of the issue and its impact
 - steps or a minimal app to reproduce it, if you have one
 
-We will acknowledge the report, keep you updated while we investigate, and
-credit you in the published advisory unless you ask us not to.
+This is a one-person project maintained on a best-effort basis. Reports will
+be acknowledged and you will be credited in the fix's release notes unless
+you ask not to be.
 
 ## Scope
 
-This policy covers the PebbleOS firmware and SDK in this repository: for
-example, a third-party app or watchface escaping the app sandbox, reading or
-writing kernel memory, or crashing the watch through a system call.
+This policy covers the changes made for these ports: for example the
+watch-specific drivers, the Bluetooth LE integration for these watches and
+the import of pairings from stock firmware.
 
-Vulnerabilities in the official Pebble mobile app or in the online services
-the watch relies on should be reported to security@repebble.com.
+If the issue is in Core's PebbleOS code and also affects Core's own builds,
+please report it to Core Devices as described in
+[their security policy](https://github.com/coredevices/PebbleOS/security/policy).
+It will be fixed here once Core releases the fix.
 
-## Third-Party Components
-
-PebbleOS includes third-party components, such as NimBLE, Moddable and Mbed
-TLS. If a vulnerability is in one of them, we report it to its maintainers and
-coordinate the fix and disclosure with them. Where required, we also
-coordinate with the relevant national computer security incident response
-teams (CSIRTs).
+These builds do not change the watch's bootloader or recovery firmware (PRF).
+Issues in those, in the Pebble mobile app or in online services are out of
+scope.
 
 ## Disclosure
 
-We fix confirmed vulnerabilities and publish a GitHub security advisory once a
-release containing the fix is available through the mobile app. Each advisory
-describes the vulnerability, the affected versions, its impact and severity,
-and how to get the fix, and references a CVE identifier where one is
-assigned. Please do not disclose the issue publicly before then.
+Please do not disclose the issue publicly until a release containing the fix
+is available. The release notes will describe what was fixed.
