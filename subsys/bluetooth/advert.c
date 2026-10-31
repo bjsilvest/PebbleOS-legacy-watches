@@ -31,10 +31,10 @@
 #include <pbl/services/new_timer/new_timer.h>
 #include <pbl/services/settings/settings_file.h>
 #include <pbl/services/shared_prf_storage/shared_prf_storage.h>
+#include <services/gatt/ble_svc_gatt.h>
 #endif
 #include <kernel/pbl_malloc.h>
 #include <os/os_mbuf.h>
-#include <services/gatt/ble_svc_gatt.h>
 
 PBL_LOG_MODULE_DECLARE(bt, CONFIG_BT_LOG_LEVEL);
 
@@ -600,32 +600,8 @@ static void prv_handle_subscription_event(struct ble_gap_event *event) {
               event->subscribe.prev_indicate, event->subscribe.cur_indicate);
 #ifdef CONFIG_BT_OWN_SERVICE_CHANGED
   // These watches indicate Service Changed themselves, with a reconnect, after pairing and after
-  // an update. The Service Changed server would indicate again 10 s into every reconnect:
-  // mid-link, the Core app rediscovers but loses its PPoGATT session, and the stalled link is
-  // dropped and retried.
+  // an update.
   prv_svc_changed_after_pairing(event);
-#else
-  const ble_uuid16_t svc_uuid = BLE_UUID16_INIT(PBL_BT_GATT_SERVICE_UUID);
-  const ble_uuid16_t chr_uuid = BLE_UUID16_INIT(BLE_SVC_GATT_CHR_SERVICE_CHANGED_UUID16);
-  uint16_t val_handle;
-  if (ble_gatts_find_chr(&svc_uuid.u, &chr_uuid.u, nullptr, &val_handle) != 0 ||
-      event->subscribe.attr_handle != val_handle ||
-      event->subscribe.cur_indicate == event->subscribe.prev_indicate) {
-    return;
-  }
-
-  struct ble_gap_conn_desc desc;
-  if (ble_gap_conn_find(event->subscribe.conn_handle, &desc) != 0) {
-    PBL_LOG_ERR("prv_handle_subscription_event: Failed to find connection descriptor");
-    return;
-  }
-
-  struct pbl_bt_gatt_server_subscribe_event subscribe_event = {
-    .connection_id = event->subscribe.conn_handle,
-    .is_subscribing = event->subscribe.cur_indicate,
-  };
-  nimble_addr_to_pebble_addr(&desc.peer_id_addr, &subscribe_event.dev_address);
-  pbl_bt_cb_gatt_service_changed_server_subscribe(&subscribe_event);
 #endif
 }
 
