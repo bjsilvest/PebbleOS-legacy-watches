@@ -134,6 +134,9 @@ CONFIG_LOG_FROM_FAULT_HANDLER=n
 # RAM is the scarce resource here: smaller buffers than the larger boards.
 CONFIG_ADVANCED_LOGGING_BUFFER_SIZE=600
 CONFIG_SERVICE_ACCEL_MANAGER_MIN_BUFFER_SAMPLES=100
+# A transfer's third chunk buffer left the 17.6 KB kernel heap without room
+# for Bluetooth packets and notifications.
+CONFIG_SERVICE_PUT_BYTES_BUFFERS=2
 
 # Left-handed mode: Settings > Display, 520 B of flash and no RAM.
 CONFIG_ORIENTATION_MANAGER=y
