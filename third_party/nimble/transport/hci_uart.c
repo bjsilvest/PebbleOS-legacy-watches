@@ -72,12 +72,7 @@ PBL_LOG_MODULE_DECLARE(nimble, CONFIG_NIMBLE_LOG_LEVEL);
 #define EVT_POOL_POLL_MS 5U
 
 static struct pbl_thread *s_hci_task_handle;
-#if defined(CONFIG_BT_CONTROLLER_DA1468X) || defined(CONFIG_BT_CONTROLLER_CC2564)
-// Booting the controller also runs on this stack.
-PBL_THREAD_STACK_DEFINE(s_hci_task_stack, 2048);
-#else
-PBL_THREAD_STACK_DEFINE(s_hci_task_stack, 1024);
-#endif
+PBL_THREAD_STACK_DEFINE(s_hci_task_stack, CONFIG_BT_HCI_UART_STACK_SIZE);
 static PBL_SEM_DEFINE(s_rx_ready, 0, 1);
 static PBL_SEM_DEFINE(s_acl_pool_avail, 0, 1);
 static PBL_MUTEX_DEFINE(s_tx_mutex);

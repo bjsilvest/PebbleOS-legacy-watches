@@ -74,3 +74,11 @@ config BT_CC2564_SLEEP_NO_STOP
       The controller still deep sleeps, but STOP stays blocked while
       Bluetooth runs, in case STOP stops MCO1, the controller's slow clock.
       For testing the two apart.
+
+config BT_HCI_UART_STACK_SIZE
+    int "HCI UART thread stack size in bytes"
+    default 2048 if BT_CONTROLLER_DA1468X || BT_CONTROLLER_CC2564
+    default 1024
+    help
+      Booting the DA1468X or CC2564 controller also runs on this thread,
+      so those need the larger stack.
