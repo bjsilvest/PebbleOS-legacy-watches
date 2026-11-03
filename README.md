@@ -9,12 +9,12 @@ to the original Pebble watches. Each port follows Core's tagged releases
 and uses Bluetooth Low Energy (NimBLE) in place of the original Bluetooth
 stack.
 
-Disclaimer: These ports were made with the assistance of LLM coding tools, used for research, coding, review and documentation. All changes were reviewed and tested on real hardware.
-
 > **Not official.** This project is not made, endorsed or supported by Core
 > Devices, Google or Pebble Technology. "Pebble" is a trademark of its owner
 > and is used here only to say which watches these builds run on.
 >
+> **Disclaimer:** These ports were made with the assistance of LLM coding tools, used for research, coding, review and some documentation. All     > changes were reviewed and tested on real hardware by a real human.
+> 
 > **Use at your own risk.** The software comes with no warranty (see
 > Apache 2.0, sections 7–8). These builds leave the watch's bootloader and
 > recovery firmware (PRF) alone, so recovery mode stays available in the event of a crash or update failure.
@@ -28,8 +28,7 @@ Disclaimer: These ports were made with the assistance of LLM coding tools, used 
 | Pebble Time Round | spalding | [v4.44.1-legacy.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.1-legacy) | [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) |
 | Pebble 2 (HR and SE) | silk | [v4.44.1-legacy.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.1-legacy) | [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) |
 
-All watches share one release per PebbleOS version. Download the
-`.pbz` that matches your watch from the latest release,
+Download the `.pbz` that matches your watch from the latest release,
 [Legacy watches 4.44.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.1-legacy). Its notes list, for each
 watch, which hardware revisions have been tested and what changed.
 
