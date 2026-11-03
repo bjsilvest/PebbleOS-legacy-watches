@@ -109,7 +109,7 @@ typedef enum {
   NumResponseCodes
 } ResponseCode;
 
-#define MAX_BATCHED_PB_PUT_OPS 3
+#define MAX_BATCHED_PB_PUT_OPS CONFIG_SERVICE_PUT_BYTES_BUFFERS
 
 typedef struct {
   uint8_t *buffer;
