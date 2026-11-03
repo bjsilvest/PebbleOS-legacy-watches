@@ -40,7 +40,9 @@ watch, which hardware revisions have been tested and what changed.
   list, and Health, Weather, Timeline Quick View, voice replies, Reminders,
   the Sports app and the large Gothic 36 / LECO 60 fonts are not included.
   Only the Kickstarter Pebble (ev2_4) has been tested; the later Pebble
-  (v1_5) and Pebble Steel (v2_0) builds have not.
+  (v1_5) and Pebble Steel (v2_0) builds have not. To find your watch's
+  file, look at **Settings → System → Information → Hardware**: V2R2 is
+  ev2_4, V3R1, V3R2 and V3R3 are v1_5, and 102V1 is v2_0.
 - **Pebble Time Steel** has not been tested. It uses the Pebble Time's
   light-sensor calibration.
 - **Pebble 2** has one build for the HR and the SE. Only the Pebble 2 HR
