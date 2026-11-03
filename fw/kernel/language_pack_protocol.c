@@ -16,6 +16,10 @@
 #define PACK_FLAG_READABLE    (1 << 1)
 #define PACK_FLAG_TRANSLATION (1 << 2)
 
+// The phone always parses this many records; boards with fewer slots report the rest empty.
+#define PACK_RECORD_COUNT 4
+_Static_assert(LANGUAGE_PACK_COUNT <= PACK_RECORD_COUNT, "too many language pack slots");
+
 typedef struct PBL_PACKED {
   uint8_t slot;
   uint8_t flags;
@@ -29,7 +33,7 @@ typedef struct PBL_PACKED {
   SystemMessageType type : 8; // == SysMsgLanguagePacksResponse
   uint8_t token;
   uint8_t active_slot;
-  LanguagePackRecord packs[LANGUAGE_PACK_COUNT];
+  LanguagePackRecord packs[PACK_RECORD_COUNT];
 } SysMsgLanguagePacksResponsePayload;
 
 static const char s_no_locale[ISO_LOCALE_LENGTH];
@@ -47,10 +51,12 @@ void language_pack_protocol_handle_list(CommSession *session, const uint8_t *dat
                  : 0,
     .active_slot = LANGUAGE_PACK_SLOT_ENGLISH,
   };
+  for (uint8_t slot = 0; slot < PACK_RECORD_COUNT; ++slot) {
+    response.packs[slot].slot = slot;
+  }
   const ShellLanguage language = shell_prefs_get_language();
   for (uint8_t slot = 0; slot < LANGUAGE_PACK_COUNT; ++slot) {
     LanguagePackRecord *record = &response.packs[slot];
-    record->slot = slot;
     I18nPackInfo info;
     const bool translation = i18n_get_pack_info(slot, &info);
     if (translation || i18n_pack_has_fonts(slot)) {
