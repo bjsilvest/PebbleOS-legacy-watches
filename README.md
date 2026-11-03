@@ -38,12 +38,12 @@ Download the `.pbz` that matches your watch from the latest release,
   list, and the removal Health, Weather, Timeline Quick View, Reminders,
   the Sports app and API, Gothic 36 font, and LECO 60 font.
 - **Pebble Time Steel** has not been tested on real hardware yet as of version v4.44.1-legacy. It uses the Pebble Time's light-sensor calibration.
-- **Pebble 2** The publish binaries omit the Bluetooth stack and heart rate firmware. The firmware for the heart rate uses the version currently flashed in the in the sensor.
+- **Pebble 2** published binaries omit the Bluetooth stack and heart rate firmware. The firmware for the heart rate uses the version currently flashed in the in the sensor.
 - **Pair your phone again after installing from stock firmware.** On the
   Pebble and Pebble Steel, stock pairings are never carried over. The other
   watches try to take over a stock Bluetooth LE pairing, but this has not
   been confirmed,
-- **If you want to return to the -rbl firmware, it is recommended you do a factory reset first.** You may not be able to delete paired Bluetooth     devices made from the newer firmware.
+- **If you want to return to the latest -rbl firmware, it is recommended you do a factory reset first.** You may not be able to delete paired Bluetooth     devices made from the newer firmware.
 
 ## Installing
 
