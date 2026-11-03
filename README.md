@@ -94,13 +94,11 @@ phone picks up the change. It waits for an app install to finish first.
 
 A factory reset starts the stock recovery firmware. To install again, pair
 the phone with recovery from the Core app (it shows no code), then sideload
-the `.pbz` as in step 3. Recovery pairs without a code, as stock always
-did, so that pairing is not protected against a nearby attacker while it
-happens.
+the `.pbz` as in step 3.
 
 - **Pebble Time, Time Steel, Time Round and Pebble 2:** the firmware takes
   over recovery's pairing, so the phone reconnects without pairing again.
-- **Pebble and Pebble Steel:** recovery's pairing is not carried over, so
+- **Pebble and Pebble Steel:** due to storage constraints, recovery's pairing is not carried over, so
   pair once more after the install. Open **Settings → Bluetooth** on the
   watch and keep it open while the phone pairs, then enter the code the
   watch shows. Alternatively, forget the watch on both sides and pair
@@ -122,25 +120,20 @@ New compared with stock 3.x:
 
 - The 4.x launcher with app glances.
 - Right-to-left text (Arabic, Hebrew) with language packs.
-- Up to four language packs at once with Core app 1.16 or later. Stock
-  allowed one.
-- Battery level in 1% steps. The hardware isn't very precise, so it may
-  jump by 2–3% at times.
+- Up to four language packs at once with Core app 1.16 or later.
+- Battery level in 1% steps.
 - The hourly usage report that Core's own watches send for the Battery
   page in the Core app (needs "Send watch analytics" turned on).
 
 Removed compared with stock 3.x:
 
 - The Sports app and PebbleKit Sports.
-- Bluetooth Classic, so the original Pebble phone app can't connect.
-  iPhones work over LE.
+- Bluetooth Classic, so the original Pebble phone app is not supported.
 - The serial debug console and info/warning logs. Error logs and core
   dumps are kept.
 
-The timeline is a plain list of up to 32 pins, because the animated
-timeline doesn't fit in flash. Health, Weather, Timeline Quick View, Reminders and the Gothic 36 and LECO 60 fonts are not included.
-Stock never had them on this watch either. The Smart Alarm menu is gone
-too, but on this watch it only ever said "requires Pebble Health".
+The timeline feature has been reworked into a plain list of up to 32 pins, because the animated
+timeline doesn't fit in flash. Health, Weather, Smart Alarm Menu, Timeline Quick View, Reminders and the Gothic 36 and LECO 60 fonts are not included.
 
 ### Pebble Time Steel
 
