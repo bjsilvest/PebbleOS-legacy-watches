@@ -97,6 +97,9 @@ typedef struct {
 #ifdef CONFIG_BOARD_SPALDING
 // The round framebuffer leaves AppState no room for 30 entries.
 #define LINE_CACHE_SIZE 20
+#elif defined(CONFIG_BOARD_TINTIN)
+// Room in AppState for four language pack fonts.
+#define LINE_CACHE_SIZE 25
 #else
 #define LINE_CACHE_SIZE 30
 #endif
