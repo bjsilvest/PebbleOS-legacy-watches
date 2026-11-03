@@ -8,6 +8,15 @@ config SERVICE_PUT_BYTES
 
 if SERVICE_PUT_BYTES
 
+config SERVICE_PUT_BYTES_BUFFERS
+    int "Put bytes chunk buffers"
+    range 2 3
+    default 3
+    help
+      Kernel heap buffers of about 2 KiB that a transfer holds to acknowledge
+      chunks before they are written. A board with a small kernel heap can
+      keep fewer, so other allocations don't fail during a transfer.
+
 module = SERVICE_PUT_BYTES
 module-str = Put bytes
 source "subsys/logging/Kconfig.template.log_level"
