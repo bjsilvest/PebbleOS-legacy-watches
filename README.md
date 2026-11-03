@@ -19,7 +19,7 @@ in place of the original Bluetooth stack.
 
 ## Download
 
-Latest build: v4.44.1-legacy.1, in the release [Legacy watches 4.44.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.1-legacy)
+Latest build: v4.44.1-legacy.2, in the release [Legacy watches 4.44.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.1-legacy)
 with the builds for the original Pebble.
 
 | Watch                | Board       | Status       |
