@@ -39,7 +39,7 @@ The original Pebble and Pebble Steel come in three hardware revisions,
 each with its own file. The watch shows its revision in **Settings →
 System → Information → Hardware**:
 
-| Watch shows | Watch | File name contains |
+| Hardware | Watch | File name contains |
 |---|---|---|
 | V2R2 | Pebble, Kickstarter edition | `ev2_4` |
 | V3R1, V3R2, V3R3 | Pebble, later edition | `v1_5` |
