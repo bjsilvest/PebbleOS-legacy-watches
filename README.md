@@ -22,14 +22,15 @@ Bluetooth Low Energy (NimBLE) in place of the original Bluetooth stack.
 Latest build: v4.44.1-legacy-lite.1, in the release [Legacy watches 4.44.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.1-legacy)
 with the builds for the other watches.
 
-| Watch                               | Board          | Status       |
-|-------------------------------------|----------------|--------------|
-| Pebble, Kickstarter edition (ev2_4) | `tintin@ev2_4` | Tested       |
-| Pebble, later edition (v1_5)        | `tintin@v1_5`  | **Untested** |
-| Pebble Steel (v2_0)                 | `tintin@v2_0`  | **Untested** |
+| Watch                               | Watch shows      | Board          | Status       |
+|-------------------------------------|------------------|----------------|--------------|
+| Pebble, Kickstarter edition (ev2_4) | V2R2             | `tintin@ev2_4` | Tested       |
+| Pebble, later edition (v1_5)        | V3R1, V3R2, V3R3 | `tintin@v1_5`  | **Untested** |
+| Pebble Steel (v2_0)                 | 102V1            | `tintin@v2_0`  | **Untested** |
 
-Download the `.pbz` for your hardware revision and sideload it from the
-Core app.
+The watch shows its hardware revision in **Settings → System →
+Information → Hardware**. Download the `.pbz` for that revision and
+sideload it from the Core app.
 Coming from stock firmware, you also need to pair again over Bluetooth
 LE: follow the [installing steps](https://github.com/bjsilvest/PebbleOS-legacy-watches#installing) on the front page. The release
 notes list what was tested and what changed.
