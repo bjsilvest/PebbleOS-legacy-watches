@@ -35,7 +35,7 @@ Download the `.pbz` that matches your watch from the latest release,
 
 - **Pebble and Pebble Steel** run a cut-down `-lite` build, as the full
   release does not fit the original Pebble's flash. Changes include the replacement of the timeline app with a simplified
-  list, and the removal Health, Weather, Timeline Quick View, voice replies, Reminders,
+  list, and the removal Health, Weather, Timeline Quick View, Reminders,
   the Sports app and API, Gothic 36 font, and LECO 60 font.
 - **Pebble Time Steel** has not been tested on real hardware yet as of version v4.44.1-legacy. It uses the Pebble Time's light-sensor calibration.
 - **Pebble 2** The publish binaries omit the Bluetooth stack and heart rate firmware. The firmware for the heart rate uses the version currently flashed in the in the sensor.
