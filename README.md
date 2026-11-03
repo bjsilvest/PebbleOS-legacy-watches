@@ -33,27 +33,19 @@ All watches share one release per PebbleOS version. Download the
 [Legacy watches 4.44.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.1-legacy). Its notes list, for each
 watch, which hardware revisions have been tested and what changed.
 
-### Notes per watch
+### Notes
 
 - **Pebble and Pebble Steel** run a cut-down `-lite` build, as the full
-  release does not fit the original Pebble's flash. The timeline is a plain
-  list, and Health, Weather, Timeline Quick View, voice replies, Reminders,
-  the Sports app and the large Gothic 36 / LECO 60 fonts are not included.
-  Only the Kickstarter Pebble (ev2_4) has been tested; the later Pebble
-  (v1_5) and Pebble Steel (v2_0) builds have not. To find your watch's
-  file, look at **Settings → System → Information → Hardware**: V2R2 is
-  ev2_4, V3R1, V3R2 and V3R3 are v1_5, and 102V1 is v2_0.
-- **Pebble Time Steel** has not been tested. It uses the Pebble Time's
-  light-sensor calibration.
-- **Pebble 2** has one build for the HR and the SE. Only the Pebble 2 HR
-  has been tested; the SE has not. Heart rate uses the application already
-  in the sensor, and this firmware never updates the sensor.
+  release does not fit the original Pebble's flash. Changes include the replacement of the timeline app with a simplified
+  list, and the removal Health, Weather, Timeline Quick View, voice replies, Reminders,
+  the Sports app and API, Gothic 36 font, and LECO 60 font.
+- **Pebble Time Steel** has not been tested. It uses the Pebble Time's light-sensor calibration.
+- **Pebble 2** The publish binaries omit the Bluetooth stack and heart rate firmware. The firmware for the heart rate uses the version currently flashed in the in the sensor.
 - **Pair your phone again after installing from stock firmware.** On the
   Pebble and Pebble Steel, stock pairings are never carried over. The other
   watches try to take over a stock Bluetooth LE pairing, but this has not
-  been confirmed, and Android phones paired with stock firmware over
-  Bluetooth Classic, which these builds do not use.
-- **If you want to return to the -rbl firmware, it is recommended you do a factory reset first.** You may not be able to delete paired Bluetooth devices made from the newer firmware.
+  been confirmed,
+- **If you want to return to the -rbl firmware, it is recommended you do a factory reset first.** You may not be able to delete paired Bluetooth     devices made from the newer firmware.
 
 ## Installing
 
