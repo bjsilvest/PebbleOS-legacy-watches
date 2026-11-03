@@ -116,7 +116,7 @@ pairings made with this firmware.
 ### Pebble and Pebble Steel
 
 The original Pebble has very little flash and RAM, so these watches run a
-cut-down build whose version ends in **-lite**.
+cut-down **-lite** version.
 
 New compared with stock 3.x:
 
@@ -138,12 +138,9 @@ Removed compared with stock 3.x:
   dumps are kept.
 
 The timeline is a plain list of up to 32 pins, because the animated
-timeline doesn't fit in flash. Health, Weather, Timeline Quick View, voice
-replies, Reminders and the Gothic 36 and LECO 60 fonts are not included.
+timeline doesn't fit in flash. Health, Weather, Timeline Quick View, Reminders and the Gothic 36 and LECO 60 fonts are not included.
 Stock never had them on this watch either. The Smart Alarm menu is gone
-too, but on this watch it only ever said "requires Pebble Health". These
-watches have no microphone, so apps that ask for one are told it isn't
-available.
+too, but on this watch it only ever said "requires Pebble Health".
 
 ### Pebble Time Steel
 
@@ -153,14 +150,8 @@ report back.
 
 ### Pebble 2
 
-One file covers the Pebble 2 HR and SE. The firmware checks for the heart
-rate sensor at boot and leaves it out on the SE.
-
-- **Heart rate** uses the application already in the sensor. This firmware
-  never writes the sensor's firmware.
-- **Heart rate variability (HRV)** is on. While an app asks for HRV, the
-  sensor runs its HRV mode, which stock never used, and its LEDs look solid
-  instead of flashing. No app can use it yet, because the app SDK doesn't
+- **Heart rate variability (HRV)** mode has been enabled. The Pebble While an app asks for HRV, the
+  sensor runs its HRV mode, which stock never used. No app can use it yet, because the current app SDK doesn't
   support asking for HRV on the Pebble 2 and the sensor's HRV results are
   not decoded yet.
 
@@ -184,9 +175,9 @@ rate sensor at boot and leaves it out on the SE.
 ## Building
 
 See the README on the [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) or
-[`legacy-lite`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy-lite) branch. The Pebble 2 also needs an
-image for its Bluetooth chip, built from the Renesas (Dialog) DA1468x SDK,
-which you have to get yourself because the SDK can't be shared here.
+[`legacy-lite`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy-lite) branch. 
+
+The Pebble 2 relies on two proprietary components that are not included in this release. First, the heart rate sensor runs on its factory-installed application, and is not included in any releases. Second, the Bluetooth chip requires an image built from the Renesas (Dialog) DA1468x SDK. Because legal/licensing terms prevent us from sharing the SDK here, you will need to acquire it separately to compile the Bluetooth image.
 
 ## Support
 
