@@ -115,9 +115,17 @@ CONFIG_RESOURCES_LARGE_FONTS=n
 # Same glyphs in less space.
 CONFIG_RESOURCES_COMPACT_FONTS=y
 
-# 24 task timers are in use once booted (192 on the bigger watches); give
-# the 3.8 KB back to the kernel heap.
-CONFIG_TASK_TIMER_POOL_SIZE=96
+# 24 task timers are in use once booted and a Pebble Steel peaked at 33 in
+# an hour of use (192 on the bigger watches); give the rest back to the
+# kernel heap.
+CONFIG_TASK_TIMER_POOL_SIZE=64
+
+# Thread stacks sized for the bigger watches, measured on a Pebble Steel
+# (deepest use: HCI 752 B including controller boot, new_timer 488 B,
+# watchdog 304 B). The kernel heap gets the difference.
+CONFIG_BT_HCI_UART_STACK_SIZE=1536
+CONFIG_SERVICE_NEW_TIMER_STACK_SIZE=1024
+CONFIG_TASK_WDT_THREAD_STACK_SIZE=1024
 
 # Room for the GATT client (ANCS, AMS, device names) and core dumps in 496 KiB:
 # errors only in the log, and whole-program LTO.
