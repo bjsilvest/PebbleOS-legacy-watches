@@ -29,8 +29,7 @@ stack.
 | Pebble 2 (HR and SE) | silk | [v4.44.1-legacy.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.1-legacy) | [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) |
 
 Download the `.pbz` that matches your watch from the latest release,
-[Legacy watches 4.44.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.1-legacy). Its notes list, for each
-watch, which hardware revisions have been tested and what changed.
+[Legacy watches 4.44.1](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.44.1-legacy). See the release notes for changed and bug fixes.
 
 ### Notes
 
