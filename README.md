@@ -25,8 +25,7 @@ stack.
 ## Download
 
 Get the `.pbz` for your watch from the
-**[latest release](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/latest)**. Its notes say which builds have
-been tested on real hardware, what changed and any known issues.
+**[latest release](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/latest)**.
 
 | Watch | Codename | Branch |
 |---|---|---|
