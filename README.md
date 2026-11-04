@@ -108,7 +108,7 @@ cut-down **-lite** version.
 New compared with stock 3.x:
 
 - The 4.x launcher with app glances.
-- Right-to-left text (Arabic, Hebrew) with language packs.
+- Support for right-to-left text (Arabic, Hebrew) with language packs.
 - Up to four language packs at once with Core app 1.16 or later.
 - Battery level in 1% steps.
 - The hourly usage report that Core's own watches send for the Battery
@@ -118,8 +118,7 @@ Removed compared with stock 3.x:
 
 - The Sports app and PebbleKit Sports.
 - Bluetooth Classic, so the original Pebble phone app is not supported.
-- The serial debug console and info/warning logs. Error logs and core
-  dumps are kept.
+- The serial debug console and info/warning logs. 
 
 The timeline feature has been reworked into a plain list of up to 32 pins, because the animated
 timeline doesn't fit in flash. Health, Weather, Smart Alarm Menu, Timeline Quick View, Reminders and the Gothic 36 and LECO 60 fonts are not included.
@@ -132,10 +131,7 @@ report back.
 
 ### Pebble 2
 
-- **Heart rate variability (HRV)** mode has been enabled. The Pebble While an app asks for HRV, the
-  sensor runs its HRV mode, which stock never used. No app can use it yet, because the current app SDK doesn't
-  support asking for HRV on the Pebble 2 and the sensor's HRV results are
-  not decoded yet.
+- **Heart rate variability (HRV)** mode enabled. The Pebble 2 heart rate sensor is capable of HRV, but it was never taken enabled in stock. It will only turn on when an app asks for HRV. The sensor requires an app request to activate HRV mode; however, current Pebble SDK limitations prevent apps from requesting this mode. A future SDK update from Core could unlock this capability. Note that HRV data decoding is still actively under development.
 
 ## Branches
 
