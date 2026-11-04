@@ -123,12 +123,6 @@ Removed compared with stock 3.x:
 The timeline feature has been reworked into a plain list of up to 32 pins, because the animated
 timeline doesn't fit in flash. Health, Weather, Smart Alarm Menu, Timeline Quick View, Reminders and the Gothic 36 and LECO 60 fonts are not included.
 
-### Pebble Time Steel
-
-The Time Steel uses the Pebble Time's light sensor calibration, so the
-backlight may come on at the wrong light levels. If you try it, please
-report back.
-
 ### Pebble 2
 
 - **Heart rate variability (HRV)** mode enabled. The Pebble 2 heart rate sensor is capable of HRV, but it was never taken enabled in stock. It will only turn on when an app asks for HRV. The sensor requires an app request to activate HRV mode; however, current Pebble SDK limitations prevent apps from requesting this mode. A future SDK update from Core could unlock this capability. Note that HRV data decoding for Pebble 2 is still actively under development.
