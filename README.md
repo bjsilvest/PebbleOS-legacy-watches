@@ -10,7 +10,7 @@ This branch is the unofficial port of
 **Pebble 2** (HR and SE).
 
 **Downloads, installing, the disclaimer and notes on each watch are on the
-[front page](https://github.com/bjsilvest/PebbleOS-legacy-watches).** See the [latest release](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/latest) for ready to install '.pbz' files.
+[front page](https://github.com/bjsilvest/PebbleOS-legacy-watches).** See the [latest release](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/latest) for ready to install `.pbz` files.
 
 ## Building
 
