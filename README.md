@@ -104,79 +104,79 @@ The following is a list of new features (as of v4.44.1) that the legacy watches 
 
 ### Settings and System ###
 
-Settings sync with the Core app, so most watch settings can be changed from the phone.
-Set time and date by hand, with a Time Source option (automatic or manual).
-Left-handed mode (display rotated 180°).
-Motion Sensitivity setting for shake-to-light and wrist gestures.
-Battery percentage shown to the exact 1%.
-Low-power watchface shows the date as well as the time.
-Text Size moved to the Display menu; open menus re-lay out immediately when it changes.
+- Settings sync with the Core app, so most watch settings can be changed from the phone.
+- Set time and date by hand, with a Time Source option (automatic or manual).
+- Left-handed mode (display rotated 180°).
+- Motion Sensitivity setting for shake-to-light and wrist gestures.
+- Battery percentage shown to the exact 1%.
+- Low-power watchface shows the date as well as the time.
+- Text Size moved to the Display menu; open menus re-lay out immediately when it changes.
 
  ### Backlight ###
 
-Backlight presets: Max Brightness, Standard, Battery Saver, Advanced.
-Dynamic backlight: the light sensor sets the brightness. Core added it; we enabled it and calibrated it on each watch.
-Wake on motion as its own option.
-Quiet Time can turn off motion backlight and the backlight for notifications.
+- Backlight presets: Max Brightness, Standard, Battery Saver, Advanced.
+- Dynamic backlight: the light sensor sets the brightness. Core added it; we enabled it and calibrated it on each watch.
+- Wake on motion as its own option.
+- Quiet Time can turn off motion backlight and the backlight for notifications.
 
 ### Notifications ###
 
-Group by Sender.
-Vibe Timing setting.
-Clock Style for the status bar, including Big & Bold.
-Banner Style (Pebble 2 only, black-and-white watches).
-Dedicated notification text size.
-30-second timeout option.
-Timed mute: 1 hour or Today.
-Quiet Time choice between auto-dismissing notifications and keeping them.
-Images sent with notifications are shown.
-iOS notifications can use custom icons, vibrations and colours.
-Many new app icons (Signal, YouTube, Reddit, WhatsApp-era apps, banks and others).
-Emoji: Rebble emoji set, colour emoji on Time and Time Round, and an emoji grid for quick replies.
+- Group by Sender.
+- Vibe Timing setting.
+- Clock Style for the status bar, including Big & Bold.
+- Banner Style (Pebble 2 only, black-and-white watches).
+- Dedicated notification text size.
+- 30-second timeout option.
+- Timed mute: 1 hour or Today.
+- Quiet Time choice between auto-dismissing notifications and keeping them.
+- Images sent with notifications are shown.
+- iOS notifications can use custom icons, vibrations and colours.
+- Many new app icons (Signal, YouTube, Reddit, WhatsApp-era apps, banks and others).
+- Emoji: Rebble emoji set, colour emoji on Time and Time Round, and an emoji grid for quick replies.
 
 ### Quick Launch ###
 
-A single press of Up or Down on the watchface can launch an app or action; stock had press-and-hold only.
-Hold Back and Back+Up combo shortcuts.
-Picker split into "Actions" and "Apps".
-New actions: Nothing (disable a button), Backlight toggle, Clear notification history.
+- A single press of Up or Down on the watchface can launch an app or action; stock had press-and-hold only.
+- Hold Back and Back+Up combo shortcuts.
+- Picker split into "Actions" and "Apps".
+- New actions: Nothing (disable a button), Backlight toggle, Clear notification history.
 
 ### Vibrations ###
 
-Hourly vibration ("Hourly Notice").
-Vibration when the phone disconnects.
-New built-in patterns, including a "Gentle" alarm.
-Custom vibration patterns sent by the phone.
+- Hourly vibration ("Hourly Notice").
+- Vibration when the phone disconnects.
+- New built-in patterns, including a "Gentle" alarm.
+- Custom vibration patterns sent by the phone.
 
 ### Quiet Time ###
 
-Reorganised into Schedule and Backlight submenus.
-Option to let notifications through.
-Calendar Aware moved into this menu.
+- Reorganised into Schedule and Backlight submenus.
+- Option to let notifications through.
+- Calendar Aware moved into this menu.
 
 ### Apps ###
 
-Full Timeline app in the launcher, with past next to future.
-Timeline: "Unsupported Faces" option for Quick View; notification timestamps on round screens.
-Music: album art (Time and Time Round), fast-forward/rewind icons, volume controls and progress bar settings.
-Weather: wind in m/s and knots.
-Phone calls can be answered from the watch on Android.
+- Full Timeline app in the launcher, with past next to future.
+- Timeline: "Unsupported Faces" option for Quick View; notification timestamps on round screens.
+- Music: album art (Time and Time Round), fast-forward/rewind icons, volume controls and progress bar settings.
+- Weather: wind in m/s and knots.
+- Phone calls can be answered from the watch on Android.
 
 ### Health ###
 
-Health Tracking on/off switch.
-Distance unit setting (km or miles).
-Shows yesterday's sleep until tonight's is recorded.
-Calories shown in kcal; more days shown per screen.
-Pebble 2 HR only: today's heart rate on the HR card, HR monitoring interval (including 5 minutes), and HR during activities.
-Pebble 2 only: deep sleep shown on its black-and-white screen.
+- Health Tracking on/off switch.
+- Distance unit setting (km or miles).
+- Shows yesterday's sleep until tonight's is recorded.
+- Calories shown in kcal; more days shown per screen.
+- Pebble 2 HR only: today's heart rate on the HR card, HR monitoring interval (including 5 minutes), and HR during activities.
+- Pebble 2 only: deep sleep shown on its black-and-white screen.
 
 ### Languages ###
 
-Arabic and Hebrew, with right-to-left text.
-New translations: Danish, Catalan, Japanese, Polish, Ukrainian, simplified Chinese.
-Several language packs installed at once, with a picker listing them.
-Better Unicode coverage: all of Latin Extended-A, plural forms, proper space widths.
+- Arabic and Hebrew, with right-to-left text support.
+- New translations: Danish, Catalan, Japanese, Polish, Ukrainian, simplified Chinese.
+- Several language packs installed at once, with a picker listing them.
+- Better Unicode coverage: all of Latin Extended-A, plural forms, proper space widths.
 
  
 ## Notes
@@ -186,22 +186,16 @@ Better Unicode coverage: all of Latin Extended-A, plural forms, proper space wid
 The original Pebble has very little flash and RAM, so these watches run a
 cut-down **-lite** version.
 
-New compared with stock 3.x:
+Changes compared with stock 3.x:
 
-- The 4.x launcher with app glances.
-- The hourly usage report that Core's own watches send for the Battery
-  page in the Core app (needs "Send watch analytics" turned on).
-
-Removed compared with stock 3.x:
-
-- The Sports app and PebbleKit Sports.
-- Bluetooth Classic, so the original Pebble phone app is not supported.
-- The serial debug console and info/warning logs.
+- Added The 4.x launcher with app glances.
+- Removed The Sports app and PebbleKit Sports.
+- Removed Bluetooth Classic support, so the original Pebble phone app is not supported.
+- Removed The serial debug console and info/warning logs.
 
 Changes in Legacy-lite build:
 
-- The timeline feature has been reworked into a plain list of up to 32 pins, because the animated
-  timeline doesn't fit in flash.
+- The timeline feature has been reworked into a plain list of up to 32 pins to save space in flash.
 - Health, Weather, Smart Alarm Menu, Timeline Quick View, Reminders apps are not included
 - Gothic 36 and LECO 60 fonts are not included.
 
