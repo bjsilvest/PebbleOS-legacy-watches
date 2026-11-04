@@ -5,8 +5,7 @@
 # PebbleOS for the legacy Pebble watches
 
 Unofficial ports of [Core Devices' PebbleOS](https://github.com/coredevices/PebbleOS)
-to the original Pebble watches following Core's tagged releases. These ports use Bluetooth Low Energy (NimBLE) in place of the original Bluetooth
-stack, and therefore do not use Bluetooth Classic or work on the legacy Pebble app.
+to the original Pebble watches. Each release corresponds to a Core's tagged releases. These ports use Bluetooth Low Energy (NimBLE) in place of the original Bluetooth stack, and therefore do not use Bluetooth Classic or work on the legacy Pebble app.
 
 > **Not official.** This project is not made, endorsed or supported by Core
 > Devices, Google or Pebble Technology. "Pebble" is a trademark of its owner
