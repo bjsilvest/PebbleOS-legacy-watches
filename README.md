@@ -11,7 +11,7 @@ This branch is the unofficial port of
 the original Pebble's flash.
 
 **Downloads, installing, the disclaimer changes from the stock firmware
-are on the [front page](https://github.com/bjsilvest/PebbleOS-legacy-watches).** See the [latest release](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/latest) for ready to install '.pbz' files.
+are on the [front page](https://github.com/bjsilvest/PebbleOS-legacy-watches).** See the [latest release](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/latest) for ready to install `.pbz` files.
 
 ## Building
 
