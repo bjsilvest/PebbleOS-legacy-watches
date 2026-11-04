@@ -11,8 +11,7 @@ This branch is the unofficial port of
 tag on it.
 
 **Downloads, installing, the disclaimer and notes on each watch are on the
-[front page](https://github.com/bjsilvest/PebbleOS-legacy-watches).** The [latest release](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/latest) lists what
-changed and what was tested.
+[front page](https://github.com/bjsilvest/PebbleOS-legacy-watches).** See the [latest release](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/latest) for ready to install firmware.
 
 ## Building
 
