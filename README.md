@@ -188,7 +188,7 @@ cut-down **-lite** version.
 
 Changes compared with stock 3.x:
 
-- Added The 4.x launcher with app glances.
+- Added the 4.x launcher with app glances.
 - Removed The Sports app and PebbleKit Sports.
 - Removed Bluetooth Classic support, so the original Pebble phone app is not supported.
 - Removed The serial debug console and info/warning logs.
