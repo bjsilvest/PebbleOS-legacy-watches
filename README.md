@@ -98,7 +98,7 @@ the `.pbz` as in step 3.
 Do a factory reset first. Otherwise you may not be able to remove the
 pairings made with this firmware.
 
-## Notes on each watch
+## Notes
 
 ### Pebble and Pebble Steel
 
@@ -118,10 +118,14 @@ Removed compared with stock 3.x:
 
 - The Sports app and PebbleKit Sports.
 - Bluetooth Classic, so the original Pebble phone app is not supported.
-- The serial debug console and info/warning logs. 
+- The serial debug console and info/warning logs.
 
-The timeline feature has been reworked into a plain list of up to 32 pins, because the animated
-timeline doesn't fit in flash. Health, Weather, Smart Alarm Menu, Timeline Quick View, Reminders and the Gothic 36 and LECO 60 fonts are not included.
+Changes in Legacy-lite build:
+
+- The timeline feature has been reworked into a plain list of up to 32 pins, because the animated
+  timeline doesn't fit in flash.
+- Health, Weather, Smart Alarm Menu, Timeline Quick View, Reminders apps are not included
+- Gothic 36 and LECO 60 fonts are not included.
 
 ### Pebble 2
 
