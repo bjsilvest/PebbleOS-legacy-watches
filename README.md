@@ -13,7 +13,7 @@ stack.
 > Devices, Google or Pebble Technology. "Pebble" is a trademark of its owner
 > and is used here only to say which watches these builds run on.
 >
-> **Disclaimer:** These ports were made with the help of LLM coding tools,
+> **AI Disclaimer.** These ports were made with the help of LLM coding tools,
 > used for research, coding, review and some documentation. All changes
 > were reviewed and tested on real hardware by real humans.
 >
