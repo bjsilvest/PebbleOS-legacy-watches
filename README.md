@@ -6,7 +6,7 @@
 
 This branch is the unofficial port of
 [Core Devices' PebbleOS](https://github.com/coredevices/PebbleOS) to the
-original **Pebble** and the **Pebble Steel**. It is a cut-down build of the
+**Pebble Classic** and the **Pebble Steel**. It is a cut-down build of the
 [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) branch, because the full firmware doesn't fit
 the original Pebble's flash.
 
