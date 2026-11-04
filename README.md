@@ -7,11 +7,11 @@
 This branch is the unofficial port of
 [Core Devices' PebbleOS](https://github.com/coredevices/PebbleOS) to the
 **Pebble Classic** and the **Pebble Steel**. It is a cut-down build of the
-[`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) branch, because the full firmware doesn't fit
+[`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) branch, as the full firmware doesn't fit
 the original Pebble's flash.
 
 **Downloads, installing, the disclaimer changes from the stock firmware
-are on the [front page](https://github.com/bjsilvest/PebbleOS-legacy-watches).** See the [latest release](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/latest) for ready to install firmware.
+are on the [front page](https://github.com/bjsilvest/PebbleOS-legacy-watches).** See the [latest release](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/latest) for ready to install '.pbz' files.
 
 ## Building
 
