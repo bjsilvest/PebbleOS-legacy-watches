@@ -85,8 +85,8 @@ A factory reset starts the stock recovery firmware. To install again, pair
 the phone with recovery from the Core app (it shows no code), then sideload
 the `.pbz` as in step 3.
 
-- **Pebble Time, Time Steel, Time Round and Pebble 2:** the firmware takes
-  over recovery's pairing, so the phone reconnects without pairing again.
+- **Pebble Time, Time Steel, Time Round and Pebble 2:** the firmware should take
+  over recovery's pairing, so the phone reconnects immediately upon reboot without pairing again.
 - **Pebble and Pebble Steel:** due to storage constraints, recovery's pairing is not carried over, so
   pair once more after the install. Open **Settings → Bluetooth** on the
   watch and keep it open while the phone pairs, then enter the code the
