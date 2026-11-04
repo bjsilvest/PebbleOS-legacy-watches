@@ -27,7 +27,7 @@ Get the `.pbz` for your watch from the
 
 | Watch | Codename | Branch |
 |---|---|---|
-| Pebble, Pebble Steel | tintin | [`legacy-lite`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy-lite) |
+| Pebble Classic, Pebble Steel | tintin | [`legacy-lite`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy-lite) |
 | Pebble Time, Pebble Time Steel | snowy | [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) |
 | Pebble Time Round | spalding | [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) |
 | Pebble 2 (HR and SE) | silk | [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) |
