@@ -221,6 +221,27 @@ See the README on the [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-wa
 
 The Pebble 2 relies on two proprietary components that are not included in this release. First, the heart rate sensor runs on its factory-installed application, and is not included in any releases. Second, the Bluetooth chip requires an image built from the Renesas (Dialog) DA1468x SDK. Because legal/licensing terms prevent us from sharing the SDK here, you will need to acquire it separately to compile the Bluetooth image.
 
+## Feedback wanted
+
+Three things need more real-world testing:
+
+- **Dynamic backlight.** The light sensor was calibrated on one watch of
+  each model. Say whether the backlight is too dim, too bright or slow to
+  change, and in what light (dark room, indoors, daylight).
+- **Brightness Calibration** Does the backlight turn on when the room is dark? Does it stay off when out in the sun?
+- **Battery life.** How many days a full charge lasts, compared with stock
+  if you remember it.
+
+If you feel performance is not as good as stock, please [open an issue](https://github.com/bjsilvest/PebbleOS-legacy-watches/issues)
+and include:
+
+- watch model and firmware version (**Settings → System → Information**)
+- phone (Android or iPhone)
+- backlight preset (Standard, Battery Saver, …) and whether motion
+  backlight is on
+- for battery: roughly how many notifications a day, and whether Health or
+  heart rate monitoring is on
+
 ## Support
 
 This project is provided as-is, and may be updated over time. If you have
