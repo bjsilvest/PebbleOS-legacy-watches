@@ -23,11 +23,15 @@ pbl configure --board tintin@ev2_4   # or tintin@v1_5, tintin@v2_0
 pbl bundle
 ```
 
-| Watch shows | Board |
-|---|---|
-| V2R2 | `tintin@ev2_4` |
-| V3R1, V3R2, V3R3 | `tintin@v1_5` |
-| 102V1 (Pebble Steel) | `tintin@v2_0` |
+The original Pebble and Pebble Steel come in three hardware revisions,
+each with its own file. The watch shows its revision in **Settings →
+System → Information → Hardware**:
+
+| Hardware | Watch | File name contains |
+|---|---|---|
+| V2R2 | Pebble, Kickstarter edition | `ev2_4` |
+| V3R1, V3R2, V3R3 | Pebble, later edition | `v1_5` |
+| 102V1 | Pebble Steel | `v2_0` |
 
 The board's page in `docs/boards/tintin` has the hardware details.
 
