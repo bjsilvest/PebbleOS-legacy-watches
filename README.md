@@ -212,7 +212,7 @@ Changes in Legacy-lite build:
   release is a tag on it.
 - `legacy-lite`: the original Pebble and Pebble Steel's cut-down build of
   `legacy`.
-- Older branches and releases are retained for historical reference. They are less stable than the current release and are not           recommended for daily use."
+- Older branches and releases are retained for historical reference. They are less stable than the current release and are not           recommended for daily use.
 
 ## Building
 
