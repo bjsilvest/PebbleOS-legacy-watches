@@ -193,11 +193,12 @@ Changes compared with stock 3.x:
 - Removed Bluetooth Classic support, so the original Pebble phone app is not supported.
 - Removed The serial debug console and info/warning logs.
 
-Changes in Legacy-lite build:
+Due to storage constraints, `legacy-lite` includes the following changes compared to `legacy`:
 
-- The timeline feature has been reworked into a plain list of up to 32 pins to save space in flash.
-- Health, Weather, Smart Alarm Menu, Timeline Quick View, Reminders apps are not included
-- Gothic 36 and LECO 60 fonts are not included.
+- The timeline feature has been reworked into a plain list of up to 32 pins.
+- Health, Weather, Smart Alarm Menu, Timeline Quick View, Reminders apps are not included.
+- The new Gothic 36 and LECO 60 fonts are not included.
+- Some animations have been removed.
 
 ### Pebble 2
 
@@ -207,12 +208,11 @@ Changes in Legacy-lite build:
 
 - `main`: Core's `main` branch from when this repository was made, with
   this page.
-- `legacy`: the Pebble Time, Pebble Time Steel, Pebble Time Round and
-  Pebble 2, from PebbleOS v4.44.0 on. It follows Core's releases, and each
-  release is a tag on it.
-- `legacy-lite`: the original Pebble and Pebble Steel's cut-down build of
+- `legacy`: the build for Pebble Time, Pebble Time Steel, Pebble Time Round and
+  Pebble 2.
+- `legacy-lite`: the Pebble Classic and Pebble Steel's cut-down build of
   `legacy`.
-- Older branches and releases are retained for historical reference. They are less stable than the current release and are not           recommended for daily use.
+- Older branches and releases are retained for historical reference. They are less stable than the current release and are not recommended for daily use.
 
 ## Building
 
@@ -223,7 +223,7 @@ The Pebble 2 relies on two proprietary components that are not included in this 
 
 ## Feedback wanted
 
-Three things need more real-world testing:
+Things need more real-world testing:
 
 - **Dynamic backlight.** The light sensor was calibrated on one watch of
   each model. Say whether the backlight is too dim, too bright or slow to
