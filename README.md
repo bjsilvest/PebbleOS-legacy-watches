@@ -7,11 +7,10 @@
 This branch is the unofficial port of
 [Core Devices' PebbleOS](https://github.com/coredevices/PebbleOS) to the
 **Pebble Time**, **Pebble Time Steel**, **Pebble Time Round** and
-**Pebble 2** (HR and SE). It follows Core's releases, and each release is a
-tag on it.
+**Pebble 2** (HR and SE).
 
 **Downloads, installing, the disclaimer and notes on each watch are on the
-[front page](https://github.com/bjsilvest/PebbleOS-legacy-watches).** See the [latest release](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/latest) for ready to install firmware.
+[front page](https://github.com/bjsilvest/PebbleOS-legacy-watches).** See the [latest release](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/latest) for ready to install '.pbz' files.
 
 ## Building
 
