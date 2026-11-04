@@ -173,7 +173,6 @@ The following is a list of new features (as of v4.44.1) that have been introduce
 
 ### Languages ###
 
-- Arabic and Hebrew, with right-to-left text support.
 - New translations: Danish, Catalan, Japanese, Polish, Ukrainian, simplified Chinese.
 - Several language packs installed at once, with a picker listing them.
 - Better Unicode coverage: all of Latin Extended-A, plural forms, proper space widths.
@@ -189,6 +188,7 @@ cut-down **-lite** version.
 Changes compared with stock 3.x:
 
 - Added the 4.x launcher with app glances.
+- Added right-to-left text support (Arabic/Hebrew).
 - Removed The Sports app and PebbleKit Sports.
 - Removed Bluetooth Classic support, so the original Pebble phone app is not supported.
 - Removed The serial debug console and info/warning logs.
