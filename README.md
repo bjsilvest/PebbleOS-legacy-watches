@@ -133,20 +133,14 @@ Changes in Legacy-lite build:
 
 ## Branches
 
+- `main`: Core's `main` branch from when this repository was made, with
+  this page.
 - `legacy`: the Pebble Time, Pebble Time Steel, Pebble Time Round and
   Pebble 2, from PebbleOS v4.44.0 on. It follows Core's releases, and each
   release is a tag on it.
 - `legacy-lite`: the original Pebble and Pebble Steel's cut-down build of
   `legacy`.
-- `<watch>-v4.43.0`: one branch per watch, based on PebbleOS v4.43.0
-  (release [Legacy watches 4.43.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.43.0-legacy)).
-- `<watch>-v4.42.0`: based on PebbleOS v4.42.0 (release
-  [Legacy watches 4.42.0](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.42.0-legacy)).
-- `snowy-port`, `spalding-port`, `tintin-lite-fork`: the earlier ports,
-  based on PebbleOS v4.41.2 (release
-  [Legacy watches 4.41.2](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/tag/v4.41.2-legacy)).
-- `main`: Core's `main` branch from when this repository was made, with
-  this page.
+- Older branches and releases are retained for historical reference. They are less stable than the current release and are not           recommended for daily use."
 
 ## Building
 
