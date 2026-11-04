@@ -2,7 +2,7 @@
   <img src="docs/_static/images/logo.svg" alt="PebbleOS" width="320">
 </p>
 
-# PebbleOS for the Pebble and Pebble Steel (tintin)
+# PebbleOS for the Pebble Classic and Pebble Steel
 
 This branch is the unofficial port of
 [Core Devices' PebbleOS](https://github.com/coredevices/PebbleOS) to the
