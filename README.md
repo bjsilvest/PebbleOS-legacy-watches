@@ -202,7 +202,7 @@ Due to storage constraints, `legacy-lite` includes the following changes compare
 
 ### Pebble 2
 
-- **Heart rate variability (HRV)** mode enabled. The Pebble 2 heart rate sensor is capable of HRV, but it was never taken enabled in stock. It will only turn on when an app asks for HRV. The sensor requires an app request to activate HRV mode; however, current Pebble SDK limitations prevent apps from requesting this mode. A future SDK update from Core could unlock this capability. Note that HRV data decoding for Pebble 2 is still actively under development.
+- **Heart rate variability (HRV)** mode enabled. The Pebble 2 heart rate sensor is capable of HRV, but it was never enabled in stock. It will only turn on when an app asks for HRV. The sensor requires an app request to activate HRV mode; however, current Pebble SDK limitations prevent apps from requesting this mode. A future SDK update from Core could unlock this capability. Note that HRV data decoding for Pebble 2 is still actively under development.
 
 ## Branches
 
