@@ -5,9 +5,8 @@
 # PebbleOS for the legacy Pebble watches
 
 Unofficial ports of [Core Devices' PebbleOS](https://github.com/coredevices/PebbleOS)
-to the original Pebble watches. Each port follows Core's tagged releases
-and uses Bluetooth Low Energy (NimBLE) in place of the original Bluetooth
-stack.
+to the original Pebble watches following Core's tagged releases. These ports use Bluetooth Low Energy (NimBLE) in place of the original Bluetooth
+stack, and therefore do not use Bluetooth Classic or work on the legacy Pebble app.
 
 > **Not official.** This project is not made, endorsed or supported by Core
 > Devices, Google or Pebble Technology. "Pebble" is a trademark of its owner
@@ -266,6 +265,3 @@ questions, please [open an issue](https://github.com/bjsilvest/PebbleOS-legacy-w
   firmware is built with the Renesas (Dialog) DA1468x SDK and FreeRTOS. It
   is not under the Apache License and is distributed with Renesas's
   permission.
-
-Each release has the matching license files, notices and the FreeRTOS
-source attached next to the firmware files.
