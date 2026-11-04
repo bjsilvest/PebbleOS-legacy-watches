@@ -34,16 +34,6 @@ Get the `.pbz` for your watch from the
 | Pebble Time Round | spalding | [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) |
 | Pebble 2 (HR and SE) | silk | [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) |
 
-The original Pebble and Pebble Steel come in three hardware revisions,
-each with its own file. The watch shows its revision in **Settings →
-System → Information → Hardware**:
-
-| Hardware | Watch | File name contains |
-|---|---|---|
-| V2R2 | Pebble, Kickstarter edition | `ev2_4` |
-| V3R1, V3R2, V3R3 | Pebble, later edition | `v1_5` |
-| 102V1 | Pebble Steel | `v2_0` |
-
 ## Installing
 
 Install the firmware from the Core app on your phone. You need the Core
