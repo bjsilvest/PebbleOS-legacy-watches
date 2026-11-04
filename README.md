@@ -11,7 +11,7 @@ original **Pebble** and the **Pebble Steel**. It is a cut-down build of the
 the original Pebble's flash.
 
 **Downloads, installing, the disclaimer changes from the stock firmware
-are on the [front page](https://github.com/bjsilvest/PebbleOS-legacy-watches).** The [latest release](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/latest) lists the latest updates.
+are on the [front page](https://github.com/bjsilvest/PebbleOS-legacy-watches).** See the [latest release](https://github.com/bjsilvest/PebbleOS-legacy-watches/releases/latest) for ready to install firmware.
 
 ## Building
 
