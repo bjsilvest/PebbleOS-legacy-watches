@@ -22,6 +22,8 @@
 #include <resource/resource_ids.auto.h>
 #include <shell/prefs.h>
 
+#ifdef CONFIG_SERVICE_MIC_MANAGER
+
 #define ICON_MIN_TOP (4)
 
 #if PBL_RECT
@@ -434,3 +436,34 @@ void mic_banner_handle_process_kill(void) {
 bool mic_banner_is_visible(void) {
   return s_banner.visible;
 }
+
+#else
+
+// Without the mic manager no app can take the microphone, so the banner never shows
+
+void mic_banner_init(void) {
+}
+
+void mic_banner_show(void) {
+}
+
+void mic_banner_hide(void) {
+}
+
+void mic_banner_handle_process_kill(void) {
+}
+
+bool mic_banner_is_visible(void) {
+  return false;
+}
+
+int16_t mic_banner_get_obstruction_origin_y(void) {
+  return DISP_ROWS;
+}
+
+bool mic_banner_get_accessory_area(GRect *area_out) {
+  *area_out = GRectZero;
+  return false;
+}
+
+#endif // CONFIG_SERVICE_MIC_MANAGER
