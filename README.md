@@ -217,7 +217,7 @@ Due to storage constraints, `legacy-lite` includes the following changes compare
 See the README on the [`legacy`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy) or
 [`legacy-lite`](https://github.com/bjsilvest/PebbleOS-legacy-watches/tree/legacy-lite) branch. 
 
-The Pebble 2 relies on two proprietary components that are not included in this release. First, the heart rate sensor runs on its factory-installed application, and is not included in any releases. Second, the Bluetooth chip requires an image built from the Renesas (Dialog) DA1468x SDK. Because legal/licensing terms prevent us from sharing the SDK here, you will need to acquire it separately to compile the Bluetooth image.
+The Pebble 2 relies on two proprietary components that are not included in this release. First, the heart rate sensor runs on its already installed application from stock, and is not included or modified by any of these releases. Second, the Bluetooth chip requires an image built from the Renesas (Dialog) DA1468x SDK. Because legal/licensing terms prevent us from sharing the SDK here, you will need to acquire it separately to compile the Bluetooth image. See the legacy branch for more info.
 
 ## Feedback wanted
 
