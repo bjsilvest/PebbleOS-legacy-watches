@@ -98,7 +98,7 @@ pairings made with this firmware.
 
 ## New Features
 
-The following is a list of new features (as of v4.44.1) that have been introduced to PebbleOS that the legacy watches can now take advantage of.
+The following is a list of new features (as of v4.44.4) that have been introduced to PebbleOS that the legacy watches can now take advantage of.
 
 ### Settings and System ###
 
