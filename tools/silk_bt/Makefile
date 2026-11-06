@@ -2,8 +2,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Builds the silk DA14681 images: the HCI controller and the stage 2 loader.
-# They are built from the Dialog DA1468x SDK 1.0.14.1081, which may not be
-# redistributed, and neither may the output. See docs/boards/silk.
+# They are built from the proprietary Dialog DA1468x SDK 1.0.14.1081, which
+# is not in this tree. Release firmware carries the images with permission
+# from Renesas; the SDK and the images on their own may not be
+# redistributed. See docs/boards/silk.
 #
 #   make -C tools/silk_bt SDK=/path/to/DA1468x_DA15xxx_SDK_1.0.14.1081
 

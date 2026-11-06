@@ -310,10 +310,13 @@ it never changes, and it matches the address the legacy firmware used.
 
 ### Building
 
-The Dialog DA1468x SDK 1.0.14.1081 (with hotfix 002) may not be
-redistributed, and neither may images built from it, so neither is in this
-tree, and firmware built with them is for personal use only. Without them
-silk builds with the fake controller (no Bluetooth).
+The Dialog DA1468x SDK 1.0.14.1081 (with hotfix 002) is proprietary, so
+neither it nor the images built from it are in this tree. The release
+firmware carries the controller image with permission from Renesas (see the
+Bluetooth notice attached to each release). That permission covers the image
+only as part of this firmware on a Pebble 2, not the SDK or the image on its
+own, so to build with Bluetooth you need your own copy of the SDK. Without
+it, silk builds with the fake controller (no Bluetooth).
 
 ```shell
 make -C tools/silk_bt SDK=/path/to/DA1468x_DA15xxx_SDK_1.0.14.1081 \
