@@ -58,10 +58,8 @@ update.
 5. **Android:** in the Core app, go to **Settings → Connectivity** and
    turn on **Show legacy watches in BLE scan**. iPhones don't need this.
 6. Pair the watch again from the Core app. The Pebble 2 pairs like Core's
-   newer watches. The Pebble, Pebble Steel, Pebble Time and Time Round show
-   a code on the watch that you type on the phone, because their Bluetooth
-   chips are older than the pairing method that only asks you to confirm a
-   code.
+   newer watches. The Pebble Classic, Pebble Steel, Pebble Time and Time Round may show
+   a code on the watch that needs to be typed on the phone due to their older Bluetooth version.
 
 On the Pebble and Pebble Steel, stock pairings are never carried over. The
 other watches try to take over a stock Bluetooth LE pairing, but this has
