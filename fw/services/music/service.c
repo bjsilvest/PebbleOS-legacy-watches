@@ -67,10 +67,14 @@ struct MusicServiceContext {
   bool skip_seeks_within_track;
 
   //! Album art for the current track, or NULL if none. Owned by the service; freed with
-  //! kernel_free. Deliberately kept (up to ~34 KB of kernel heap on the largest displays) even
-  //! while the Music app is closed, so reopening it shows the cover instantly; a track change,
-  //! NoArt reply or server disconnect replaces or frees it.
+  //! kernel_free. Kept only while the Music app is open: it takes up to ~34 KB of kernel heap, so
+  //! holding it while the app is closed can leave too little for the rest of the system. A track
+  //! change, NoArt reply or server disconnect also replaces or frees it.
   GBitmap *album_art;
+
+  //! Whether the Music app is open. Art that arrives while it is closed is dropped.
+  //! @see music_album_art_set_in_use
+  bool album_art_in_use;
 
   //! The now_playing_generation the current album art response was for. A track change bumps
   //! now_playing_generation without clearing the art (so the previous art stays on screen until the
@@ -586,6 +590,19 @@ void music_set_album_art(GBitmap *bitmap, uint8_t token) {
     return;
   }
 
+  if (!s_music_ctx.album_art_in_use) {
+    // The Music app closed while the art was in flight. Don't hold it on the kernel heap; the app
+    // requests it again when it opens.
+    PBL_LOG_DBG("Drop album art token=%u, Music app closed", token);
+    if (bitmap) {
+      kernel_free(bitmap->addr);
+      kernel_free(bitmap->palette);
+      kernel_free(bitmap);
+    }
+    pbl_mutex_unlock(&s_music_ctx.mutex);
+    return;
+  }
+
   prv_free_album_art_locked();
   s_music_ctx.album_art = bitmap;
   // Record that we've now got a response (art, or NULL for NoArt) for this track, so the Music app
@@ -608,6 +625,17 @@ void music_album_art_transfer_failed(uint8_t token) {
     PBL_LOG_DBG("Ignore stale album art failure token=%u current=%u", token,
                 music_get_now_playing_generation());
   }
+}
+
+void music_album_art_set_in_use(bool in_use) {
+  pbl_mutex_lock(&s_music_ctx.mutex, PBL_FOREVER);
+  s_music_ctx.album_art_in_use = in_use;
+  if (!in_use) {
+    prv_free_album_art_locked();
+    // No art is held any more, so the next open must request it again.
+    s_music_ctx.album_art_generation = s_music_ctx.now_playing_generation - 1;
+  }
+  pbl_mutex_unlock(&s_music_ctx.mutex);
 }
 
 bool music_album_art_is_current(void) {

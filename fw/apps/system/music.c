@@ -1753,6 +1753,8 @@ static void prv_music_event_handler(PebbleEvent *event, void *context) {
 // App boilerplate
 
 static void prv_handle_init(void) {
+  music_album_art_set_in_use(true);
+
   MusicAppData *data = app_malloc_check(sizeof(MusicAppData));
   *data = (MusicAppData){};
   app_state_set_user_data(data);
@@ -1823,6 +1825,8 @@ static void prv_handle_deinit(void) {
   // Detach the action bar so its touch-nav snapshot does not keep routing taps after the app exits.
   action_bar_layer_remove_from_window(&data->action_bar);
   i18n_free_all(data);
+
+  music_album_art_set_in_use(false);
 }
 
 static void prv_main(void) {

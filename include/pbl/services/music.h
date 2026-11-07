@@ -241,6 +241,16 @@ struct GBitmap;
 uint8_t music_get_now_playing_generation(void);
 
 /**
+ * @brief Tell the service whether the Music app is open and showing album art.
+ *
+ * Album art is only kept while this is true. Setting it to false frees the held art and marks it
+ * as not current, so it is requested again next time; art that arrives meanwhile is dropped.
+ *
+ * @param in_use True when the Music app opens, false when it closes.
+ */
+void music_album_art_set_in_use(bool in_use);
+
+/**
  * @brief Check whether the held album art belongs to the current track.
  *
  * True once a response (art or "no art") was received for the current generation. The previous

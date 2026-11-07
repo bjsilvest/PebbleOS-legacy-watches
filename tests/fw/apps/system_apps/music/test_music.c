@@ -107,6 +107,9 @@ void music_album_art_unlock(void) {
   s_album_art_lock_depth--;
 }
 
+void music_album_art_set_in_use(bool in_use) {
+}
+
 bool music_album_art_is_current(void) {
   return s_album_art_current;
 }
