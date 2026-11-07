@@ -241,6 +241,16 @@ struct GBitmap;
 uint8_t music_get_now_playing_generation(void);
 
 /**
+ * @brief Tell the service whether the Music app is open and showing album art.
+ *
+ * Album art is only kept while this is true. Setting it to false frees the held art and marks it
+ * as not current, so it is requested again next time; art that arrives meanwhile is dropped.
+ *
+ * @param in_use True when the Music app opens, false when it closes.
+ */
+void music_album_art_set_in_use(bool in_use);
+
+/**
  * @brief Check whether the held album art belongs to the current track.
  *
  * True once a response (art or "no art") was received for the current generation. The previous
@@ -252,7 +262,7 @@ uint8_t music_get_now_playing_generation(void);
 bool music_album_art_is_current(void);
 
 /**
- * @brief Borrow the current album art for drawing.
+ * @brief Borrow the album art that arrived, to copy it.
  *
  * Holds the service lock until music_album_art_unlock(), which must always be called, even when
  * NULL is returned. The pointer must not be used after unlocking.
@@ -263,5 +273,22 @@ const struct GBitmap *music_album_art_lock(void);
 
 /** @brief Release the album art borrowed with music_album_art_lock(). */
 void music_album_art_unlock(void);
+
+/**
+ * @brief Get a counter that changes whenever the album art to show changes.
+ *
+ * Bumped on new art, a "no art" reply and a server connect or disconnect, but not by
+ * music_album_art_release_held(). A Music app holding its own copy drops it when this changes.
+ *
+ * @return Current serial.
+ */
+uint8_t music_album_art_get_serial(void);
+
+/**
+ * @brief Free the held album art once the Music app has copied it into its own heap.
+ *
+ * The art stays current for its track, so it is not requested again.
+ */
+void music_album_art_release_held(void);
 
 /** @} */

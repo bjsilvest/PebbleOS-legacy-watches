@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <pbl/logging/logging.h>
 #include <pbl/services/clock.h>
 #include <pbl/services/i18n/i18n.h>
 #include <pbl/services/imaging.h>
@@ -323,9 +324,13 @@ typedef struct {
   EventServiceInfo event_info;
 
   // Album art fills the top (where the artist/title normally sit). When shown, the artist is hidden
-  // and the track title moves down beside the tape. Art itself is owned by the music service; this
-  // layer just blits it.
+  // and the track title moves down beside the tape. The art arrives on the kernel heap; the app
+  // copies it into its own heap (album_art) and lets the service free the kernel copy, so it does
+  // not take kernel memory that voice replies and others need while the app is open.
   Layer album_art_layer;
+  GBitmap *album_art;
+  //! music_album_art_get_serial() the album_art copy belongs to
+  uint8_t album_art_serial;
   bool has_album_art;
   // Last now-playing generation we requested art for, so a track change re-fetches even if the
   // title/artist strings happen to match.
@@ -1288,8 +1293,8 @@ static void prv_draw_round_progress(GContext *ctx, const GRect *bounds) {
 #endif
 
 static void prv_album_art_update_proc(Layer *layer, GContext *ctx) {
-  // Hold the art locked for the whole draw so the service can't free it mid-blit.
-  const GBitmap *art = music_album_art_lock();
+  MusicAppData *data = app_state_get_user_data();
+  const GBitmap *art = data->album_art;
   if (art && shell_prefs_get_music_show_album_art()) {
     // The phone renders the whole cover to the content width, so it fills the square; centre it in
     // case the box is a touch shorter than the cover.
@@ -1299,7 +1304,6 @@ static void prv_album_art_update_proc(Layer *layer, GContext *ctx) {
     graphics_context_set_compositing_mode(ctx, GCompOpAssign);
     graphics_draw_bitmap_in_rect(ctx, art, &dst);
   }
-  music_album_art_unlock();
 #if MUSIC_ROUND_MEDIA_LAYOUT
   // The layer doubles as the round backdrop: the arc and times draw with or without a cover.
   prv_draw_round_progress(ctx, &layer->bounds);
@@ -1497,13 +1501,43 @@ static void prv_artist_restore(MusicAppData *data) {
   layer_set_clips(&data->artist_text_layer.layer, false);
 }
 
+//! Copy art that arrived into the app heap and free the kernel copy. Drops the app's copy when the
+//! service says the art changed (new track art, no art, or a server disconnect).
+static void prv_sync_album_art(MusicAppData *data) {
+  const GBitmap *art = music_album_art_lock();
+  const uint8_t serial = music_album_art_get_serial();
+  if (serial != data->album_art_serial) {
+    gbitmap_destroy(data->album_art);
+    data->album_art = nullptr;
+    data->album_art_serial = serial;
+  }
+  if (art) {
+    if (!data->album_art) {
+      GBitmap *copy = gbitmap_create_blank(art->bounds.size, gbitmap_get_format(art));
+      if (copy && (copy->row_size_bytes == art->row_size_bytes)) {
+        memcpy(copy->addr, art->addr, (size_t)art->row_size_bytes * art->bounds.size.h);
+        const uint8_t palette_size = gbitmap_get_palette_size(gbitmap_get_format(art));
+        if (palette_size > 0) {
+          memcpy(copy->palette, art->palette, palette_size * sizeof(GColor));
+        }
+        data->album_art = copy;
+      } else {
+        PBL_LOG_WRN("No room to copy the album art");
+        gbitmap_destroy(copy);
+      }
+    }
+    // Free the kernel copy even if ours failed: holding it can starve the kernel heap.
+    music_album_art_release_held();
+  }
+  music_album_art_unlock();
+}
+
 //! Reflect the current art state: show/hide the cover, lay out the artist (outlined, over the art)
 //! and the scrolling title, and outline the clock so it stays legible over
 //! the cover. A full-window repaint clears the moved layers' old pixels.
 static void prv_apply_art_appearance(MusicAppData *data) {
-  const GBitmap *art = music_album_art_lock();
-  data->has_album_art = (art != nullptr) && shell_prefs_get_music_show_album_art();
-  music_album_art_unlock();
+  prv_sync_album_art(data);
+  data->has_album_art = (data->album_art != nullptr) && shell_prefs_get_music_show_album_art();
 
   layer_set_hidden(&data->album_art_layer, !prv_use_media_layout(data));
   if (prv_use_media_layout(data)) {
@@ -1753,6 +1787,8 @@ static void prv_music_event_handler(PebbleEvent *event, void *context) {
 // App boilerplate
 
 static void prv_handle_init(void) {
+  music_album_art_set_in_use(true);
+
   MusicAppData *data = app_malloc_check(sizeof(MusicAppData));
   *data = (MusicAppData){};
   app_state_set_user_data(data);
@@ -1823,6 +1859,10 @@ static void prv_handle_deinit(void) {
   // Detach the action bar so its touch-nav snapshot does not keep routing taps after the app exits.
   action_bar_layer_remove_from_window(&data->action_bar);
   i18n_free_all(data);
+  gbitmap_destroy(data->album_art);
+  data->album_art = nullptr;
+
+  music_album_art_set_in_use(false);
 }
 
 static void prv_main(void) {

@@ -211,6 +211,8 @@ void test_music_endpoint__initialize(void) {
   fake_rtc_init(0, 0);
   fake_comm_session_init();
   music_init();
+  // Most tests act as if the Music app is open, as album art is only kept then.
+  music_album_art_set_in_use(true);
 
   s_transport = fake_transport_create(TransportDestinationSystem, nullptr, nullptr);
   fake_transport_set_connected(s_transport, true /* connected */);
@@ -225,6 +227,7 @@ void test_music_endpoint__cleanup(void) {
   // Simulate disconnecting Pebble mobile app:
   prv_receive_app_event(false /* is_open */);
 
+  music_album_art_set_in_use(false);
   fake_comm_session_cleanup();
 }
 
@@ -321,6 +324,57 @@ void test_music_endpoint__held_art_is_released_when_transfer_starts(void) {
   s_imaging_will_receive_handlers[ImagingImageTypeAlbumArt](generation);
   cl_assert(music_album_art_lock() == nullptr);
   music_album_art_unlock();
+}
+
+void test_music_endpoint__album_art_release_held_keeps_it_current(void) {
+  music_update_now_playing("first", 5, "artist", 6, "album", 5);
+  const uint8_t serial = music_album_art_get_serial();
+  music_set_album_art(prv_make_album_art(), music_get_now_playing_generation());
+  const uint8_t art_serial = music_album_art_get_serial();
+  cl_assert(art_serial != serial);
+
+  music_album_art_release_held();
+  cl_assert(music_album_art_lock() == nullptr);
+  music_album_art_unlock();
+  // Still current, so it is not fetched again, and the app keeps its copy.
+  cl_assert(music_album_art_is_current());
+  cl_assert_equal_i(music_album_art_get_serial(), art_serial);
+}
+
+void test_music_endpoint__album_art_serial_changes_on_disconnect(void) {
+  // The Android app connects as the music server.
+  prv_receive_app_info_event(true /* is_android */);
+  const uint8_t serial = music_album_art_get_serial();
+  prv_receive_app_event(false /* is_open */);
+  cl_assert(music_album_art_get_serial() != serial);
+  prv_receive_app_event(true /* is_open */);
+}
+
+void test_music_endpoint__album_art_freed_when_app_closes(void) {
+  music_update_now_playing("first", 5, "artist", 6, "album", 5);
+  music_set_album_art(prv_make_album_art(), music_get_now_playing_generation());
+  cl_assert(music_album_art_is_current());
+
+  music_album_art_set_in_use(false);
+  cl_assert(music_album_art_lock() == nullptr);
+  music_album_art_unlock();
+  // Reopening the app must request the art again.
+  cl_assert(!music_album_art_is_current());
+}
+
+void test_music_endpoint__album_art_dropped_while_app_closed(void) {
+  music_update_now_playing("first", 5, "artist", 6, "album", 5);
+  music_album_art_set_in_use(false);
+
+  fake_event_clear_last();
+  music_set_album_art(prv_make_album_art(), music_get_now_playing_generation());
+  cl_assert(music_album_art_lock() == nullptr);
+  music_album_art_unlock();
+  cl_assert(!music_album_art_is_current());
+  cl_assert_equal_i(fake_event_get_last().type, PEBBLE_NULL_EVENT);
+
+  music_album_art_set_in_use(true);
+  cl_assert(!music_album_art_is_current());
 }
 
 void test_music_endpoint__ignore_now_playing_while_not_connected(void) {
