@@ -326,6 +326,30 @@ void test_music_endpoint__held_art_is_released_when_transfer_starts(void) {
   music_album_art_unlock();
 }
 
+void test_music_endpoint__album_art_release_held_keeps_it_current(void) {
+  music_update_now_playing("first", 5, "artist", 6, "album", 5);
+  const uint8_t serial = music_album_art_get_serial();
+  music_set_album_art(prv_make_album_art(), music_get_now_playing_generation());
+  const uint8_t art_serial = music_album_art_get_serial();
+  cl_assert(art_serial != serial);
+
+  music_album_art_release_held();
+  cl_assert(music_album_art_lock() == nullptr);
+  music_album_art_unlock();
+  // Still current, so it is not fetched again, and the app keeps its copy.
+  cl_assert(music_album_art_is_current());
+  cl_assert_equal_i(music_album_art_get_serial(), art_serial);
+}
+
+void test_music_endpoint__album_art_serial_changes_on_disconnect(void) {
+  // The Android app connects as the music server.
+  prv_receive_app_info_event(true /* is_android */);
+  const uint8_t serial = music_album_art_get_serial();
+  prv_receive_app_event(false /* is_open */);
+  cl_assert(music_album_art_get_serial() != serial);
+  prv_receive_app_event(true /* is_open */);
+}
+
 void test_music_endpoint__album_art_freed_when_app_closes(void) {
   music_update_now_playing("first", 5, "artist", 6, "album", 5);
   music_set_album_art(prv_make_album_art(), music_get_now_playing_generation());

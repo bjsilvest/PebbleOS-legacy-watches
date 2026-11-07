@@ -96,10 +96,23 @@ uint8_t music_get_now_playing_generation(void) {
 static GBitmap *s_album_art;
 static bool s_album_art_current;
 static int s_album_art_lock_depth;
+// Set once the app has copied the art and released the service's copy. The fake keeps the bitmap
+// so cleanup can free it.
+static bool s_album_art_released;
+static uint8_t s_album_art_serial;
 
 const struct GBitmap *music_album_art_lock(void) {
   s_album_art_lock_depth++;
-  return s_album_art;
+  return s_album_art_released ? nullptr : s_album_art;
+}
+
+uint8_t music_album_art_get_serial(void) {
+  return s_album_art_serial;
+}
+
+void music_album_art_release_held(void) {
+  cl_assert(s_album_art_lock_depth > 0);
+  s_album_art_released = true;
 }
 
 void music_album_art_unlock(void) {
@@ -257,6 +270,8 @@ void test_music__initialize(void) {
   s_album_art = nullptr;
   s_album_art_current = false;
   s_album_art_lock_depth = 0;
+  s_album_art_released = false;
+  s_album_art_serial = 0;
 
   s_imaging_supported = false;
   s_imaging_request_count = 0;
@@ -320,6 +335,8 @@ static void prv_receive_album_art(void) {
   s_album_art = get_gbitmap_from_pbi("test_music__art_cover_" PLATFORM_NAME ".pbi");
   cl_assert(s_album_art != nullptr);
   s_album_art_current = true;
+  s_album_art_released = false;
+  s_album_art_serial++;
 }
 #endif
 
@@ -522,6 +539,8 @@ void test_music__playing_album_art(void) {
 
   prv_launch_app_and_render();
   cl_check(gbitmap_pbi_eq(&s_ctx.dest_bitmap, TEST_PBI_FILE));
+  // The app draws its own copy; the service's kernel copy must be gone.
+  cl_assert(s_album_art_released);
 #endif
 }
 
