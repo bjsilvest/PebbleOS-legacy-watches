@@ -171,6 +171,28 @@ void test_gatt_client_discovery__disconnected_during_discovery(void) {
   prv_assert_event(&device, PBL_BT_ERRNO_SERVICE_DISCOVERY_DISCONNECTED);
 }
 
+extern void gatt_client_discovery_discover_range(GAPLEConnection *connection,
+                                                 struct pbl_bt_att_handle_range *hdl_range);
+
+void test_gatt_client_discovery__disconnected_during_range_discovery(void) {
+  struct pbl_bt_device_internal device = prv_connected_dummy_device(1);
+
+  cl_assert_equal_i(gatt_client_discovery_discover_all(&device), PBL_BT_ERRNO_OK);
+  prv_simulate_and_assert_discovery_of_one_service(&device);
+
+  GAPLEConnection *connection = gap_le_connection_by_device(&device);
+  cl_assert_equal_i(list_count(&connection->gatt_remote_services->node), 1);
+
+  struct pbl_bt_att_handle_range range = {.start = 0x100, .end = 0x200};
+  gatt_client_discovery_discover_range(connection, &range);
+  cl_assert_equal_b(fake_gatt_is_service_discovery_running(), true);
+
+  // The services from the earlier discovery must be freed with the connection:
+  gap_le_connection_remove(&device);
+  prv_assert_event(&device, PBL_BT_ERRNO_SERVICE_DISCOVERY_DISCONNECTED);
+  fake_pbl_malloc_check_net_allocs();
+}
+
 void test_gatt_client_discovery__complete_error(void) {
   struct pbl_bt_device_internal device = prv_connected_dummy_device(1);
 
