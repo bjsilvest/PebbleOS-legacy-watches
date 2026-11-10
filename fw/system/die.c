@@ -2,6 +2,7 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 
 #include <pbl/kernel/irq.h>
+#include <pbl/kernel/mutex.h>
 
 #include <logging/logging_private.h>
 #include <logging/pulse_logging.h>
@@ -31,5 +32,11 @@ void prepare_for_software_failure(void) {
 #endif
 
   PBL_LOG_FROM_FAULT_HANDLER("Resetting!");
+
+  // The orderly teardown in system_reset() can wait on a thread that needs a
+  // lock held here (e.g. bt_lock); a locked-out scheduler skips to the dump.
+  if (pbl_mutex_any_held()) {
+    pbl_irq_lock();
+  }
   system_reset();
 }
