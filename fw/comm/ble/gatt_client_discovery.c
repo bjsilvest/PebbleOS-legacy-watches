@@ -470,9 +470,9 @@ void gatt_client_discovery_cleanup_by_connection(GAPLEConnection *connection,
     // Assuming "disconnection" reason is appropriate here:
     prv_finalize_discovery(connection, reason);
     pbl_bt_gatt_handle_discovery_abandoned();
-  } else {
-    prv_free_service_nodes(connection);
   }
+  // Finalizing a failed range job keeps the services, so always free them here.
+  prv_free_service_nodes(connection);
 }
 
 //! extern for gatt_service_changed.c
