@@ -141,3 +141,14 @@ void test_system_resource_language_fonts__generation_is_a_plain_read(void) {
   system_resource_language_changed();
   cl_assert(g_font_language_generation != generation);
 }
+
+void test_system_resource_language_fonts__mixed_lookups_stay_cached(void) {
+  load_resource_fixture_on_pfs(RESOURCES_FIXTURE_PATH, CHINESE_FIXTURE_NAME, "lang1");
+  FontInfo font;
+  for (int i = 0; i < 2; ++i) {
+    cl_assert(!sys_font_get_language_font(RESOURCE_ID_GOTHIC_24, 1, &font));
+    cl_assert(sys_font_get_language_font(RESOURCE_ID_GOTHIC_18, 1, &font));
+    cl_assert_equal_i(font.base.resource_id, prv_extension(1));
+    cl_assert(!sys_font_get_language_font(RESOURCE_ID_GOTHIC_14, 1, &font));
+  }
+}

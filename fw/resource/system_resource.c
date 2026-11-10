@@ -65,10 +65,17 @@ uint32_t g_font_language_generation KERNEL_READONLY_DATA;
   (RESOURCE_ID_LECO_60_BOLD_NUMBERS_AM_PM_EXTENDED - RESOURCE_ID_GOTHIC_14_EXTENDED + 1)
 static_assert(NUM_LANGUAGE_FONTS <= 32, "checked bits must fit in a word");
 
-// Extension fonts of a pack, loaded on first use and kept until its file changes.
+// Extension fonts of a pack, loaded on first use and kept until its file changes. Only the
+// fonts found are stored: a pack is rarely asked for more than a few, and the kernel heap is small.
 typedef struct {
-  FontInfo fonts[NUM_LANGUAGE_FONTS];
+  uint8_t index;
+  FontInfo font;
+} LanguageFont;
+
+typedef struct {
   uint32_t checked;
+  uint8_t count;
+  LanguageFont fonts[];
 } LanguageFonts;
 
 typedef enum {
@@ -138,6 +145,15 @@ static LanguageFonts *prv_get_language_fonts(uint8_t slot) {
   return s_language_fonts[slot];
 }
 
+static const LanguageFont *prv_find_language_font(const LanguageFonts *fonts, int index) {
+  for (uint8_t i = 0; i < fonts->count; ++i) {
+    if (fonts->fonts[i].index == index) {
+      return &fonts->fonts[i];
+    }
+  }
+  return NULL;
+}
+
 static int prv_language_font_index(uint32_t base_resource_id) {
   for (size_t i = 0; i < NUM_SYSTEM_FONTS; ++i) {
     if (s_font_resource_keys[i].resource_id == base_resource_id) {
@@ -181,8 +197,9 @@ PBL_SYSCALL(bool, sys_font_get_language_font, (VAL, uint32_t, base_resource_id),
   pbl_mutex_lock(&s_language_fonts_mutex, PBL_FOREVER);
   LanguageFonts *fonts = prv_get_language_fonts(slot);
   const bool checked = fonts && (fonts->checked & bit);
-  if (checked) {
-    *font_out = fonts->fonts[index];
+  const LanguageFont *cached = checked ? prv_find_language_font(fonts, index) : NULL;
+  if (cached) {
+    *font_out = cached->font;
   }
   const uint32_t changes = s_language_pack_changes[slot];
   pbl_mutex_unlock(&s_language_fonts_mutex);
@@ -190,7 +207,7 @@ PBL_SYSCALL(bool, sys_font_get_language_font, (VAL, uint32_t, base_resource_id),
     return false;
   }
   if (checked) {
-    return font_out->loaded;
+    return cached != NULL;
   }
 
   // Validating a large font takes a while; keep the lock free for renders and invalidation.
@@ -201,8 +218,17 @@ PBL_SYSCALL(bool, sys_font_get_language_font, (VAL, uint32_t, base_resource_id),
 
   pbl_mutex_lock(&s_language_fonts_mutex, PBL_FOREVER);
   const bool current = s_language_pack_changes[slot] == changes && s_language_fonts[slot];
-  if (current) {
-    s_language_fonts[slot]->fonts[index] = font;
+  if (current && font.loaded && !prv_find_language_font(s_language_fonts[slot], index)) {
+    LanguageFonts *grown = kernel_realloc(
+        s_language_fonts[slot],
+        sizeof(LanguageFonts) + (s_language_fonts[slot]->count + 1) * sizeof(LanguageFont));
+    // Out of memory: hand the font out uncached and look it up again next time
+    if (grown) {
+      grown->fonts[grown->count++] = (LanguageFont){.index = index, .font = font};
+      grown->checked |= bit;
+      s_language_fonts[slot] = grown;
+    }
+  } else if (current) {
     s_language_fonts[slot]->checked |= bit;
   }
   pbl_mutex_unlock(&s_language_fonts_mutex);
