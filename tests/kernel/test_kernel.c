@@ -397,6 +397,7 @@ static void prv_pi_high(void *arg) {
   prv_trace('h');
   cl_assert_equal_i(pbl_mutex_lock(&s_mutex, PBL_FOREVER), 0);
   cl_assert(pbl_mutex_is_owner(&s_mutex));
+  cl_assert(pbl_mutex_any_held());
   prv_trace('H');
   pbl_mutex_unlock(&s_mutex);
   pbl_thread_sleep(PBL_TICKS(5));
@@ -415,13 +416,16 @@ void test_kernel__mutex_priority_inheritance(void) {
 }
 
 static void prv_recursive(void *arg) {
+  cl_assert(!pbl_mutex_any_held());
   cl_assert_equal_i(pbl_mutex_lock(&s_mutex, PBL_FOREVER), 0);
   cl_assert_equal_i(pbl_mutex_lock(&s_mutex, PBL_FOREVER), 0);
   cl_assert_equal_i(s_mutex.count, 2);
   pbl_mutex_unlock(&s_mutex);
   cl_assert(pbl_mutex_is_owner(&s_mutex));
+  cl_assert(pbl_mutex_any_held());
   pbl_mutex_unlock(&s_mutex);
   cl_assert(!pbl_mutex_is_owner(&s_mutex));
+  cl_assert(!pbl_mutex_any_held());
   pbl_test_kernel_stop();
 }
 

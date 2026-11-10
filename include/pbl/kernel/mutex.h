@@ -122,6 +122,13 @@ void pbl_mutex_unlock(struct pbl_mutex *m);
 bool pbl_mutex_is_owner(const struct pbl_mutex *m);
 
 /**
+ * @brief Check whether the calling thread holds any mutex.
+ *
+ * @return true if the calling thread owns at least one mutex.
+ */
+bool pbl_mutex_any_held(void);
+
+/**
  * @brief Assert that ownership of a mutex by the calling thread matches @p held.
  *
  * @param m Mutex.

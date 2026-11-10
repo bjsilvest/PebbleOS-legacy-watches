@@ -69,6 +69,10 @@ bool pbl_mutex_is_owner(const struct pbl_mutex *m) {
   return m->count > 0 && m->owner == pbl_cur;
 }
 
+bool pbl_mutex_any_held(void) {
+  return pbl_cur != nullptr && pbl_cur->backend.mutexes_held > 0;
+}
+
 void pbl_mutex_assert_held(const struct pbl_mutex *m, bool held) {
   PBL_ASSERTN(pbl_mutex_is_owner(m) == held);
 }
