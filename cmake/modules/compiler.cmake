@@ -104,6 +104,17 @@ if(CONFIG_LTO)
   )
 endif()
 
+# After the LTO list: the last -f flag given wins.
+if(CONFIG_SIZE_INLINING)
+  list(APPEND pbl_arch_flags
+    -fno-conserve-stack
+    --param=uninlined-function-insns=0
+    -fno-move-loop-invariants
+    -fno-tree-loop-im
+    -fno-partial-inlining
+  )
+endif()
+
 if(CONFIG_ARCH_POSIX)
 elseif(CONFIG_CPU_STAR_MC1)
   set(pbl_cpu star-mc1)

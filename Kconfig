@@ -79,6 +79,18 @@ config MERGE_ALL_CONSTANTS
       (-fmerge-all-constants): about 0.25 KB smaller on tintin. Breaks
       code that relies on distinct constants having distinct addresses.
 
+config SIZE_INLINING
+    bool "Size-oriented inlining and loop flags"
+    depends on LTO
+    help
+      Let the inliner merge functions whatever their stack frames
+      (no -fconserve-stack), count calls as free when deciding what to
+      inline, and keep loop-invariant code in its loop
+      (-fno-move-loop-invariants, -fno-tree-loop-im,
+      -fno-partial-inlining). About 6.5 KB smaller on tintin. Some
+      functions end up with larger stack frames; loops may run a
+      little slower.
+
 choice
     prompt "Optimization level"
     default SIZE_OPTIMIZATIONS
