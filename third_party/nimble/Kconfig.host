@@ -100,6 +100,13 @@ config NIMBLE_BLE_SM_LEGACY
     bool "Security manager legacy pairing"
     default y
 
+config NIMBLE_BLE_SM_COMPACT_AES
+    bool "Compact AES-128 for pairing"
+    help
+      A byte-oriented AES-128 behind the Mbed TLS names instead of the
+      table-driven one: about 1.8 KB smaller, only ever used for a few
+      blocks per pairing.
+
 config NIMBLE_BLE_SM_SC
     bool "Security manager secure connections (4.2)"
     default y if NIMBLE_BLE_MESH != 0

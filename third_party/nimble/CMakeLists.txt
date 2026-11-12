@@ -92,6 +92,10 @@ if(CONFIG_NIMBLE_TRNG)
   list(APPEND sources port/src/trng.c)
 endif()
 
+if(CONFIG_NIMBLE_BLE_SM_COMPACT_AES)
+  list(APPEND sources port/src/aes_compact.c)
+endif()
+
 pbl_include_directories(${includes})
 
 pbl_library_named(nimble)
