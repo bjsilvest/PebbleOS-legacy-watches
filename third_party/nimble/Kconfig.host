@@ -111,6 +111,12 @@ config NIMBLE_BLE_SM_SC
     bool "Security manager secure connections (4.2)"
     default y if NIMBLE_BLE_MESH != 0
 
+config NIMBLE_BLE_SM_SC_MICRO_ECC
+    bool "Use micro-ecc for Secure Connections"
+    depends on NIMBLE_BLE_SM_SC
+    help
+      Smaller, heap-free P-256 and AES-CMAC for boards short on flash.
+
 config NIMBLE_BLE_SM_SC_ONLY
     bool "Force global Secure Connections Pairing Only mode"
     help

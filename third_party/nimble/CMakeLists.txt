@@ -96,6 +96,24 @@ if(CONFIG_NIMBLE_BLE_SM_COMPACT_AES)
   list(APPEND sources port/src/aes_compact.c)
 endif()
 
+if(CONFIG_NIMBLE_BLE_SM_SC_MICRO_ECC)
+  list(APPEND sources port/src/ble_sm_alg_uecc.c ../micro-ecc/micro-ecc/uECC.c)
+  list(APPEND includes ../micro-ecc/micro-ecc)
+  list(APPEND defines
+    uECC_OPTIMIZATION_LEVEL=1
+    uECC_SUPPORTS_secp160r1=0
+    uECC_SUPPORTS_secp192r1=0
+    uECC_SUPPORTS_secp224r1=0
+    uECC_SUPPORTS_secp256k1=0
+    uECC_SUPPORT_COMPRESSED_POINT=0
+  )
+  # ble_sm_alg.c keeps the rest of the toolbox; these come from the port file
+  set_source_files_properties(${nimble}/nimble/host/src/ble_sm_alg.c PROPERTIES
+    COMPILE_DEFINITIONS
+    "ble_sm_alg_gen_dhkey=ble_sm_alg_gen_dhkey_mbedtls;ble_sm_alg_gen_key_pair=ble_sm_alg_gen_key_pair_mbedtls;mbedtls_cipher_cmac=ble_sm_port_cmac;mbedtls_cipher_info_from_type=ble_sm_port_cipher_info"
+  )
+endif()
+
 pbl_include_directories(${includes})
 
 pbl_library_named(nimble)
