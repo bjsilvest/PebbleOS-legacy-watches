@@ -48,3 +48,9 @@ config NIMBLE_BLE_TRANSPORT_EVT_COUNT
 # sleeps (eHCILL) and the host enters STOP meanwhile.
 config BT_CC2564_SLEEP
     default y
+
+# The recovery firmware is the stock one, with its own (v2) shared PRF
+# storage at 0x100000. Import its keys and pairing so phones see one watch,
+# already paired, in either firmware.
+config SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK_V2
+    default y

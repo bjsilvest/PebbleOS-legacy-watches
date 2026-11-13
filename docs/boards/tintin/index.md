@@ -79,8 +79,8 @@ phone connected since -312 (notifications, watchface installs, reconnects).
   the recovery firmware.
 - **Filesystem**: the firmware mounts the stock firmware's filesystem. Stock
   pairings, stored in an older 109-byte layout, show in Settings, Bluetooth
-  and can be forgotten (`abaa19341`); they are not imported, so a phone has
-  to pair again.
+  and can be forgotten (`abaa19341`). Recovery's own pairing is imported
+  (see below).
 - **Resources** stay within the stock 256 KiB banks, so the stock recovery
   firmware can still install them.
 
@@ -88,9 +88,9 @@ phone connected since -312 (notifications, watchface installs, reconnects).
 
 The usual install goes through the stock recovery firmware: factory reset,
 pair the phone with recovery, install. This applies after every factory
-reset, since a factory reset boots recovery. Recovery's pairing is not
-carried over on this watch (snowy and spalding import it, see below), so the
-phone's first encryption fails. Then:
+reset, since a factory reset boots recovery. Recovery's pairing is imported
+(see below), so the phone reconnects without pairing again. If it does not,
+or to pair another phone:
 
 1. Open Settings, Bluetooth on the watch. While it is open, the watch accepts
    a pairing request from a phone it already has a bond with, deletes the old
@@ -118,23 +118,13 @@ Service Changed on the first encrypted link even without a subscription
 (`e405743be`), and reconnects 10 seconds later (`542a30106`) so the phone
 can finish rediscovering first.
 
-### Importing recovery's pairing (not done here)
+### Importing recovery's pairing
 
-Snowy and spalding import recovery's pairing, so the phone reconnects
-without pairing again (tested on both, 2026-10-30). Tintin's recovery keeps
-the same stock (v2) shared storage, at `STOCK_SHARED_PRF_STORAGE`
-(0x100000), so the same code should work here, but it costs about 832 B
-(measured on ev2_4): over the limit by 203 B on ev2_4 and 331 B on v1_5, with
-21 B left on v2_0. To add it later, free that space, then:
-
-1. Turn on `SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK_V2` (`6c58a0187`, already
-   in this tree).
-2. Take the stock key derivation from the snowy or spalding branch
-   (`shared_prf_storage: regenerate stock pairing keys as stock does`,
-   e2f8f99f6 on snowy-v4.43.0) and the transport check (`nimble: hci_uart:
-   check an imported stock key by regenerating it`, 7859b5f2e).
-3. Test the full flow: factory reset, pair with recovery, install. The phone
-   should reconnect with no code.
+As on snowy and spalding, recovery's pairing is imported
+(`SERVICE_SHARED_PRF_STORAGE_IMPORT_STOCK_V2`), so the phone reconnects
+without pairing again. Tintin's recovery keeps the same stock (v2) shared
+storage, at `STOCK_SHARED_PRF_STORAGE` (0x100000). It costs about 830 B,
+which the size-oriented build options made room for.
 
 Stock recovery stores only the DIV and EDIV it gave the phone, not the key or
 the Rand. Pebble's stock Bluetooth driver (Bluetopia, through the CC2564's
