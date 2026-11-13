@@ -82,3 +82,8 @@ add_dependencies(pbl_generated_headers pbl_applib_malloc)
 
 pbl_library()
 pbl_library_sources(${sources} ${applib_malloc_c})
+
+if(CONFIG_SIZE_INLINING)
+  # walk_line runs on the 2 KiB app stack; keep its frame as it was.
+  set_source_files_properties(graphics/text_layout.c PROPERTIES COMPILE_OPTIONS -fconserve-stack)
+endif()
