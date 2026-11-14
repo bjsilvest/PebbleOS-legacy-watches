@@ -5,6 +5,8 @@
 
 #include "gap_le_connect.h"
 
+#include <stdatomic.h>
+
 #include <pbl/bluetooth/advert.h>
 #include <pbl/bluetooth/init.h>
 #include <pbl/kernel/assert.h>
@@ -247,8 +249,12 @@ static void prv_increment_elapsed_time_for_job(GAPLEAdvertisingJob **job_ptr, bo
 //! It removes the job if it's done.
 //! It updates the s_jobs list.
 //! It calls prv_perform_next_job() to set up the next job.
+static atomic_bool s_cycle_cb_queued;
+
 static void prv_cycle_kernelmain_cb(void *unused) {
   bool force_update = false;
+
+  atomic_store(&s_cycle_cb_queued, false);
 
   bt_lock();
   {
@@ -278,6 +284,11 @@ unlock:
 //! Runs once per second on the NewTimers task; never block on bt_lock there
 //! (it stalls every other timer in the system) — bounce to KernelMain.
 static void prv_cycle_timer_callback(void *unused) {
+  // One at a time: while KernelMain lags (e.g. each cycle waits on a
+  // restarting controller), queued cycles would fill the kernel event queue.
+  if (atomic_exchange(&s_cycle_cb_queued, true)) {
+    return;
+  }
   launcher_task_add_callback(prv_cycle_kernelmain_cb, nullptr);
 }
 

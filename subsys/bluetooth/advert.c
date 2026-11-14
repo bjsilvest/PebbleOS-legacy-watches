@@ -19,6 +19,7 @@
 #include <pbl/util/math.h>
 
 #include <host/ble_gap.h>
+#include <host/ble_hs.h>
 #include <host/ble_gatt.h>
 #ifdef CONFIG_BT_OWN_SERVICE_CHANGED
 #include <comm/ble/gap_le_connection.h>
@@ -86,6 +87,12 @@ bool pbl_bt_advert_client_get_tx_power(int8_t *tx_power) {
 
 bool pbl_bt_advert_set_advertising_data(const struct pbl_bt_ad_data *ad_data) {
   int rc;
+
+  // While the host resyncs with the controller, each command would wait
+  // for its timeout on the caller's task (KernelMain).
+  if (!ble_hs_synced()) {
+    return false;
+  }
 
   rc = ble_gap_adv_set_data((uint8_t *)&ad_data->data, ad_data->ad_data_length);
   if (rc != 0) {

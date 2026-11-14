@@ -1078,6 +1078,11 @@ static bool prv_is_hcill(uint8_t c) {
 static bool prv_hcill_lock_awake(void) {
   for (int attempt = 0; attempt < HCILL_WAKE_ATTEMPTS; attempt++) {
     pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
+    // Restarting or off: drop the packet, and keep wake messages off the UART.
+    if (s_controller_state != ControllerStateReady) {
+      pbl_mutex_unlock(&s_tx_mutex);
+      return false;
+    }
     if (s_hcill == HcillAwake) {
       return true;
     }
@@ -1129,6 +1134,74 @@ static bool prv_hcill_lock_awake(void) {
   }
   ble_hs_sched_reset(BLE_HS_ECONTROLLER);
   return false;
+}
+#endif
+
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+static volatile bool s_cc2564_restart_requested;
+static uint32_t s_cc2564_restarts;
+
+//! Drop a packet the parser was part way through.
+static void prv_h4_reset(void) {
+  if (s_hci_h4sm.state != H4_SM_IDLE) {
+    if (s_hci_h4sm.pkt_type == HCI_H4_EVT) {
+      if (s_hci_h4sm.buf != NULL) {
+        ble_transport_free(s_hci_h4sm.buf);
+      }
+    } else if (s_hci_h4sm.om != NULL) {
+      os_mbuf_free_chain(s_hci_h4sm.om);
+    }
+  }
+  hci_h4_sm_init(&s_hci_h4sm, &s_hci_h4_allocs_from_ll, prv_hci_frame_cb);
+}
+
+//! Runs on the HCI thread after a stall. Writers drop their bytes while the
+//! controller restarts; the host then drops its links and resyncs.
+static void prv_cc2564_restart(void) {
+  s_cc2564_restart_requested = false;
+  if (s_controller_state != ControllerStatePending) {
+    return;
+  }
+  s_cc2564_restarts++;
+  PBL_LOG_WRN("Restarting the CC2564 (%lu)", (unsigned long)s_cc2564_restarts);
+
+  // A writer may be between bytes: wait for it to finish.
+  pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
+  uart_set_rx_interrupt_enabled(BT_HCI_UART, false);
+#ifdef CONFIG_BT_CC2564_SLEEP
+  cc2564_cts_wake_disable();
+  // Not asleep holds a STOP block and cc2564_boot() takes its own: hand it over.
+  pbl_irq_lock();
+  const bool held_stop_block = (s_hcill != HcillAsleep);
+  s_hcill = HcillAwake;
+  pbl_irq_unlock();
+  if (held_stop_block) {
+    soc_stm32_stop_release();
+  }
+  (void)pbl_sem_take(&s_hcill_awake, PBL_NO_WAIT);
+  cc2564_hold_rts(false);
+#endif
+  pbl_irq_lock();
+  s_rx_head = 0U;
+  s_rx_tail = 0U;
+  s_rx_paused = false;
+  s_fake_head = 0U;
+  s_fake_tail = 0U;
+  pbl_irq_unlock();
+  prv_h4_reset();
+  pbl_mutex_unlock(&s_tx_mutex);
+
+  if (!cc2564_boot()) {
+    s_controller_state = ControllerStateFailed;
+    return;
+  }
+  prv_uart_start();
+#ifdef CONFIG_BT_CC2564_SLEEP
+  if (cc2564_take_sleep_ind()) {
+    prv_hcill_rx(HCILL_GO_TO_SLEEP_IND);
+  }
+#endif
+  ble_hs_sched_reset(BLE_HS_ECONTROLLER);
 }
 #endif
 
@@ -1188,6 +1261,11 @@ static void prv_hci_task_main(void *unused) {
     prv_hcill_check_false_wake();
 #else
     pbl_sem_take(&s_rx_ready, PBL_FOREVER);
+#endif
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+    if (s_cc2564_restart_requested) {
+      prv_cc2564_restart();
+    }
 #endif
 
     while (s_rx_tail != s_rx_head) {
@@ -1379,8 +1457,10 @@ static bool prv_write_byte_bounded(uint8_t byte) {
 }
 
 static void prv_tx_stalled(void) {
-  s_controller_state = ControllerStateFailed;
+  s_controller_state = ControllerStatePending;
   cc2564_report_stall(s_rx_paused, s_evt_waiting);
+  s_cc2564_restart_requested = true;
+  pbl_sem_give(&s_rx_ready);
 }
 #endif
 
