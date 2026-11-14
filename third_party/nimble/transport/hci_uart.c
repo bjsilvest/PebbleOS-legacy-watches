@@ -49,7 +49,7 @@
 #include <nimble/transport_impl.h>
 #include <os/endian.h>
 
-#ifdef CONFIG_BT_CONTROLLER_DA1468X
+#if defined(CONFIG_BT_CONTROLLER_DA1468X) || defined(CONFIG_BT_CONTROLLER_CC2564)
 // Controller reboots and forced sends belong in the flash log; NimBLE's own logging is too noisy.
 PBL_LOG_MODULE_DECLARE(bt, CONFIG_BT_LOG_LEVEL);
 #else
@@ -977,10 +977,16 @@ static volatile uint32_t s_hcill_host_wakes;
 static volatile uint32_t s_hcill_wake_retries;
 static volatile uint32_t s_hcill_false_wakes;
 static volatile RtcTicks s_hcill_ctrl_wake_ticks;
+// Last eHCILL messages each way and when the last one passed, for stalls.
+static volatile uint8_t s_hcill_last_rx;
+static volatile uint8_t s_hcill_last_tx;
+static volatile RtcTicks s_hcill_msg_ticks;
 
 //! With s_tx_mutex held.
 static void prv_hcill_send(uint8_t msg) {
   cc2564_send_hcill(msg);
+  s_hcill_last_tx = msg;
+  s_hcill_msg_ticks = rtc_get_ticks();
 }
 
 static void prv_hcill_cts_wake_isr(void) {
@@ -1004,6 +1010,8 @@ static void prv_hcill_set_awake(void) {
 
 //! In the HCI task, for an eHCILL message where a packet type would be.
 static void prv_hcill_rx(uint8_t msg) {
+  s_hcill_last_rx = msg;
+  s_hcill_msg_ticks = rtc_get_ticks();
   switch (msg) {
     case HCILL_GO_TO_SLEEP_IND:
       if (s_hcill != HcillAwake) {
@@ -1143,6 +1151,7 @@ static bool prv_hcill_lock_awake(void) {
 #endif
 
 #ifdef CONFIG_BT_CONTROLLER_CC2564
+static volatile RtcTicks s_last_rx_ticks;
 static volatile bool s_cc2564_restart_requested;
 static uint32_t s_cc2564_restarts;
 
@@ -1168,7 +1177,7 @@ static void prv_cc2564_restart(void) {
     return;
   }
   s_cc2564_restarts++;
-  PBL_LOG_WRN("Restarting the CC2564 (%lu)", (unsigned long)s_cc2564_restarts);
+  PBL_LOG_ERR("Restarting the CC2564 (%lu)", (unsigned long)s_cc2564_restarts);
 
   // A writer may be between bytes: wait for it to finish.
   pbl_mutex_lock(&s_tx_mutex, PBL_FOREVER);
@@ -1307,6 +1316,9 @@ static void prv_hci_task_main(void *unused) {
       }
 #endif
       s_rx_tail = (tail + consumed) % RX_RING_SIZE;
+#ifdef CONFIG_BT_CONTROLLER_CC2564
+      s_last_rx_ticks = rtc_get_ticks();
+#endif
 
       if (s_rx_paused) {
         s_rx_paused = false;
@@ -1464,6 +1476,17 @@ static bool prv_write_byte_bounded(uint8_t byte) {
 static void prv_tx_stalled(void) {
   s_controller_state = ControllerStatePending;
   cc2564_report_stall(s_rx_paused, s_evt_waiting);
+  const RtcTicks now = rtc_get_ticks();
+#define MS_SINCE(t) ((unsigned long)(((now - (t)) * 1000U) / RTC_TICKS_HZ))
+#ifdef CONFIG_BT_CC2564_SLEEP
+  PBL_LOG_ERR("Stall: hcill %d rx %02x tx %02x %lu ms, rx %lu ms, acl %lu, cmd %04x", (int)s_hcill,
+              s_hcill_last_rx, s_hcill_last_tx, MS_SINCE(s_hcill_msg_ticks),
+              MS_SINCE(s_last_rx_ticks), (unsigned long)(s_acl_tx - s_acl_completed), s_last_cmd);
+#else
+  PBL_LOG_ERR("Stall: rx %lu ms, acl %lu, cmd %04x", MS_SINCE(s_last_rx_ticks),
+              (unsigned long)(s_acl_tx - s_acl_completed), s_last_cmd);
+#endif
+#undef MS_SINCE
   s_cc2564_restart_requested = true;
   pbl_sem_give(&s_rx_ready);
 }

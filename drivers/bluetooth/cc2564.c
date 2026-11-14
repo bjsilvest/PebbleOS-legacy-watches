@@ -36,7 +36,8 @@
 #include <board/board.h>
 #include <stm32f4xx.h>
 
-PBL_LOG_MODULE_DECLARE(nimble, CONFIG_NIMBLE_LOG_LEVEL);
+// Start failures and stalls belong in the flash log; NimBLE's own logging is too noisy.
+PBL_LOG_MODULE_DECLARE(bt, CONFIG_BT_LOG_LEVEL);
 
 #define BOOT_BAUD 115200U
 
