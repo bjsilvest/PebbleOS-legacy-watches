@@ -34,7 +34,9 @@ except ImportError:
 LOG_MAGIC = 0x21474F4C  # "LOG!"
 LOG_VERSION = 0x1
 LOG_FLAGS_VALID = 0x1
-LOG_PAGE_SIZE = 0x2000  # 8KB
+# Log pages are 8 KB, or the flash's erase unit if smaller (4 KB on tintin).
+LOG_PAGE_SIZE = 0x2000
+LOG_PAGE_SIZE_MIN = 0x1000
 MAX_MSG_LEN = 253
 
 FLASH_LOGGING_HEADER_SIZE = 4 + 1 + 20 + 1 + 1 + 1  # 28 bytes
@@ -88,11 +90,21 @@ def parse_log_binary_message(data, offset, msg_length):
     }
 
 
-def parse_flash_logs(flash_data):
+def detect_page_size(flash_data):
+    # A page header between 8 KB boundaries means 4 KB pages.
+    for offset in range(LOG_PAGE_SIZE_MIN, len(flash_data), LOG_PAGE_SIZE):
+        if parse_flash_logging_header(flash_data, offset):
+            return LOG_PAGE_SIZE_MIN
+    return LOG_PAGE_SIZE
+
+
+def parse_flash_logs(flash_data, page_size=None):
+    if page_size is None:
+        page_size = detect_page_size(flash_data)
     logs = []
     # Find all pages with valid headers
     pages = []
-    for page_start in range(0, len(flash_data), LOG_PAGE_SIZE):
+    for page_start in range(0, len(flash_data), page_size):
         header = parse_flash_logging_header(flash_data, page_start)
         if header:
             pages.append((page_start, header))
@@ -102,7 +114,7 @@ def parse_flash_logs(flash_data):
 
     for page_start, header in pages:
         page_offset = page_start + FLASH_LOGGING_HEADER_SIZE
-        while page_offset < page_start + LOG_PAGE_SIZE:
+        while page_offset < page_start + page_size:
             if page_offset + LOG_RECORD_HEADER_SIZE > len(flash_data):
                 break
 
@@ -170,6 +182,11 @@ def main():
     parser.add_argument("--output", help="Output file")
     parser.add_argument("--show", action="store_true", help="Show logs in stdout")
     parser.add_argument("--dehash", help="Path to loghash_dict.json")
+    parser.add_argument(
+        "--page-size",
+        type=lambda v: int(v, 0),
+        help="Log page size in bytes (default: detected, 0x2000 or 0x1000)",
+    )
     args = parser.parse_args()
 
     if not os.path.exists(args.file):
@@ -192,7 +209,7 @@ def main():
         if os.path.exists(default_dict):
             dehash_path = default_dict
 
-    logs = parse_flash_logs(data)
+    logs = parse_flash_logs(data, args.page_size)
     dehasher = get_dehasher(dehash_path)
 
     if args.filter:
