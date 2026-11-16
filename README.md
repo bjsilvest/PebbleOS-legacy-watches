@@ -61,8 +61,7 @@ update.
    newer watches. The Pebble Classic, Pebble Steel, Pebble Time and Time Round may show
    a code on the watch that needs to be typed on the phone due to their older Bluetooth version.
 
-On the Pebble and Pebble Steel, stock pairings are never carried over. The
-other watches try to take over a stock Bluetooth LE pairing, but this has
+The watches try to take over a stock Bluetooth LE pairing, but this has
 not been confirmed yet. Android phones paired with stock over Bluetooth
 Classic anyway, so plan on pairing again.
 
@@ -81,13 +80,9 @@ A factory reset starts the stock recovery firmware. To install again, pair
 the phone with recovery from the Core app (it shows no code), then sideload
 the `.pbz` as in step 3.
 
-- **Pebble Time, Time Steel, Time Round and Pebble 2:** the firmware should take
-  over recovery's pairing, so the phone reconnects immediately upon reboot without pairing again.
-- **Pebble and Pebble Steel:** due to storage constraints, recovery's pairing is not carried over, so
-  pair once more after the install. Open **Settings → Bluetooth** on the
-  watch and keep it open while the phone pairs, then enter the code the
-  watch shows. Alternatively, forget the watch on both sides and pair
-  again.
+The firmware should take over recovery's pairing, so the phone reconnects
+after the restart without pairing again. If it doesn't, forget the watch on
+both sides and pair again.
 
 ### Going back to stock firmware
 
@@ -255,6 +250,9 @@ questions, please [open an issue](https://github.com/bjsilvest/PebbleOS-legacy-w
 - **TI Bluetooth init scripts** (Pebble, Pebble Steel, Pebble Time, Time
   Round) are shipped unmodified and licensed by Texas Instruments for use
   only with TI devices.
+- **[micro-ecc](https://github.com/kmackay/micro-ecc)**, used for
+  Bluetooth pairing on the Pebble and Pebble Steel, is under the BSD
+  2-Clause License.
 - **[Speex](https://github.com/xiph/speex)**, the speech codec used for
   voice replies on every watch except the Pebble and Pebble Steel, is under
   the BSD 3-Clause License.
