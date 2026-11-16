@@ -226,9 +226,16 @@ static void os_callout_timer_cb(void *timer) {
 
 void npl_pebble_callout_init(struct ble_npl_callout *co, struct ble_npl_eventq *evq,
                              ble_npl_event_fn *ev_cb, void *ev_arg) {
+  // NimBLE inits some callouts again on every host start. All of them are in
+  // static storage, so a handle here is from an earlier init: keep its timer
+  // rather than leaking one per start.
+  const TimerID handle = co->handle;
+  if (handle != TIMER_INVALID_ID) {
+    new_timer_stop(handle);
+  }
   memset(co, 0, sizeof(*co));
 
-  co->handle = new_timer_create();
+  co->handle = (handle != TIMER_INVALID_ID) ? handle : new_timer_create();
   PBL_ASSERTN(co->handle != TIMER_INVALID_ID);
   co->evq = evq;
   co->ticks = 0;
